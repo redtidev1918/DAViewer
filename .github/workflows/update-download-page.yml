@@ -18,6 +18,8 @@ on:
 
 permissions:
   contents: write
+  # dispatch Pages 重建需要 actions: write（GITHUB_TOKEN 级联限制的例外入口）
+  actions: write
 
 concurrency:
   group: update-download-page
