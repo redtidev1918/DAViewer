@@ -47,3 +47,10 @@ jobs:
           git add docs/download.md docs/en/download.md
           git commit -m "docs: refresh download page (${{ github.event.release.tag_name || 'manual' }})"
           git push
+
+      # GITHUB_TOKEN 的 push 不会级联触发其他工作流，docs 站点不会自动重建；
+      # workflow_dispatch 例外，这里显式触发一次 Pages 部署让下载页真正上线。
+      - name: Rebuild docs site
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run "Deploy static content to Pages" --repo "${{ github.repository }}"""
