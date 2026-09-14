@@ -3,6 +3,16 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.2.187](https://github.com/redtidev1918/daviewer/compare/v0.2.186...v0.2.187) (2026-09-14)
+
+
+### Bug Fixes
+
+* **updates:** drop unnecessary backtick escapes in tests ([b06d5d0](https://github.com/redtidev1918/daviewer/commit/b06d5d08bc47fd024972a5736ee2ef291f5b64a7))
+* **updates:** keep in-app release notes free of the downloads section ([f756e59](https://github.com/redtidev1918/daviewer/commit/f756e59c954356fb0f4336ba55c80e935008ebfc))
+* **updates:** keep in-app release notes free of the downloads section ([7f14386](https://github.com/redtidev1918/daviewer/commit/7f14386919e3132ba23fc4d380973de72cccb4e0))
+* **updates:** use Dart RegExp multiLine flag instead of inline (?m) ([1f52760](https://github.com/redtidev1918/daviewer/commit/1f52760b716de0e4608f00ac2ef7c28dd1f21310))
+
 ## [0.2.186](https://github.com/redtidev1918/daviewer/compare/v0.2.185...v0.2.186) (2026-09-14)
 
 
