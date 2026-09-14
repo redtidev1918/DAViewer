@@ -25,6 +25,68 @@ void main() {
     expect(info?.notes, '## 0.2.166\n\n- 修复了问题。');
   });
 
+  test('extractUserReleaseNotes drops the downloads section (zh)', () {
+    const body = '''
+## 问题修复
+
+- 修复：web session on flaky-network cold start
+
+## 下载
+
+| 平台 | 文件 | 大小 | 下载 |
+|---|---|---|---|
+| Android | \`DAViewer-v0.2.186.apk\` | 62.4 MB | [下载](url) |
+
+下载后可用本 Release 资产中的 \`SHA256SUMS\` 校验完整性。
+''';
+    expect(
+      extractUserReleaseNotes(body),
+      '## 问题修复\n\n- 修复：web session on flaky-network cold start',
+    );
+  });
+
+  test('extractUserReleaseNotes drops the downloads section (en)', () {
+    const body = '''
+## Fixes
+
+- Fixed the flaky-web-session login prompt.
+
+## Downloads
+
+| Platform | File | Size | Download |
+|---|---|---|---|
+| Android | \`app.apk\` | 62 MB | [download](url) |
+
+Verify your download against \`SHA256SUMS\`.
+''';
+    expect(
+      extractUserReleaseNotes(body),
+      '## Fixes\n\n- Fixed the flaky-web-session login prompt.',
+    );
+  });
+
+  test('extractUserReleaseNotes keeps bodies without a downloads section', () {
+    expect(
+      extractUserReleaseNotes('## 0.2.166\n\n- 修复了问题。'),
+      '## 0.2.166\n\n- 修复了问题。',
+    );
+  });
+
+  test('extractUserReleaseNotes returns null for downloads-only or empty', () {
+    expect(extractUserReleaseNotes('## 下载\n\n| a | b |\n'), isNull);
+    expect(extractUserReleaseNotes('   '), isNull);
+  });
+
+  test('parseLatestRelease strips the downloads section from notes', () {
+    final info = parseLatestRelease(<String, Object?>{
+      'tag_name': 'v0.2.186',
+      'body': '## 问题修复\n\n- 修复了问题。\n\n## 下载\n\n| a | b |\n',
+    });
+
+    expect(info?.version, '0.2.186');
+    expect(info?.notes, '## 问题修复\n\n- 修复了问题。');
+  });
+
   test('parseLatestRelease trims and tolerates missing notes', () {
     final withNotes = parseLatestRelease(<String, Object?>{
       'tag_name': 'v0.2.165',
