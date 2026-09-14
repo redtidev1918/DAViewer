@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/web_session.dart';
 import '../runtime/runtime_provider.dart';
 import 'auth_controller.dart';
+import 'auth_state.dart';
 import 'session_state.dart';
 import 'web_session_store.dart';
 
@@ -102,24 +103,33 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
   }
 
   /// Re-injects the persisted deviantart.com cookies when the WebView store
-  /// currently has no signed-in `userinfo` cookie. Only restores for a
-  /// signed-in OAuth account whose username matches the saved session, so a
-  /// signed-out user is never silently given a web session (that would make
-  /// the login screen dismiss itself before OAuth completes) and a different
-  /// account's cookies are never injected.
+  /// currently has no signed-in `userinfo` cookie. Restoring requires a
+  /// signed-in OAuth state; while the OAuth account profile is normally
+  /// matched against the saved session's username (see
+  /// [shouldRestoreSavedWebSession]), an account that is temporarily unknown —
+  /// a preserved session during a flaky-network cold start — still restores,
+  /// because the snapshot itself was identity-policed at write time.
   Future<void> _restoreWebCookies(Map<String, Object?> saved) async {
     final rawCookies = saved['cookies'];
     if (rawCookies is! Map || rawCookies.isEmpty) return;
     final savedUsername = (saved['username'] as String?)?.trim() ?? '';
     if (savedUsername.isEmpty) return;
-    final oauthUsername = _ref.read(authControllerProvider).account?.username;
-    if (oauthUsername == null || oauthUsername.isEmpty) {
-      // Not signed in (or the account is still loading): never restore a web
-      // session the user has not explicitly re-established.
-      return;
-    }
-    if (savedUsername.toLowerCase() != oauthUsername.toLowerCase()) {
-      // Saved web session belongs to a different account; do not restore it.
+    // The OAuth account profile is loaded in the background during startup
+    // (AuthController deliberately does not block the splash on /user/whoami).
+    // Wait for it to settle so a cold start after a platform cookie-store
+    // loss restores the snapshot instead of racing the account load, seeing
+    // no account yet, and skipping the re-injection entirely — which is
+    // exactly the update scenario this restore exists for.
+    await _ref.read(authControllerProvider.notifier).accountLoad;
+    final auth = _ref.read(authControllerProvider);
+    if (!shouldRestoreSavedWebSession(
+      oauthSignedIn: auth.status == AuthStatus.signedIn,
+      oauthUsername: auth.account?.username,
+      savedUsername: savedUsername,
+    )) {
+      // Signed out, or the saved session belongs to a different account:
+      // never restore a web session the user has not explicitly
+      // re-established.
       return;
     }
     try {
@@ -210,11 +220,41 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
   /// This supports public website metadata fallbacks without asking the user
   /// for a second login after OAuth. An empty CSRF still never overwrites a
   /// valid snapshot.
+  ///
+  /// A hidden probe landing on an anonymous page (bot challenge, transient
+  /// empty cookie-store read, redirect before session cookies are re-injected)
+  /// must never flip a known signed-in web session to signed-out — the feeds
+  /// would then demand a login the user already has (see docs/authentication:
+  /// an incomplete page never means signed out). Only the user-visible web
+  /// login page's [report] is authoritative for anonymous state. Anonymous
+  /// probe results therefore rotate the CSRF only and leave the session
+  /// identity and cookie snapshot intact.
   Future<void> reportRefresh({
     required String csrf,
     required String username,
   }) async {
     if (!shouldStoreBackgroundBrowserSession(csrf)) return;
+    if (shouldPreserveSignedInSessionOnAnonymousProbe(
+      currentlySignedIn: state.isLoggedIn == true,
+      probeUsername: username,
+    )) {
+      final saved = await _store.read();
+      final cookies = _stringMap(saved['cookies']);
+      state = WebSessionState(
+        csrf: csrf,
+        isLoggedIn: true,
+        username: state.username,
+      );
+      if (cookies.isNotEmpty) {
+        await _store.write(
+          csrf: csrf,
+          isLoggedIn: true,
+          username: state.username,
+          cookies: cookies,
+        );
+      }
+      return;
+    }
     await report(csrf: csrf, username: username);
   }
 
@@ -291,6 +331,33 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
           verifiedUser.trim().toLowerCase() ==
               importedUsername.trim().toLowerCase();
       if (!sameAccount) {
+        // Re-importing the app's own live session (identical `userinfo`
+        // value) can fail the read-back on stores that normalize cookie
+        // values on write (Android `getCookie` truncation, macOS cookie
+        // re-creation). The session was not changed by this import — the
+        // claimed session is already live, so nothing was rejected. Treat it
+        // as success instead of rolling back a working session and reporting
+        // a spurious rejection.
+        if (isUnchangedSessionReimport(
+          previous: previousCookies,
+          imported: cookies,
+        )) {
+          state = WebSessionState(
+            csrf: state.csrf,
+            isLoggedIn: true,
+            username: importedUsername,
+          );
+          await _store.write(
+            csrf: state.csrf,
+            isLoggedIn: true,
+            username: importedUsername,
+            cookies: cookies,
+          );
+          return CookieImportResult(
+            CookieImportOutcome.success,
+            username: importedUsername,
+          );
+        }
         await _rollbackCookies(cookieManager, previousCookies);
         return const CookieImportResult(CookieImportOutcome.verifyFailed);
       }
@@ -344,6 +411,50 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
   /// during early startup). Returns an empty map when nothing is stored.
   Future<Map<String, String>> persistedCookies() async =>
       _stringMap((await _store.read())['cookies']);
+}
+
+/// Whether the persisted web session may be restored for the current OAuth
+/// identity. Restoring requires a signed-in OAuth state (a signed-out user is
+/// never silently given a web session, which would dismiss the login screen
+/// before OAuth completes). When the OAuth account is known it must match the
+/// saved session's username; when the account is temporarily unknown — a
+/// preserved session during a flaky-network cold start — the restore is
+/// allowed, because the snapshot itself was identity-policed at write time
+/// and [report] re-checks identity against the live web session afterwards.
+bool shouldRestoreSavedWebSession({
+  required bool oauthSignedIn,
+  required String? oauthUsername,
+  required String savedUsername,
+}) {
+  if (!oauthSignedIn) return false;
+  final oauth = oauthUsername?.trim().toLowerCase() ?? '';
+  if (oauth.isEmpty) return true;
+  return savedUsername.trim().toLowerCase() == oauth;
+}
+
+/// Whether a hidden (background) probe result must leave the current web
+/// session in place: an anonymous probe must never downgrade a session that
+/// is already known to be signed in — the probe can land on a bot challenge,
+/// a transiently empty cookie-store read, or a redirect that ran before the
+/// persisted cookies were re-injected, and docs/authentication states an
+/// incomplete page never means signed out. Only the user-visible web login
+/// page's [report] is authoritative for anonymous state.
+bool shouldPreserveSignedInSessionOnAnonymousProbe({
+  required bool currentlySignedIn,
+  required String probeUsername,
+}) => probeUsername.isEmpty && currentlySignedIn;
+
+/// Whether an import is a no-op re-import of the app's own live session: the
+/// previous session carried the exact same `userinfo` value. Such an import
+/// cannot be rejected — the session it claims is already live.
+bool isUnchangedSessionReimport({
+  required Map<String, String> previous,
+  required Map<String, String> imported,
+}) {
+  final previousUser = previous['userinfo'];
+  return previousUser != null &&
+      previousUser.isNotEmpty &&
+      previousUser == imported['userinfo'];
 }
 
 /// Keeps the last valid cookie snapshot when a signed-in platform read fails.
