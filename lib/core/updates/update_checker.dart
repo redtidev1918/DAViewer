@@ -69,7 +69,10 @@ UpdateInfo? parseLatestRelease(Object? data) {
 }
 
 /// The `## 下载` / `## Downloads` heading that starts the asset table.
-final RegExp _downloadsHeading = RegExp(r'(?m)^##\s*(?:下载|Downloads)\s*$');
+final RegExp _downloadsHeading = RegExp(
+  r'^##\s*(?:下载|Downloads)\s*$',
+  multiLine: true,
+);
 
 /// Keeps only the user-facing parts of a GitHub Release body for the in-app
 /// banner. The downloads section — the asset table plus the checksums hint —
