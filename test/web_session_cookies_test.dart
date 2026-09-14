@@ -130,6 +130,153 @@ void main() {
     });
   });
 
+  group('shouldRestoreSavedWebSession', () {
+    test('restores for a signed-in OAuth account that matches', () {
+      expect(
+        shouldRestoreSavedWebSession(
+          oauthSignedIn: true,
+          oauthUsername: 'Artist',
+          savedUsername: 'artist',
+        ),
+        isTrue,
+      );
+    });
+
+    test('restores a preserved session while the account is unknown', () {
+      expect(
+        shouldRestoreSavedWebSession(
+          oauthSignedIn: true,
+          oauthUsername: null,
+          savedUsername: 'Artist',
+        ),
+        isTrue,
+      );
+    });
+
+    test('never restores for a signed-out user or a different account', () {
+      expect(
+        shouldRestoreSavedWebSession(
+          oauthSignedIn: false,
+          oauthUsername: null,
+          savedUsername: 'Artist',
+        ),
+        isFalse,
+      );
+      expect(
+        shouldRestoreSavedWebSession(
+          oauthSignedIn: true,
+          oauthUsername: 'other',
+          savedUsername: 'Artist',
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  group('shouldPreserveSignedInSessionOnAnonymousProbe', () {
+    test(
+      'keeps a signed-in session when a hidden probe sees an anonymous page',
+      () {
+        expect(
+          shouldPreserveSignedInSessionOnAnonymousProbe(
+            currentlySignedIn: true,
+            probeUsername: '',
+          ),
+          isTrue,
+        );
+      },
+    );
+
+    test('still records an anonymous probe when no session is signed in', () {
+      expect(
+        shouldPreserveSignedInSessionOnAnonymousProbe(
+          currentlySignedIn: false,
+          probeUsername: '',
+        ),
+        isFalse,
+      );
+    });
+
+    test('never overrides a signed-in probe result', () {
+      expect(
+        shouldPreserveSignedInSessionOnAnonymousProbe(
+          currentlySignedIn: true,
+          probeUsername: 'Artist',
+        ),
+        isFalse,
+      );
+      expect(
+        shouldPreserveSignedInSessionOnAnonymousProbe(
+          currentlySignedIn: false,
+          probeUsername: 'Artist',
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  group('isUnchangedSessionReimport', () {
+    test('an app-exported session is an unchanged re-import', () {
+      final cookies = <String, String>{
+        'userinfo': _userInfo('Artist'),
+        'csrf': 'tok',
+      };
+      expect(
+        isUnchangedSessionReimport(previous: cookies, imported: cookies),
+        isTrue,
+      );
+    });
+
+    test('different userinfo or no previous userinfo is not unchanged', () {
+      expect(
+        isUnchangedSessionReimport(
+          previous: <String, String>{'userinfo': _userInfo('A')},
+          imported: <String, String>{'userinfo': _userInfo('B')},
+        ),
+        isFalse,
+      );
+      expect(
+        isUnchangedSessionReimport(
+          previous: <String, String>{'csrf': 'tok'},
+          imported: <String, String>{'userinfo': _userInfo('A'), 'csrf': 'x'},
+        ),
+        isFalse,
+      );
+      expect(
+        isUnchangedSessionReimport(
+          previous: <String, String>{'userinfo': ''},
+          imported: <String, String>{'userinfo': _userInfo('A')},
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  group('export -> import round trip', () {
+    test('an app-exported session passes the import identity gate', () {
+      // Export the app's own session, parse it back, and check the identity
+      // gate used by importCookies accepts it for the same account.
+      final cookies = <String, String>{
+        'userinfo': _userInfo('Artist'),
+        'csrf': 'tok',
+      };
+      final imported = parseImportedCookies(formatCookieExport(cookies));
+      expect(imported, isNotNull);
+      final importedUsername = WebSession.usernameFromUserInfo(
+        imported!['userinfo'],
+      );
+      expect(importedUsername, 'Artist');
+      expect(
+        evaluateCookieImportIdentity(
+          importedUsername: importedUsername,
+          oauthUsername: 'artist',
+          currentWebUsername: 'ARTIST',
+        ),
+        isNull,
+      );
+    });
+  });
+
   group('evaluateCookieImportIdentity', () {
     test('allows import when no identity exists yet', () {
       expect(

@@ -68,6 +68,7 @@ final class AuthController extends StateNotifier<AuthState> {
   bool _initializing = false;
   bool _loggingIn = false;
   Future<void>? _loginOperation;
+  Future<void>? _accountLoad;
 
   AppRuntime get _runtime => _ref.read(runtimeProvider);
   AppLogger get _log => AppLogger.instance;
@@ -90,7 +91,7 @@ final class AuthController extends StateNotifier<AuthState> {
           // Sign in immediately; the account profile loads in the background
           // so the splash can hand off to Home without waiting on /user/whoami.
           state = const AuthState(status: AuthStatus.signedIn);
-          unawaited(_loadAccount(runtime));
+          unawaited(_startAccountLoad(runtime));
           _initializing = false;
           return;
         }
@@ -110,7 +111,7 @@ final class AuthController extends StateNotifier<AuthState> {
         );
         await AppPreferences.saveOAuthSessionKnown(true);
         state = const AuthState(status: AuthStatus.signedIn);
-        unawaited(_loadAccount(runtime));
+        unawaited(_startAccountLoad(runtime));
         _initializing = false;
         return;
       } on DAKitException catch (error) {
@@ -123,6 +124,10 @@ final class AuthController extends StateNotifier<AuthState> {
                 'preserving signed-in state',
             error,
           );
+          // Still try the profile: it is independent of the token check and
+          // may succeed on the next attempt; identity-dependent cold-start
+          // steps (web-session cookie restore) await [accountLoad].
+          unawaited(_startAccountLoad(runtime));
           state = const AuthState(status: AuthStatus.signedIn);
           _initializing = false;
           return;
@@ -144,6 +149,9 @@ final class AuthController extends StateNotifier<AuthState> {
           error,
           stack,
         );
+        // Same as the DAKit case: try the profile anyway so the web-session
+        // cookie restore can verify (or at least not be skipped by) identity.
+        unawaited(_startAccountLoad(runtime));
         state = const AuthState(status: AuthStatus.signedIn);
         _initializing = false;
         return;
@@ -281,6 +289,16 @@ final class AuthController extends StateNotifier<AuthState> {
     }
     await _ref.read(webSessionControllerProvider.notifier).clear();
   }
+
+  /// Starts the background account profile load once and memoizes its future,
+  /// so identity-dependent cold-start steps can await it instead of racing a
+  /// still-loading account.
+  Future<void> _startAccountLoad(AppRuntime runtime) =>
+      _accountLoad ??= _loadAccount(runtime);
+
+  /// Completes when the initial account profile load settles (account loaded,
+  /// or the load failed and signed-in state has no account).
+  Future<void> get accountLoad => _accountLoad ?? Future<void>.value();
 
   Future<void> _loadAccount(AppRuntime runtime) async {
     _log.info('auth', 'loading account');
