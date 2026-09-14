@@ -64,10 +64,30 @@ UpdateInfo? parseLatestRelease(Object? data) {
   if (!isSemver(version)) return null;
   return UpdateInfo(
     version: version,
-    notes: rawBody is String && rawBody.trim().isNotEmpty
-        ? rawBody.trim()
-        : null,
+    notes: rawBody is String ? extractUserReleaseNotes(rawBody) : null,
   );
+}
+
+/// The `## 下载` / `## Downloads` heading that starts the asset table.
+final RegExp _downloadsHeading = RegExp(
+  r'^##\s*(?:下载|Downloads)\s*$',
+  multiLine: true,
+);
+
+/// Keeps only the user-facing parts of a GitHub Release body for the in-app
+/// banner. The downloads section — the asset table plus the checksums hint —
+/// is the release page's job, not news; everything from the first
+/// `## 下载`/`## Downloads` heading onward is dropped. Returns `null` when
+/// nothing user-facing remains.
+String? extractUserReleaseNotes(String body) {
+  final trimmed = body.trim();
+  if (trimmed.isEmpty) return null;
+  final match = _downloadsHeading.firstMatch(trimmed);
+  if (match != null) {
+    final notes = trimmed.substring(0, match.start).trim();
+    return notes.isEmpty ? null : notes;
+  }
+  return trimmed;
 }
 
 /// A single parsed update check result.
