@@ -35,9 +35,9 @@ void main() {
 
 | 平台 | 文件 | 大小 | 下载 |
 |---|---|---|---|
-| Android | \`DAViewer-v0.2.186.apk\` | 62.4 MB | [下载](url) |
+| Android | `DAViewer-v0.2.186.apk` | 62.4 MB | [下载](url) |
 
-下载后可用本 Release 资产中的 \`SHA256SUMS\` 校验完整性。
+下载后可用本 Release 资产中的 `SHA256SUMS` 校验完整性。
 ''';
     expect(
       extractUserReleaseNotes(body),
@@ -55,9 +55,9 @@ void main() {
 
 | Platform | File | Size | Download |
 |---|---|---|---|
-| Android | \`app.apk\` | 62 MB | [download](url) |
+| Android | `app.apk` | 62 MB | [download](url) |
 
-Verify your download against \`SHA256SUMS\`.
+Verify your download against `SHA256SUMS`.
 ''';
     expect(
       extractUserReleaseNotes(body),
