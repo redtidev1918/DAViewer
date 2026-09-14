@@ -3,6 +3,14 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.2.186](https://github.com/redtidev1918/daviewer/compare/v0.2.185...v0.2.186) (2026-09-14)
+
+
+### Bug Fixes
+
+* **auth:** restore web session on flaky-network cold start ([26f8e20](https://github.com/redtidev1918/daviewer/commit/26f8e20f83e292123a9572b3f16e3db74a0b5f7b))
+* **auth:** restore web session on flaky-network cold start ([205f0b4](https://github.com/redtidev1918/daviewer/commit/205f0b4af025ff580b7d5c9009760798929b23ba))
+
 ## [0.2.185](https://github.com/redtidev1918/daviewer/compare/v0.2.184...v0.2.185) (2026-09-12)
 
 
