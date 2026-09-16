@@ -19,11 +19,12 @@ permissions:
   pull-requests: write
   issues: write
   packages: write
+  actions: write # post-release workflow_dispatch from 20ac922+
   id-token: write
 
 jobs:
   release:
-    uses: redtidev1918/releasegraph/.github/workflows/reusable-release.yml@d6d0bbec4e37bec025ab13de1783d4af96d6f925 # ReleaseGraph v1.4.8
+    uses: redtidev1918/releasegraph/.github/workflows/reusable-release.yml@20ac922821e2c11d1a6f8360b3ceafb434a7c9d6 # ReleaseGraph 20ac922 (actions:write + tag-drift recovery)
     with:
       version: ${{ inputs.version || '' }}
       dry_run: ${{ github.event_name == 'pull_request' || inputs.dry_run || false }}
