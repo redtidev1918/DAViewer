@@ -12,9 +12,9 @@ dependencies:
   cached_network_image: ^3.4.1
   chewie: ^1.16.2
   cupertino_icons: ^1.0.8
-  dakit_api: ^0.2.0
-  dakit_core: ^0.2.0
-  dakit_flutter: ^0.1.13
+  dakit_api: ^1.0.0
+  dakit_core: ^1.0.0
+  dakit_flutter: ^1.0.0
   dio: ^5.11.1
   flutter_cache_manager: ^3.4.2
   flutter_html: ^3.0.0
