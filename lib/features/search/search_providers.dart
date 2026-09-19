@@ -6,8 +6,10 @@ import '../../core/auth/session_state.dart';
 import '../../core/auth/web_session_controller.dart';
 import '../../core/auth/web_session_refresher.dart';
 import '../../core/data/data_access.dart';
+import '../../core/data/source_policy.dart';
 import '../../core/data/web_search.dart';
 import '../../core/feed/artwork_feed_controller.dart';
+import '../../core/runtime/app_runtime.dart';
 import '../../core/runtime/runtime_provider.dart';
 import '../../core/search/interest_store.dart';
 import '../../core/search/search_history_store.dart';
@@ -35,42 +37,103 @@ final searchFeedProvider = StateNotifierProvider.autoDispose
         final webSession = ref.read(webSessionProvider);
         var csrf = ref.read(webSessionControllerProvider).csrf;
         var cookieHeader = await webSession.cookieHeader();
-        var page = await _tryWebSearch(dio, query, csrf, cookieHeader, request);
-        if (page == null) {
+        var result = await _routeSearch(
+          dio,
+          runtime,
+          query,
+          request,
+          csrf: csrf,
+          cookieHeader: cookieHeader,
+        );
+        if (!result.isSuccess && !result.isEmpty) {
           await ref.read(webSessionRefresherProvider).refresh();
           csrf = ref.read(webSessionControllerProvider).csrf;
           cookieHeader = await webSession.cookieHeader();
-          page = await _tryWebSearch(dio, query, csrf, cookieHeader, request);
+          result = await _routeSearch(
+            dio,
+            runtime,
+            query,
+            request,
+            csrf: csrf,
+            cookieHeader: cookieHeader,
+          );
         }
-        if (page != null) {
-          ref.read(artworkStoreProvider.notifier).putAll(page.items);
-          return page;
+        if (result.isSuccess) {
+          ref.read(artworkStoreProvider.notifier).putAll(result.value!.items);
+          return result.value!;
         }
-        return dataAccessFor(runtime).search(query, request);
+        if (result.isEmpty) {
+          return const Page<Artwork>(items: <Artwork>[], hasMore: false);
+        }
+        throw const DAKitException(
+          kind: DAKitFailureKind.network,
+          code: 'search.unavailable',
+          message: 'Search is unavailable right now.',
+        );
       });
       return controller;
     });
 
-/// Fetches one page of web search results, or `null` when the web session is
-/// missing or the request failed (the caller then refreshes the session and
-/// retries once, finally falling back to the official API).
-Future<Page<Artwork>?> _tryWebSearch(
+/// Routes a search page through [CapabilityPolicy.search]: Web primary, then
+/// coarse official fallback. Web empty is a real "no results"; Web failure or
+/// an unsupported session is the only path that reaches the official source.
+Future<SourceResult<Page<Artwork>>> _routeSearch(
+  Dio dio,
+  AppRuntime runtime,
+  String query,
+  PageRequest request, {
+  required String csrf,
+  required String cookieHeader,
+}) async {
+  final plan = CapabilityPolicy.planFor(DesiredCapability.search);
+  final webSupported = csrf.isNotEmpty && cookieHeader.isNotEmpty;
+  final attempts = <SourceAttempt<Page<Artwork>>>[
+    SourceAttempt(
+      source: plan.primary,
+      supported: webSupported,
+      run: () => _tryWebSearch(dio, query, csrf, cookieHeader, request),
+    ),
+  ];
+  final fallback = plan.secondary;
+  if (fallback != null) {
+    attempts.add(
+      SourceAttempt(
+        source: fallback,
+        run: () async {
+          try {
+            final page = await dataAccessFor(runtime).search(query, request);
+            return page.items.isEmpty
+                ? SourceResult<Page<Artwork>>.empty(source: fallback)
+                : SourceResult<Page<Artwork>>.success(page, source: fallback);
+          } on Object catch (error) {
+            return SourceResult<Page<Artwork>>.failed(error, source: fallback);
+          }
+        },
+      ),
+    );
+  }
+  return SourceCoordinator.tryInOrder(attempts);
+}
+
+Future<SourceResult<Page<Artwork>>> _tryWebSearch(
   Dio dio,
   String query,
   String csrf,
   String cookieHeader,
   PageRequest request,
 ) async {
-  if (csrf.isEmpty || cookieHeader.isEmpty) return null;
   try {
-    return await WebSearchFetcher(dio).fetch(
+    final page = await WebSearchFetcher(dio).fetch(
       query: query,
       cookieHeader: cookieHeader,
       csrfToken: csrf,
       cursor: request.cursor,
     );
-  } on Object {
-    return null;
+    return page.items.isEmpty
+        ? const SourceResult<Page<Artwork>>.empty(source: DataSource.webApi)
+        : SourceResult<Page<Artwork>>.success(page, source: DataSource.webApi);
+  } on Object catch (error) {
+    return SourceResult<Page<Artwork>>.failed(error, source: DataSource.webApi);
   }
 }
 
