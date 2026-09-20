@@ -89,6 +89,27 @@ State and recovery rules are in [Authentication and session recovery](docs/en/au
 
 Issues, PRs, and docs are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). After a change, run `dart format lib test`, `flutter analyze`, and `flutter test`. Security reports go to [SECURITY.md](SECURITY.md).
 
+## Documentation
+
+This README only covers the start; everything else lives at <https://redtidev1918.github.io/DAViewer/>:
+
+| What you want | Where |
+| --- | --- |
+| Download a build | [Download page](https://redtidev1918.github.io/DAViewer/download.md) |
+| Sign-in and common issues | [Authentication](docs/en/authentication.md) |
+| Networking and proxies | [Networking](docs/en/networking.md) |
+| App/SDK boundary | [Architecture](docs/en/architecture.md) |
+| Local builds and releases | [Build notes](docs/en/build.md) |
+
+## Acknowledgements
+
+DAViewer builds on [DAKit](https://github.com/redtidev1918/DAKit) and [Flutter](https://flutter.dev); the embedded
+WebView, state management, routing, image cache, video playback, and rich text come from
+`flutter_inappwebview`, `flutter_riverpod`, `go_router`, `cached_network_image`,
+`chewie` / `video_player`, and `flutter_html` respectively — see [pubspec.yaml](pubspec.yaml) for the full list.
+Private website endpoint research referenced [gallery-dl](https://github.com/mikf/gallery-dl) and
+[deviantart.ts](https://www.npmjs.com/package/deviantart.ts).
+
 ## Notes
 
 - DAViewer is a third-party client and is not affiliated with DeviantArt.

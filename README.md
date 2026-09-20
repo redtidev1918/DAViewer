@@ -89,6 +89,26 @@ flutter build windows --release      # Windows
 
 Issue、PR、文档都欢迎，见 [CONTRIBUTING.md](CONTRIBUTING.md)。改动后跑 `dart format lib test`、`flutter analyze`、`flutter test`；安全问题走 [SECURITY.md](SECURITY.md)。
 
+## 文档
+
+README 只讲怎么开始；完整内容在文档站 <https://redtidev1918.github.io/DAViewer/>：
+
+| 你想做什么 | 文档 |
+| --- | --- |
+| 下载安装包 | [下载页](https://redtidev1918.github.io/DAViewer/download.md) |
+| 登录与常见问题 | [登录与会话](docs/authentication.md) |
+| 网络与代理 | [网络与代理](docs/networking.md) |
+| 看应用与 SDK 的边界 | [架构说明](docs/architecture.md) |
+| 本地构建、发版 | [构建说明](docs/build.md) |
+
+## 致谢
+
+DAViewer 建立在 [DAKit](https://github.com/redtidev1918/DAKit) 与 [Flutter](https://flutter.dev) 之上；
+WebView、状态管理、路由、图片缓存、视频播放与富文本分别由 `flutter_inappwebview`、`flutter_riverpod`、
+`go_router`、`cached_network_image`、`chewie` / `video_player`、`flutter_html` 承担，完整清单见
+[pubspec.yaml](pubspec.yaml)。网页私有接口的解析参考了 [gallery-dl](https://github.com/mikf/gallery-dl) 与
+[deviantart.ts](https://www.npmjs.com/package/deviantart.ts)。
+
 ## 说明
 
 - DAViewer 是第三方客户端，与 DeviantArt 无隶属关系。
