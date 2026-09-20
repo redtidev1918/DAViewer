@@ -13,19 +13,13 @@
 
 ## 安装
 
-从 [Releases](https://github.com/redtidev1918/DAViewer/releases) 下载对应平台的安装包：
+从 [Releases](https://github.com/redtidev1918/DAViewer/releases) 下载对应平台的包：
 
 - **Android**：`DAViewer-v<版本>.apk`
-- **macOS 12+ 测试版**：`DAViewer-v<版本>-macos-unsigned-preview.zip`（同时支持 Intel 与 Apple Silicon；解压后拖入「应用程序」）
-- **Windows**：`DAViewer-v<版本>-windows.zip`（解压后运行 `DAViewer.exe`）
+- **Windows**：`DAViewer-v<版本>-windows.zip`，解压后运行 `DAViewer.exe`。登录全程在 App 内完成，不改系统设置、不需要管理员权限，文件夹放哪都能跑
+- **macOS 12+**：`DAViewer-v<版本>-macos-unsigned-preview.zip`，Intel 与 Apple Silicon 通用，解压后拖进「应用程序」
 
-每个平台只发布**一个**资产，文件名固定为 `DAViewer-v<版本>-<平台>`；`v` 前缀是命名规范的一部分，
-不是装饰。历史 Release 上可能残留旧协议的重复文件（例如同时存在 `DAViewer-0.2.184.apk` 与
-`DAViewer-v0.2.184.apk`），这只是旧协议留下的遗留物，**不是**当前流水线的产物。
-
-Windows 版解压即用：登录全程在 App 内完成，不会改动系统设置、不需要管理员权限，也不安装任何服务；文件夹移到任何位置都能直接运行。
-
-> **关于 macOS 版本**：这是社区免费发布的测试版，没有走 Apple 的官方审核（那需要付费的开发者账号），所以首次打开时 macOS 会拦截一次。请在 Finder 中**右键点 App 图标，选择「打开」**，即可正常使用——App 不会上传或收集任何数据。
+macOS 首次打开会被系统拦一次：这是社区免费发布的测试版，没有 Apple 的付费签名。在 Finder 里**右键点 App 图标，选「打开」**就能正常使用，App 不上传也不收集任何数据。
 
 ## 截图预览
 
