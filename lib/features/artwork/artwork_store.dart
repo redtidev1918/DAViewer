@@ -1,6 +1,10 @@
 import 'package:dakit_core/dakit_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+/// Whether the canonical source has already told us a list-like field's
+/// real value, as opposed to the field being missing from a sparse payload.
+enum HydrationStatus { unknown, resolved, confirmedEmpty }
+
 /// In-memory cache of [Artwork] objects that have already been loaded by a
 /// feed.
 ///
@@ -27,8 +31,18 @@ final class ArtworkStore extends Notifier<Map<String, Artwork>> {
   /// Whether the canonical detail endpoint has already confirmed this
   /// artwork's tags. This distinguishes a genuinely tagless work from a
   /// compact feed item whose `tags` field was omitted upstream.
-  bool hasResolvedTags(String id) =>
-      _resolvedTagIds.contains(id) || (state[id]?.tags.isNotEmpty ?? false);
+  bool hasResolvedTags(String id) => tagStatus(id) != HydrationStatus.unknown;
+
+  /// Tags from sparse list payloads are `unknown`; a canonical detail response
+  /// is either `resolved` (non-empty) or `confirmedEmpty`.
+  HydrationStatus tagStatus(String id) {
+    if (_resolvedTagIds.contains(id)) {
+      return (state[id]?.tags.isNotEmpty ?? false)
+          ? HydrationStatus.resolved
+          : HydrationStatus.confirmedEmpty;
+    }
+    return HydrationStatus.unknown;
+  }
 
   void putAll(Iterable<Artwork> artworks) {
     var next = Map<String, Artwork>.of(state);
@@ -38,10 +52,7 @@ final class ArtworkStore extends Notifier<Map<String, Artwork>> {
       // List endpoints are allowed to return sparse artwork objects. Never let
       // a later feed refresh erase tags that the canonical detail endpoint has
       // already hydrated.
-      next[artwork.id] =
-          cached != null && artwork.tags.isEmpty && cached.tags.isNotEmpty
-          ? artwork.copyWith(tags: cached.tags)
-          : artwork;
+      next[artwork.id] = mergeArtwork(cached: cached, incoming: artwork);
       if (artwork.tags.isNotEmpty) _resolvedTagIds.add(artwork.id);
     }
     if (next.length > _maxEntries) {
@@ -74,6 +85,16 @@ final class ArtworkStore extends Notifier<Map<String, Artwork>> {
       id: artwork.copyWith(isFavourited: favourited),
     };
   }
+}
+
+/// The single merge rule for sparse list payloads vs a hydrated detail/web
+/// result: a later empty-tags payload never erases already-known tags.
+Artwork mergeArtwork({Artwork? cached, required Artwork incoming}) {
+  if (cached == null) return incoming;
+  if (incoming.tags.isEmpty && cached.tags.isNotEmpty) {
+    return incoming.copyWith(tags: cached.tags);
+  }
+  return incoming;
 }
 
 bool _sameStrings(List<String> left, List<String> right) {
