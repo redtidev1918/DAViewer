@@ -1,3 +1,4 @@
 {
-  "displayName": "DAViewer"
+  "displayName": "DAViewer",
+  "docsWorkflow": "static.yml"
 }
