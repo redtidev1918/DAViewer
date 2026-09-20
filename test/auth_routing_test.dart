@@ -24,6 +24,7 @@ void main() {
   test(
     'settings, updates and diagnostics remain available while signed out',
     () {
+      expect(authRedirect(AuthStatus.signedOut, '/history'), isNull);
       expect(authRedirect(AuthStatus.signedOut, '/settings'), isNull);
       expect(authRedirect(AuthStatus.signedOut, '/settings/proxy'), isNull);
       expect(
