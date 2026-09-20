@@ -3,6 +3,20 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.3.0](https://github.com/redtidev1918/daviewer/compare/v0.2.187...v0.3.0) (2026-09-20)
+
+
+### Features
+
+* add source coordinator and policy-driven search routing ([8fbe1f0](https://github.com/redtidev1918/daviewer/commit/8fbe1f04bb8f88ce6051abe57dff0359327c0000))
+* centralize download planning ([a475e26](https://github.com/redtidev1918/daviewer/commit/a475e26525ce6d0d00adee774b843347917deda5))
+* centralize download planning ([ad8c02b](https://github.com/redtidev1918/daviewer/commit/ad8c02b665a5ed2007f22ea1fff4b2bbfb1b0c97))
+* explicit artwork hydration statuses ([a59f4da](https://github.com/redtidev1918/daviewer/commit/a59f4da0f59393b8366e338aba2f7d721863be7f))
+* explicit artwork hydration statuses and unified merge rule ([ecd10c7](https://github.com/redtidev1918/daviewer/commit/ecd10c739f746d3e54b6ccdff22f3a88cd59f80c))
+* explicit source coordinator and capability policy ([b5dfff5](https://github.com/redtidev1918/daviewer/commit/b5dfff5097e9d3757bba40c7c6e12c55e5ce4c78))
+* upgrade DAViewer to DAKit 1.0.0 ([d3f13f6](https://github.com/redtidev1918/daviewer/commit/d3f13f631b254047e62a62d20534076e1652b1c7))
+* upgrade to DAKit 1.0.0 ([751317e](https://github.com/redtidev1918/daviewer/commit/751317e9fa31172c05f583d6b7e837cb37111b91))
+
 ## [0.2.187](https://github.com/redtidev1918/daviewer/compare/v0.2.186...v0.2.187) (2026-09-14)
 
 
