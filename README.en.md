@@ -4,7 +4,7 @@
   <img src="assets/icon/icon.png" alt="DAViewer" width="160" />
 </p>
 
-**Language:** English · [中文](README.md)
+**Language / 语言:** [中文](README.md) · English
 
 DeviantArt's official client is no longer maintained. DAViewer is a third-party client built on [DAKit](https://github.com/redtidev1918/DAKit) for Android, macOS, and Windows.
 
