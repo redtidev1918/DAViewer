@@ -1,6 +1,7 @@
 import 'package:dakit_flutter/dakit_flutter.dart';
 import 'package:daviewer/core/l10n/app_strings.dart';
 import 'package:daviewer/features/artwork/download_section.dart';
+import 'package:daviewer/features/artwork/download_planner.dart';
 import 'package:daviewer/features/artwork/download_reason.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
@@ -122,6 +123,61 @@ void main() {
 
     expect(bestFallbackImage(<MediaAsset>[small, large]), same(large));
     expect(bestFallbackImage(<MediaAsset>[small, video]), isNull);
+  });
+
+  test('planDownload prefers the transferable original', () {
+    final original = MediaAsset(
+      id: 'original',
+      kind: MediaKind.image,
+      role: MediaRole.original,
+      availability: MediaAvailability.available,
+      uri: Uri.parse('https://example.test/original.png'),
+    );
+
+    final plan = planDownload(original: original, media: const <MediaAsset>[]);
+
+    expect(plan.canDownload, isTrue);
+    expect(plan.usingFallback, isFalse);
+    expect(plan.downloadable, same(original));
+  });
+
+  test('planDownload only falls back for transferable displayed images', () {
+    final large = MediaAsset(
+      id: 'large',
+      kind: MediaKind.image,
+      role: MediaRole.preview,
+      availability: MediaAvailability.available,
+      uri: Uri.parse('https://example.test/large.jpg'),
+      width: 1600,
+      height: 1200,
+    );
+    final unavailable = MediaAsset(
+      id: 'original',
+      kind: MediaKind.image,
+      role: MediaRole.original,
+      availability: MediaAvailability.unavailable,
+    );
+    final video = MediaAsset(
+      id: 'video',
+      kind: MediaKind.video,
+      role: MediaRole.preview,
+      availability: MediaAvailability.available,
+      uri: Uri.parse('https://example.test/video.mp4'),
+    );
+
+    final fallbackPlan = planDownload(
+      original: unavailable,
+      media: <MediaAsset>[large],
+    );
+    expect(fallbackPlan.usingFallback, isTrue);
+    expect(fallbackPlan.downloadable, same(large));
+
+    final noPlan = planDownload(
+      original: unavailable,
+      media: <MediaAsset>[video],
+    );
+    expect(noPlan.usingFallback, isFalse);
+    expect(noPlan.canDownload, isFalse);
   });
 
   test(

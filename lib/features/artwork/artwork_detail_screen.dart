@@ -20,6 +20,7 @@ import 'artwork_detail_sections.dart';
 import 'artwork_navigation.dart';
 import 'artwork_store.dart';
 import 'download_section.dart';
+import 'download_planner.dart';
 import 'download_reason.dart';
 import 'favourite_actions.dart';
 import 'media_viewer.dart';
@@ -596,13 +597,9 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
     TransferSnapshot? transfer,
     List<MediaAsset> additionalOriginals,
   ) {
-    final original = resolution.asset;
-    // Only image artworks may fall back to the highest-quality displayed
-    // image. A video poster must never make a restricted video look
-    // downloadable.
-    final downloadable = original.canTransfer
-        ? original
-        : bestFallbackImage(media) ?? original;
+    final plan = planDownload(original: resolution.asset, media: media);
+    final original = plan.original;
+    final downloadable = plan.downloadable;
     return DownloadSection(
       s: s,
       original: original,
