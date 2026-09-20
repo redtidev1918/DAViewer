@@ -3,6 +3,14 @@
 这里只写下载者需要知道的变化，一行一条。内部实现、协议与调试细节请见
 `CHANGELOG.md`。
 
+## 0.3.0
+
+- 集中下载规划；作品补全状态更明确；新增来源协调器和策略化搜索路由；升级 DAKit 1.0.0。
+- 移除应用内重复网页协议解析，统一使用 `dakit_web`；WebView 登录和会话仍由 DAViewer 负责。
+
+- Centralizes download planning, clarifies artwork hydration states, adds a source coordinator with policy-driven search routing, and upgrades to DAKit 1.0.0.
+- Removes duplicated in-app web-protocol parsing by reusing `dakit_web`; WebView sign-in and sessions remain owned by DAViewer.
+
 ## 0.2.184
 
 - 同步底层 DAKit 到最新版（API/Core 0.2.0、Flutter 适配包 0.1.13），修复多图作品附加页原图的获取与下载，应用本身界面无变化。

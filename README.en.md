@@ -126,16 +126,18 @@ no service. You can move the folder anywhere and just launch it.
 
 ## Relationship with DAKit
 
-`DAViewer` is the app; DAKit is the SDK. The client only depends on DAKit and
-does not copy SDK code: OAuth, official API mapping, domain models, and
-background transfers live in DAKit, while website sparse-data hydration and
-native interaction live in DAViewer. Dependencies:
+`DAViewer` is the app; DAKit is the SDK. The client only depends on published
+DAKit packages and does not copy SDK code: OAuth, official API mapping, domain
+models, and background transfers live in DAKit; generic private-website protocol
+parsing lives in the optional `dakit_web` package; WebView sessions, capability
+routing, and native interaction live in DAViewer. Dependencies:
 
 ```yaml
 dependencies:
-  dakit_core: ^0.2.0
-  dakit_api: ^0.2.0
-  dakit_flutter: ^0.1.13
+  dakit_core: ^1.1.0
+  dakit_api: ^1.0.0
+  dakit_flutter: ^1.0.0
+  dakit_web: ^0.2.1
 ```
 
 Each attempt creates one official OAuth/PKCE transaction. Account selection,
