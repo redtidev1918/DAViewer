@@ -40,7 +40,7 @@ On macOS, right-click the app in Finder and choose **Open** the first time.
 - **Media**: video at highest quality with autoplay, looping, seeking, and retry; GIF badges
 - **Related content**: more like this, similar artists, collections, more from the artist
 - **Artist**: profile, searchable gallery, custom folders, favourites, watch
-- **Social**: favourite (with state), watch/unwatch, watched-user list, notifications (unread dot + local mark-as-read)
+- **Social**: favourite (with state), watch/unwatch, watched-user list, notifications
 - **Download**: saves the highest-quality preview when the original is restricted; long-press one image to download it, then open the file or folder
 - **Sharing**: native share sheet for artwork, artists, gallery folders, collections, tags
 - **Settings**: light / dark / system, Chinese / English, clear cache, check for updates
