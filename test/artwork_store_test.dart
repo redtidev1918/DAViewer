@@ -85,4 +85,37 @@ void main() {
     expect(store.hasResolvedTags('1'), isTrue);
     expect(container.read(artworkStoreProvider)['1']!.tags, isEmpty);
   });
+
+  test(
+    'hydration status distinguishes unknown, resolved, and confirmed empty',
+    () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final store = container.read(artworkStoreProvider.notifier);
+
+      expect(store.tagStatus('1'), HydrationStatus.unknown);
+
+      store.putAll(<Artwork>[_artwork()]);
+      expect(store.tagStatus('1'), HydrationStatus.resolved);
+
+      store.putAll(<Artwork>[_artwork().copyWith(tags: const <String>[])]);
+      store.setTags('1', const <String>[]);
+      expect(store.tagStatus('1'), HydrationStatus.confirmedEmpty);
+    },
+  );
+
+  test('mergeArtwork keeps hydrated tags and accepts richer payloads', () {
+    final hydrated = _artwork();
+    final sparse = _artwork().copyWith(tags: const <String>[], title: 'sparse');
+
+    final preserved = mergeArtwork(cached: hydrated, incoming: sparse);
+    expect(preserved.title, 'sparse');
+    expect(preserved.tags, hydrated.tags);
+
+    final richer = mergeArtwork(
+      cached: sparse,
+      incoming: hydrated.copyWith(tags: const <String>['a', 'b', 'c']),
+    );
+    expect(richer.tags, const <String>['a', 'b', 'c']);
+  });
 }
