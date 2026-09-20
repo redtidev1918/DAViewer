@@ -47,6 +47,9 @@ final class AppStrings {
   String get favourites => _lang == AppLanguage.zh ? '收藏' : 'Favourites';
   String get downloads => _lang == AppLanguage.zh ? '下载' : 'Downloads';
   String get notifications => _lang == AppLanguage.zh ? '通知' : 'Notifications';
+  String get history => _lang == AppLanguage.zh ? '历史' : 'History';
+  String get noHistory =>
+      _lang == AppLanguage.zh ? '暂无访问历史' : 'No visit history.';
   String get noNotifications =>
       _lang == AppLanguage.zh ? '暂无通知' : 'No notifications.';
   String get settings => _lang == AppLanguage.zh ? '设置' : 'Settings';

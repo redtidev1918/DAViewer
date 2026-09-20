@@ -56,6 +56,11 @@ final class AppShell extends ConsumerWidget {
             selectedIcon: const Icon(Icons.download),
             label: s.downloads,
           ),
+          NavigationDestination(
+            icon: const Icon(Icons.history_outlined),
+            selectedIcon: const Icon(Icons.history),
+            label: s.history,
+          ),
         ],
       ),
     );

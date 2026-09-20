@@ -14,6 +14,7 @@ import '../features/artwork/artwork_navigation.dart';
 import '../features/diagnostics/diagnostics_screen.dart';
 import '../features/downloads/downloads_screen.dart';
 import '../features/favourites/favourites_screen.dart';
+import '../features/history/history_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/notifications/notifications_screen.dart';
 import '../features/search/search_screen.dart';
@@ -137,6 +138,14 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/history',
+                builder: (context, state) => const HistoryScreen(),
+              ),
+            ],
+          ),
         ],
       ),
     ],
@@ -216,5 +225,6 @@ bool isSignedOutRoute(String location) =>
     location == '/' ||
     location == '/watch' ||
     location == '/web-login' ||
+    location == '/history' ||
     location == '/settings' ||
     location.startsWith('/settings/');

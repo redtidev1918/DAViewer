@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/diagnostics/error_text.dart';
+import '../../core/history/visit_history_store.dart';
 import '../../core/auth/web_session_refresher.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/runtime/runtime_provider.dart';
@@ -15,6 +16,7 @@ import '../../core/sharing/app_share.dart';
 import '../../shared/widgets/app_error_state.dart';
 import '../../shared/widgets/skeleton.dart';
 import '../downloads/download_helpers.dart';
+import '../history/history_providers.dart';
 import 'artwork_detail_providers.dart';
 import 'artwork_detail_sections.dart';
 import 'artwork_navigation.dart';
@@ -57,6 +59,7 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
   bool _favourite = false;
   bool _favBusy = false;
   bool _navigatingArtwork = false;
+  String? _recordedVisitId;
   String? _reportedTransferFailure;
 
   late final AnimationController _heartController = AnimationController(
@@ -142,6 +145,7 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
   void didUpdateWidget(covariant ArtworkDetailScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.artworkId == widget.artworkId) return;
+    _recordedVisitId = null;
     unawaited(_subscription?.cancel());
     _subscription = null;
     _transfer = null;
@@ -150,6 +154,11 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
     _favBusy = false;
     _navigatingArtwork = false;
     _reportedTransferFailure = null;
+  }
+
+  Future<void> _recordVisit(Artwork artwork) async {
+    await VisitHistoryStore.record(artwork);
+    if (mounted) ref.invalidate(visitHistoryProvider);
   }
 
   Future<void> _toggleFavourite() async {
@@ -411,6 +420,14 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
         setState(() => _favourite = value);
       }
     });
+
+    // Record once after the artwork actually resolves, so failed loads and
+    // transient rebuilds do not pollute local history.
+    final loadedArtwork = artwork.valueOrNull;
+    if (loadedArtwork != null && _recordedVisitId != widget.artworkId) {
+      _recordedVisitId = widget.artworkId;
+      unawaited(_recordVisit(loadedArtwork));
+    }
 
     return Scaffold(
       appBar: AppBar(
