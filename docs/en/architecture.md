@@ -8,10 +8,10 @@ detail, authentication, media, and release bugs.
 ## SDK and app boundary
 
 - **DAKit** owns OAuth, official DeviantArt API transports and DTO mapping,
-  domain models, secure token storage, and background transfers.
-- **DAViewer** owns web-session endpoints that have no official equivalent,
-  source fallback policy, native navigation and gestures, UI state, and
-  host-level caching.
+  domain models, secure token storage, and background transfers; the optional
+  `dakit_web` package hosts generic private-website protocol parsing.
+- **DAViewer** owns WebView session acquisition/refresh/persistence, capability
+  routing, native navigation and gestures, UI state, and host-level caching.
 - Web responses are mapped into DAKit domain models before entering feature
   code. Features must not maintain a second artwork model.
 
@@ -50,6 +50,21 @@ Rules:
    every visit.
 4. A hydration failure may hide that optional section, but must not make the
    artwork detail page unusable.
+
+## Capability routing and download planning
+
+Source composition is expressed by `SourceCoordinator` + `CapabilityPolicy`,
+not scattered across providers. Each capability declares its primary source and
+optional secondary. Results distinguish `success`, `empty`, `failed`,
+`unsupported`, and `unknown`. A confirmed empty is terminal and must not trigger
+fallback; failed, unsupported, or unknown may try the next source.
+
+Artwork hydration uses `HydrationStatus.unknown / resolved / confirmedEmpty`,
+and `mergeArtwork` is the single merge point for sparse lists, detail hydration,
+and refreshes. Download UIs first build a `DownloadPlan`: it chooses the
+transferable asset from the original probe and displayed media. Only images may
+fall back to the highest-quality displayed image; a video poster must never look
+downloadable.
 
 ### Preview-card presentation
 

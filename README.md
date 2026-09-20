@@ -79,13 +79,14 @@ Windows 版解压即用：登录全程在 App 内完成，不会改动系统设�
 
 ## 与 DAKit 的关系
 
-`DAViewer` 是应用，DAKit 是 SDK。客户端只依赖 DAKit，不复制 SDK 代码；OAuth、官方 API 映射、领域模型与后台传输归 DAKit，网页稀疏数据补全与原生交互归 DAViewer。依赖版本：
+`DAViewer` 是应用，DAKit 是 SDK。客户端只依赖已发布的 DAKit 包，不复制 SDK 代码；OAuth、官方 API 映射、领域模型与后台传输归 DAKit，通用私有网页协议解析归可选的 `dakit_web`，WebView 会话、能力路由与原生交互归 DAViewer。依赖版本：
 
 ```yaml
 dependencies:
-  dakit_core: ^0.2.0
-  dakit_api: ^0.2.0
-  dakit_flutter: ^0.1.13
+  dakit_core: ^1.1.0
+  dakit_api: ^1.0.0
+  dakit_flutter: ^1.0.0
+  dakit_web: ^0.2.1
 ```
 
 每次登录只创建一个官方 OAuth/PKCE 事务，全部账号选择、密码和人机验证都留在 App 内嵌网页的官方页面中。回调后 App 同时使用这一份 OAuth 身份与网页会话，不再要求第二次网页登录。未登录是正常引导状态。详细边界见 [架构说明](docs/architecture.md)。
