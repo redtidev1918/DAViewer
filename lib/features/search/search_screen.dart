@@ -121,6 +121,11 @@ final class _SearchScreenState extends ConsumerState<SearchScreen> {
       appBar: AppBar(
         title: Text(s.search),
         actions: <Widget>[
+          IconButton(
+            tooltip: s.history,
+            icon: const Icon(Icons.history_outlined),
+            onPressed: () => context.push('/history'),
+          ),
           PopupMenuButton<String>(
             tooltip: s.sort,
             initialValue: _newestFirst ? 'newest' : 'default',

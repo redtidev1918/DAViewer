@@ -90,6 +90,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const NotificationsScreen(),
       ),
       GoRoute(
+        path: '/history',
+        builder: (context, state) => const HistoryScreen(),
+      ),
+      GoRoute(
         path: '/tag/:tag',
         builder: (context, state) =>
             TagScreen(tag: state.pathParameters['tag']!),
@@ -135,14 +139,6 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/downloads',
                 builder: (context, state) => const DownloadsScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: <RouteBase>[
-              GoRoute(
-                path: '/history',
-                builder: (context, state) => const HistoryScreen(),
               ),
             ],
           ),
