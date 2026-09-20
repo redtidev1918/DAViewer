@@ -3,6 +3,14 @@
 这里只写下载者需要知道的变化，一行一条。内部实现、协议与调试细节请见
 `CHANGELOG.md`。
 
+## 0.4.0
+
+- 新增本地访问历史：最近浏览的作品自动去重记录，最多保留 200 条；历史只保存在本机，不上传或同步。
+- 访问历史从底部导航改为搜索页右上角入口，底部导航保留更常用的页面。
+
+- Adds local artwork visit history: recently viewed artworks are deduplicated and capped at 200 entries. History stays on-device and is never uploaded or synced.
+- Visit history now opens from the Search app bar instead of occupying a bottom-navigation slot.
+
 ## 0.3.0
 
 - 集中下载规划；作品补全状态更明确；新增来源协调器和策略化搜索路由；升级 DAKit 1.0.0。
