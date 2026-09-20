@@ -213,10 +213,10 @@ packages:
     dependency: "direct main"
     description:
       name: dakit_core
-      sha256: f182f7880b20d2a883b8dd724dddddc7d948c097bccac499a67fd933168ac8dd
+      sha256: "70c729e5dc654345540378e0b00307e36ca4e7b48bbb855e1b46851067de9ef5"
       url: "https://pub.dev"
     source: hosted
-    version: "1.0.0"
+    version: "1.1.0"
   dakit_flutter:
     dependency: "direct main"
     description:
@@ -225,6 +225,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.0"
+  dakit_web:
+    dependency: "direct main"
+    description:
+      name: dakit_web
+      sha256: "4b73d516a8a48ef5348297852f891bbe9f87d8a73be36e1be9ab1267712672ff"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.1"
   dbus:
     dependency: transitive
     description:

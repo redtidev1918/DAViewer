@@ -6,7 +6,7 @@ import '../../core/auth/auth_controller.dart';
 import '../../core/auth/session_state.dart';
 import '../../core/auth/web_session_controller.dart';
 import '../../core/auth/web_session_refresher.dart';
-import '../../core/data/rfy_feed.dart';
+import 'package:dakit_web/dakit_web.dart';
 import '../../core/feed/artwork_feed_controller.dart';
 import '../../core/runtime/runtime_provider.dart';
 import '../artwork/artwork_store.dart';
