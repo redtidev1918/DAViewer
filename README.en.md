@@ -8,6 +8,8 @@
 
 DeviantArt's official client is no longer maintained. DAViewer is a third-party client built on [DAKit](https://github.com/redtidev1918/DAKit) for Android, macOS, and Windows.
 
+📖 Full documentation: <https://redtidev1918.github.io/DAViewer/>
+
 [![GitHub license](https://img.shields.io/github/license/redtidev1918/DAViewer?style=flat)](LICENSE) [![GitHub release](https://img.shields.io/github/v/release/redtidev1918/DAViewer?style=flat)](https://github.com/redtidev1918/DAViewer/releases) [![Platforms](https://img.shields.io/badge/platform-Android%20%7C%20macOS%20%7C%20Windows-blue?style=flat)](https://github.com/redtidev1918/DAViewer/releases) [![Docs](https://img.shields.io/badge/Docs-documentation-6366f1?style=flat-square)](https://redtidev1918.github.io/DAViewer/)
 
 ## Download

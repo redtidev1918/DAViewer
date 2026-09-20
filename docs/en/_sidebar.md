@@ -8,3 +8,5 @@
   - [Architecture](/en/architecture.md)
   - [Web Adapter Contract](/en/web_adapter.md)
   - [Build](/en/build.md)
+- 中文
+  - [中文文档](/)
