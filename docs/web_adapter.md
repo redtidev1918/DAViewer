@@ -11,7 +11,7 @@ DAViewer 与两个 DeviantArt 表面通信：
 
 ## 代码位置
 
-通用私有协议适配器现在集中在 [DAKit 的 `dakit_web`](https://github.com/redtidev1918/dakit/tree/main/packages/dakit_web) 包里。这个包是可选适配层，不代表私有端点稳定；`dakit_web` 只负责“session + request → DeviantArt DTO → DAKit 模型”。
+通用私有协议适配器现在集中在 [DAKit 的 `dakit_web`](https://github.com/redtidev1918/DAKit/tree/main/packages/dakit_web) 包里。这个包是可选适配层，不代表私有端点稳定；`dakit_web` 只负责“session + request → DeviantArt DTO → DAKit 模型”。
 
 DAViewer 继续持有产品边界：WebView 登录、Cookie/CSRF 刷新与持久化、`SourceCoordinator` 能力路由、`ArtworkStore` 合并规则，以及 UI 降级文案。应用中的产品级 wrapper 仍在 `lib/core/data/`（例如 `collection_contents.dart` 与 `web_session.dart`）；HTML/JSON 解析不得回到业务代码。
 

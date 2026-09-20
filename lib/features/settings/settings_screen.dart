@@ -20,8 +20,8 @@ import '../../core/runtime/runtime_provider.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../core/updates/update_checker.dart';
 
-const String _githubUrl = 'https://github.com/redtidev1918/daviewer';
-const String _releasesUrl = 'https://github.com/redtidev1918/daviewer/releases';
+const String _githubUrl = 'https://github.com/redtidev1918/DAViewer';
+const String _releasesUrl = 'https://github.com/redtidev1918/DAViewer/releases';
 const String _devartSettingsUrl =
     'https://www.deviantart.com/settings/browsing';
 
@@ -258,7 +258,7 @@ final class SettingsScreen extends ConsumerWidget {
               leading: const Icon(Icons.code),
               title: Text(s.githubRepository),
               subtitle: const Text(
-                'github.com/redtidev1918/daviewer',
+                'github.com/redtidev1918/DAViewer',
                 style: TextStyle(fontSize: 12),
               ),
               onTap: () async {
@@ -405,7 +405,7 @@ Future<void> _checkUpdates(
   if (dio == null) return;
   try {
     final response = await dio.get<Object?>(
-      'https://api.github.com/repos/redtidev1918/daviewer/releases/latest',
+      'https://api.github.com/repos/redtidev1918/DAViewer/releases/latest',
     );
     final info = parseLatestRelease(response.data);
     if (!context.mounted) return;

@@ -1,16 +1,16 @@
 # Contributing to DAViewer
 
 Thanks for wanting to help! DAViewer is a community client for DeviantArt built
-on [DAKit](https://github.com/redtidev1918/dakit). Contributions of any size are
+on [DAKit](https://github.com/redtidev1918/DAKit). Contributions of any size are
 welcome — bug reports, fixes, features, translations, and documentation.
 
 ## Before you start
 
-- **SDK vs app**: DAViewer is the app; [DAKit](https://github.com/redtidev1918/dakit)
+- **SDK vs app**: DAViewer is the app; [DAKit](https://github.com/redtidev1918/DAKit)
   is the SDK it depends on. If a change belongs in the SDK (API adapters, OAuth,
   domain models, transfers), open the PR over there and publish it first, then
   bump the dependency here.
-- Search existing [issues](https://github.com/redtidev1918/daviewer/issues) and
+- Search existing [issues](https://github.com/redtidev1918/DAViewer/issues) and
   PRs before opening a new one.
 - For security issues, see [SECURITY.md](SECURITY.md) and do **not** file them
   publicly.

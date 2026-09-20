@@ -6,23 +6,23 @@
 
 **Language:** English · [中文](README.md)
 
-[![Docs](https://img.shields.io/badge/Docs-文档站点-6366f1?style=flat-square)](https://redtidev1918.github.io/daviewer/)
+[![Docs](https://img.shields.io/badge/Docs-文档站点-6366f1?style=flat-square)](https://redtidev1918.github.io/DAViewer/)
 
 DeviantArt has discontinued its official client app. DAViewer is an
 open-source DeviantArt client built on
-[DAKit](https://github.com/redtidev1918/dakit), providing the website's core
+[DAKit](https://github.com/redtidev1918/DAKit), providing the website's core
 features as a native app for Android, macOS, and Windows.
 
-[![GitHub stars](https://img.shields.io/github/stars/redtidev1918/daviewer?style=flat&color=yellow)](https://github.com/redtidev1918/daviewer/stargazers)
-[![GitHub license](https://img.shields.io/github/license/redtidev1918/daviewer?style=flat)](LICENSE)
-[![GitHub release](https://img.shields.io/github/v/release/redtidev1918/daviewer?style=flat)](https://github.com/redtidev1918/daviewer/releases)
-[![Platforms](https://img.shields.io/badge/platform-Android%20%7C%20macOS%20%7C%20Windows-blue?style=flat)](https://github.com/redtidev1918/daviewer/releases)
+[![GitHub stars](https://img.shields.io/github/stars/redtidev1918/DAViewer?style=flat&color=yellow)](https://github.com/redtidev1918/DAViewer/stargazers)
+[![GitHub license](https://img.shields.io/github/license/redtidev1918/DAViewer?style=flat)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/redtidev1918/DAViewer?style=flat)](https://github.com/redtidev1918/DAViewer/releases)
+[![Platforms](https://img.shields.io/badge/platform-Android%20%7C%20macOS%20%7C%20Windows-blue?style=flat)](https://github.com/redtidev1918/DAViewer/releases)
 [![Flutter](https://img.shields.io/badge/Flutter-3.47.1-blue?style=flat&logo=flutter)](https://flutter.dev)
 
 ## Install
 
 Download the package for your platform from
-[Releases](https://github.com/redtidev1918/daviewer/releases):
+[Releases](https://github.com/redtidev1918/DAViewer/releases):
 
 - **Android**: `DAViewer-v<version>.apk`
 - **macOS 12+ test preview**:
@@ -151,10 +151,10 @@ synchronize. Signed-out state is onboarding, not a feed error. See
 
 DAViewer is built on these open-source projects:
 
-- **[DAKit](https://github.com/redtidev1918/dakit)** — the DeviantArt SDK this app
+- **[DAKit](https://github.com/redtidev1918/DAKit)** — the DeviantArt SDK this app
   uses (OAuth, official API mapping, domain models, background transfers),
   published on pub.dev; docs:
-  [DAKit documentation](https://github.com/redtidev1918/dakit#documentation)
+  [DAKit documentation](https://github.com/redtidev1918/DAKit#documentation)
 - **[Flutter](https://flutter.dev)** — the cross-platform UI framework
 - **[flutter_inappwebview](https://pub.dev/packages/flutter_inappwebview)** — embedded
   WebView (sign-in, web adapters)
@@ -312,7 +312,7 @@ community guidelines.
 2. Run `dart format lib test`, `flutter analyze`, and `flutter test`;
 3. Open a PR describing what changed and why.
 
-The SDK the client depends on is [DAKit](https://github.com/redtidev1918/dakit)
+The SDK the client depends on is [DAKit](https://github.com/redtidev1918/DAKit)
 (published to pub.dev); SDK changes belong there, and the two are released
 together.
 

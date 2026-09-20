@@ -16,7 +16,7 @@ const String appVersion = String.fromEnvironment(
 /// The public GitHub release used to detect newer builds. No authentication and
 /// no user data are involved; this is the same URL a browser would fetch.
 const String _latestReleaseUrl =
-    'https://api.github.com/repos/redtidev1918/daviewer/releases/latest';
+    'https://api.github.com/repos/redtidev1918/DAViewer/releases/latest';
 
 /// Compares two dot-separated semantic versions; positive when `a` is newer.
 int compareVersions(String a, String b) {

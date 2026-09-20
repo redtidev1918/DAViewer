@@ -3,7 +3,7 @@
 **Language / 语言:** [中文](/) · English
 
 > DAViewer is an open-source DeviantArt client built on
-> [DAKit](https://github.com/redtidev1918/dakit), targeting Android, macOS and Windows.
+> [DAKit](https://github.com/redtidev1918/DAKit), targeting Android, macOS and Windows.
 > This English section mirrors the developer documentation page-by-page with the Chinese
 > section under `/`.
 
@@ -12,7 +12,7 @@
 | Document | Content |
 | :-- | :-- |
 | [Download](download.md) | Android / Windows / macOS packages, auto-updated on every release |
-| [README (English)](https://github.com/redtidev1918/daviewer/blob/main/README.en.md) | User-facing overview and install |
+| [README (English)](https://github.com/redtidev1918/DAViewer/blob/main/README.en.md) | User-facing overview and install |
 
 ## Developer documentation
 
@@ -26,8 +26,8 @@
 
 ## Links
 
-- Repository: <https://github.com/redtidev1918/daviewer>
-- Releases: <https://github.com/redtidev1918/daviewer/releases>
-- Upstream SDK documentation: <https://github.com/redtidev1918/dakit>
-- Changelog: <https://github.com/redtidev1918/daviewer/blob/main/CHANGELOG.md>
-- Release notes: <https://github.com/redtidev1918/daviewer/blob/main/RELEASE_NOTES.md>
+- Repository: <https://github.com/redtidev1918/DAViewer>
+- Releases: <https://github.com/redtidev1918/DAViewer/releases>
+- Upstream SDK documentation: <https://github.com/redtidev1918/DAKit>
+- Changelog: <https://github.com/redtidev1918/DAViewer/blob/main/CHANGELOG.md>
+- Release notes: <https://github.com/redtidev1918/DAViewer/blob/main/RELEASE_NOTES.md>

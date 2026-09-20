@@ -17,7 +17,7 @@ control — but to make any change **cheap to detect and cheap to fix**.
 ## Where the code lives
 
 The generic private-protocol adapters now live in the optional
-[`dakit_web`](https://github.com/redtidev1918/dakit/tree/main/packages/dakit_web)
+[`dakit_web`](https://github.com/redtidev1918/DAKit/tree/main/packages/dakit_web)
 package in DAKit. The package is an adapter layer, not a promise that private
 endpoints are stable; `dakit_web` owns only “session + request → DeviantArt DTO
 → DAKit model”.

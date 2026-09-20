@@ -5,7 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/updates/update_checker.dart';
 
-const String _releasesUrl = 'https://github.com/redtidev1918/daviewer/releases';
+const String _releasesUrl = 'https://github.com/redtidev1918/DAViewer/releases';
 
 /// A slim, dismissible banner shown above the Home feed when a newer release is
 /// available. It never blocks content and never re-appears for a version the

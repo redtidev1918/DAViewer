@@ -40,7 +40,7 @@ void main() {
       logExcerpt: 'error | token=LEAKED',
     );
 
-    expect(url, contains('github.com/redtidev1918/daviewer/issues/new'));
+    expect(url, contains('github.com/redtidev1918/DAViewer/issues/new'));
     expect(Uri.decodeComponent(url), contains('App version: 0.2.144'));
     expect(Uri.decodeComponent(url), contains('Platform: macOS'));
     expect(Uri.decodeComponent(url), contains('token=[redacted]'));

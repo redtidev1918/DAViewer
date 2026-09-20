@@ -10,7 +10,7 @@ final class ReportBuilder {
   const ReportBuilder._();
 
   static const String _base =
-      'https://github.com/redtidev1918/daviewer/issues/new';
+      'https://github.com/redtidev1918/DAViewer/issues/new';
 
   static String issueUrl({
     required String version,

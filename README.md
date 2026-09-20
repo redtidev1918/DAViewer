@@ -6,14 +6,14 @@
 
 **语言 / Language:** 中文 · [English](README.en.md)
 
-> DeviantArt 官方已停止维护其移动客户端。DAViewer 是一个基于 [DAKit](https://github.com/redtidev1918/dakit) 的开源 DeviantArt 客户端，面向 Android、macOS 与 Windows，以原生应用提供网页版的主要功能。
+> DeviantArt 官方已停止维护其移动客户端。DAViewer 是一个基于 [DAKit](https://github.com/redtidev1918/DAKit) 的开源 DeviantArt 客户端，面向 Android、macOS 与 Windows，以原生应用提供网页版的主要功能。
 
-[![GitHub stars](https://img.shields.io/github/stars/redtidev1918/daviewer?style=flat&color=yellow)](https://github.com/redtidev1918/daviewer/stargazers) [![GitHub license](https://img.shields.io/github/license/redtidev1918/daviewer?style=flat)](LICENSE) [![GitHub release](https://img.shields.io/github/v/release/redtidev1918/daviewer?style=flat)](https://github.com/redtidev1918/daviewer/releases) [![Platforms](https://img.shields.io/badge/platform-Android%20%7C%20macOS%20%7C%20Windows-blue?style=flat)](https://github.com/redtidev1918/daviewer/releases) [![Flutter](https://img.shields.io/badge/Flutter-3.47.1-blue?style=flat&logo=flutter)](https://flutter.dev)
-[![Docs](https://img.shields.io/badge/Docs-文档站点-6366f1?style=flat-square)](https://redtidev1918.github.io/daviewer/)
+[![GitHub stars](https://img.shields.io/github/stars/redtidev1918/DAViewer?style=flat&color=yellow)](https://github.com/redtidev1918/DAViewer/stargazers) [![GitHub license](https://img.shields.io/github/license/redtidev1918/DAViewer?style=flat)](LICENSE) [![GitHub release](https://img.shields.io/github/v/release/redtidev1918/DAViewer?style=flat)](https://github.com/redtidev1918/DAViewer/releases) [![Platforms](https://img.shields.io/badge/platform-Android%20%7C%20macOS%20%7C%20Windows-blue?style=flat)](https://github.com/redtidev1918/DAViewer/releases) [![Flutter](https://img.shields.io/badge/Flutter-3.47.1-blue?style=flat&logo=flutter)](https://flutter.dev)
+[![Docs](https://img.shields.io/badge/Docs-文档站点-6366f1?style=flat-square)](https://redtidev1918.github.io/DAViewer/)
 
 ## 安装
 
-从 [Releases](https://github.com/redtidev1918/daviewer/releases) 下载对应平台的安装包：
+从 [Releases](https://github.com/redtidev1918/DAViewer/releases) 下载对应平台的安装包：
 
 - **Android**：`DAViewer-v<版本>.apk`
 - **macOS 12+ 测试版**：`DAViewer-v<版本>-macos-unsigned-preview.zip`（同时支持 Intel 与 Apple Silicon；解压后拖入「应用程序」）
@@ -95,7 +95,7 @@ dependencies:
 
 DAViewer 建立在以下开源项目之上：
 
-- **[DAKit](https://github.com/redtidev1918/dakit)** —— 本项目的 DeviantArt SDK（OAuth、官方 API 映射、领域模型、后台传输），已发布到 pub.dev，文档见 [DAKit 文档](https://github.com/redtidev1918/dakit#文档)
+- **[DAKit](https://github.com/redtidev1918/DAKit)** —— 本项目的 DeviantArt SDK（OAuth、官方 API 映射、领域模型、后台传输），已发布到 pub.dev，文档见 [DAKit 文档](https://github.com/redtidev1918/DAKit#文档)
 - **[Flutter](https://flutter.dev)** —— 跨平台 UI 框架
 - **[flutter_inappwebview](https://pub.dev/packages/flutter_inappwebview)** —— 内嵌网页（登录、网页适配器）
 - **[flutter_riverpod](https://pub.dev/packages/flutter_riverpod)** —— 状态管理
@@ -195,7 +195,7 @@ macOS 预览包使用稳定的项目签名，登录数据安全保存在系统�
 2. 改动后运行 `dart format lib test`、`flutter analyze` 和 `flutter test`；
 3. 发 PR 描述清楚「改了什么、为什么」。
 
-客户端依赖的 SDK 是 [DAKit](https://github.com/redtidev1918/dakit)（已发布到 pub.dev），涉及 SDK 的改动请到那边提 PR，两边一起发布。
+客户端依赖的 SDK 是 [DAKit](https://github.com/redtidev1918/DAKit)（已发布到 pub.dev），涉及 SDK 的改动请到那边提 PR，两边一起发布。
 
 如果觉得这个项目有用，点个 Star 能让它被更多人看到。
 
