@@ -6,7 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/web_user_agent.dart';
+import 'package:dakit_web/dakit_web.dart';
+
 import '../runtime/runtime_provider.dart';
 import 'session_state.dart';
 import 'web_session_controller.dart';

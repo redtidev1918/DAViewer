@@ -12,7 +12,9 @@ import '../../core/auth/auth_state.dart';
 import '../../core/auth/session_state.dart';
 import '../../core/auth/web_session_controller.dart';
 import '../../core/auth/webview_oauth_bridge.dart';
-import '../../core/data/web_user_agent.dart';
+
+import 'package:dakit_web/dakit_web.dart';
+
 import '../../core/diagnostics/error_text.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/runtime/runtime_provider.dart';
