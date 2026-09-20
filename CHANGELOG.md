@@ -3,6 +3,14 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.4.0](https://github.com/redtidev1918/DAViewer/compare/v0.3.0...v0.4.0) (2026-09-20)
+
+
+### Features
+
+* add local artwork visit history ([575d7a2](https://github.com/redtidev1918/DAViewer/commit/575d7a2bac629cf6a8546a6ec78813e0389729b1))
+* add local artwork visit history ([68d2db0](https://github.com/redtidev1918/DAViewer/commit/68d2db06a03260df3788c21f118b36fd5dc99997))
+
 ## [0.3.0](https://github.com/redtidev1918/daviewer/compare/v0.2.187...v0.3.0) (2026-09-20)
 
 
