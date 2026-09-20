@@ -101,6 +101,7 @@ WebView 的网页会话（Cookie 与 CSRF）属于基础设施状态，不是认
 - **通知已读状态**（`NotificationReadStore`）：DeviantArt 没有公开的「标记已读」接口，因此未读圆点是叠加在服务端 `isNew` 标记之上的本地状态。它只本地持久化，不假装同步。
 - **用户偏好**（`core/settings/AppPreferences`）：语言、主题模式、可选手动代理、OAuth 会话证据与更新提醒状态（上次检查时间、已忽略版本）存放在 application-support 目录下的一个小 JSON 文件中。它们在首帧之前完成恢复，避免应用闪现默认值。
 - **搜索兴趣**（`core/search/InterestStore`）：轻量的持久化标签浏览计数，用于跨重启驱动搜索页的个性化「推荐标签」。
+- **访问历史**（`core/history/VisitHistoryStore`）：作品详情访问记录按最新时间去重保存，最多 200 条；入口在搜索页右上角，仅保存在本机。
 - **网页会话 Cookie 快照**（`core/auth/WebSessionStore`）：已登录的 deviantart.com Cookie 与 CSRF/用户名状态一起快照，并在冷启动时平台 WebView 存储丢失（例如跨界应用更新）后重新注入。这能在不重新登录的前提下维持个性化 `rfy` 信息流；快照被限定在当前 OAuth 账号，不构成第二个身份。
 - **主题模式**（`core/theme/ThemeModeController`）：跟随系统 / 浅色 / 深色，注入 MaterialApp 并与上述偏好一起持久化。
 
