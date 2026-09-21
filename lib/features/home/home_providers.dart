@@ -101,6 +101,23 @@ final personalizedFeedProvider =
 (bool?, String) personalizedFeedSessionIdentity(WebSessionState web) =>
     (web.isLoggedIn, web.username);
 
+/// Live health of the personalized-feed web session. Unlike OAuth sign-in,
+/// the recommendation feed additionally needs the signed-in `userinfo`
+/// DeviantArt cookie; without it the endpoint silently returns the generic
+/// daily-like feed. This provider re-attempts restoration and reports false
+/// when the cookie could not be recovered, so the UI can ask for a web login
+/// instead of showing non-personalized content.
+final webCookieHealthProvider = FutureProvider<bool>((ref) async {
+  final webSession = ref.watch(webSessionProvider);
+  ref.watch(webSessionControllerProvider.select((web) => web.username));
+  final expected = ref.read(webSessionControllerProvider).username;
+  if (await _cookieKeepsWebIdentity(webSession, expected)) return true;
+  await ref
+      .read(webSessionControllerProvider.notifier)
+      .restorePersistedCookies();
+  return _cookieKeepsWebIdentity(webSession, expected);
+});
+
 /// Whether the live DeviantArt cookies still carry the signed-in identity the
 /// app thinks it has. `userinfo` is the cookie DeviantArt uses for the web
 /// session, so an empty or mismatched value means the feed is not personalized.
@@ -110,9 +127,10 @@ Future<bool> _cookieKeepsWebIdentity(
 ) async {
   final userInfo = (await webSession.cookies())['userinfo'];
   if (userInfo == null || userInfo.isEmpty) return false;
+  final actual = WebSession.usernameFromUserInfo(userInfo).trim();
+  if (actual.isEmpty) return false;
   if (expectedUsername.trim().isEmpty) return true;
-  final actual = WebSession.usernameFromUserInfo(userInfo).trim().toLowerCase();
-  return actual == expectedUsername.trim().toLowerCase();
+  return actual.toLowerCase() == expectedUsername.trim().toLowerCase();
 }
 
 /// Fetches one rfy page, or `null` when the web session is missing or the
