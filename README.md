@@ -10,7 +10,7 @@
 
 DeviantArt 官方客户端已经停止维护。DAViewer 是基于 [DAKit](https://github.com/redtidev1918/DAKit) 的第三方客户端，支持 Android、macOS 和 Windows。
 
-📖 完整文档：<https://redtidev1918.github.io/DAViewer/>
+📖 [完整文档](https://redtidev1918.github.io/DAViewer/)
 
 [![GitHub license](https://img.shields.io/github/license/redtidev1918/DAViewer?style=flat)](LICENSE) [![GitHub release](https://img.shields.io/github/v/release/redtidev1918/DAViewer?style=flat)](https://github.com/redtidev1918/DAViewer/releases) [![Platforms](https://img.shields.io/badge/platform-Android%20%7C%20macOS%20%7C%20Windows-blue?style=flat)](https://github.com/redtidev1918/DAViewer/releases) [![Docs](https://img.shields.io/badge/Docs-文档站点-6366f1?style=flat-square)](https://redtidev1918.github.io/DAViewer/)
 
@@ -93,7 +93,7 @@ Issue、PR、文档都欢迎，见 [CONTRIBUTING.md](CONTRIBUTING.md)。改动�
 
 ## 文档
 
-README 只讲怎么开始；完整内容在文档站 <https://redtidev1918.github.io/DAViewer/>：
+README 只讲怎么开始；完整内容在[文档站](https://redtidev1918.github.io/DAViewer/)：
 
 | 你想做什么 | 文档 |
 | --- | --- |
