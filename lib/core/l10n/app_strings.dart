@@ -62,8 +62,8 @@ final class AppStrings {
   String get signInWelcomeTitle =>
       _lang == AppLanguage.zh ? '登录 DeviantArt' : 'Sign in to DeviantArt';
   String get signInWelcomeBody => _lang == AppLanguage.zh
-      ? '一次进入 DeviantArt 官方登录页，可选择 DeviantArt、Google、Apple 或 Facebook。完成后直接使用 App，不需要再次登录。'
-      : 'Open the official DeviantArt sign-in once and choose DeviantArt, Google, Apple or Facebook. The app is ready when you return—no second sign-in.';
+      ? '这次登录会同时完成两件事：官方授权（OAuth）与网页会话 Cookie。Cookie 是 DeviantArt 识别网页身份的数据，个性化推荐依赖它。请完成整个流程后再关闭页面。'
+      : 'This login completes two things at once: OAuth authorization and the web-session Cookie. The Cookie is how DeviantArt identifies the browser, and personalized recommendations depend on it. Keep the page open until it finishes.';
   String get signInOrRegister =>
       _lang == AppLanguage.zh ? '登录或注册' : 'Sign in or create an account';
   String get verificationHint => _lang == AppLanguage.zh
@@ -106,8 +106,8 @@ final class AppStrings {
   String get noRecommendations =>
       _lang == AppLanguage.zh ? '暂无推荐' : 'No recommendations yet.';
   String get recommendedSignInHint => _lang == AppLanguage.zh
-      ? '登录后即可看到为你推荐的作品。'
-      : 'Sign in to see artwork recommended for you.';
+      ? '个性化推荐需要 DeviantArt 网页会话 Cookie。当前会话没有 Cookie，推荐只会显示通用内容；点击登录，在 App 内网页完成一次登录以获取 Cookie。'
+      : 'Personalized recommendations need the DeviantArt web-session Cookie. Without it the feed shows only generic content; tap Login and finish one web sign-in inside the app to restore the Cookie.';
   String get recommendedFeedLoadFailure => _lang == AppLanguage.zh
       ? '推荐内容暂时无法加载。请下拉刷新，或在设置中检查网络代理。'
       : 'Recommendations could not load. Pull to refresh or check the proxy in Settings.';
