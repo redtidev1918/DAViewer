@@ -6,7 +6,7 @@
 
 **语言 / Language:** 中文 · [English](README.en.md)
 
-**基于 DAKit 的开源 DeviantArt 客户端，支持 Android / macOS / Windows。**
+> **基于 DAKit 的开源 DeviantArt 客户端，支持 Android / macOS / Windows。**
 
 DeviantArt 官方客户端已经停止维护。DAViewer 是基于 [DAKit](https://github.com/redtidev1918/DAKit) 的第三方客户端，支持 Android、macOS 和 Windows。
 
