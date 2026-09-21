@@ -2,10 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/web_session.dart';
 import '../runtime/runtime_provider.dart';
+import 'session_state.dart';
 import 'web_session_controller.dart';
 import 'web_session_verifier.dart';
 
-export '../data/web_session.dart' show webSessionProvider;
+export 'session_state.dart' show webSessionProvider;
 
 /// Single source of truth for the DeviantArt web session.
 enum WebSessionStatusState {
