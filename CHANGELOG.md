@@ -3,6 +3,13 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.4.2](https://github.com/redtidev1918/DAViewer/compare/v0.4.1...v0.4.2) (2026-09-21)
+
+
+### Bug Fixes
+
+* **deps:** roll back DAKit api/web to v0.4.0 baseline ([a038d40](https://github.com/redtidev1918/DAViewer/commit/a038d40583fd03d1b7ba2db1dbc958f74d8a6999))
+
 ## [0.4.1](https://github.com/redtidev1918/DAViewer/compare/v0.4.0...v0.4.1) (2026-09-21)
 
 
