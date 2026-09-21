@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dakit_core/dakit_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -211,6 +212,15 @@ final class _PersonalizedFeedState extends ConsumerState<_PersonalizedFeed>
       );
     }
     final feed = ref.watch(personalizedFeedProvider);
+    final feedError = feed.error;
+    if (feedError is DAKitException &&
+        feedError.code == 'web.session.unavailable') {
+      return LoginPrompt(
+        s: s,
+        onLogin: () => context.push('/web-login'),
+        message: s.recommendedSignInHint,
+      );
+    }
 
     return ArtworkFeedGrid(
       scrollController: _scrollController,
