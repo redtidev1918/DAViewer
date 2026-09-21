@@ -70,8 +70,8 @@ final class AppStrings {
       ? '如页面出现人机验证，请按页面提示完成；如遇白屏或加载卡住，点击右上角刷新继续登录。'
       : 'If a human-verification challenge appears, complete it; if the page stalls or goes blank, use the refresh button in the top-right corner.';
   String get webLoginChallengeExceeded => _lang == AppLanguage.zh
-      ? 'DeviantArt 人机验证已达上限：请停 1-2 分钟只刷新一次；若仍白屏，请检查网络/代理或更换节点后重试。'
-      : 'DeviantArt has exhausted its challenge attempts. Wait 1-2 minutes, refresh once, and check the network/proxy if it stays blank.';
+      ? '当前网络/代理正在被 DeviantArt 拦截（Max challenge attempts exceeded）。请稍等 1-2 分钟只刷新一次，或更换网络/代理节点后重试。'
+      : 'DeviantArt is blocking this network/proxy (Max challenge attempts exceeded). Wait 1-2 minutes, refresh once, or switch network/proxy nodes.';
   String get notLoggedIn => _lang == AppLanguage.zh ? '未登录' : 'Not signed in';
   String get loginFirst =>
       _lang == AppLanguage.zh ? '请先登录。' : 'Please sign in.';
