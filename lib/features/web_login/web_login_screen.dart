@@ -11,6 +11,7 @@ import '../../core/auth/auth_controller.dart';
 import '../../core/auth/auth_state.dart';
 import '../../core/auth/session_state.dart';
 import '../../core/auth/web_session_controller.dart';
+import '../../core/auth/web_session_status.dart';
 import '../../core/auth/webview_oauth_bridge.dart';
 
 import 'package:dakit_web/dakit_web.dart';
@@ -125,6 +126,9 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
       // re-login case, where the OAuth state never transitions and the old
       // listener-based close never fired.
       if (isLoggedIn && mounted) {
+        ref
+            .read(webSessionStatusProvider.notifier)
+            .markHealthy(serverUsername: username);
         WidgetsBinding.instance.addPostFrameCallback((_) => _closeScreen());
       } else {
         _maybeClose();
@@ -149,6 +153,9 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
       );
       final blocked =
           raw is String && raw.contains('Max challenge attempts exceeded');
+      if (blocked) {
+        ref.read(webSessionStatusProvider.notifier).markLocked();
+      }
       if (mounted && _challengeBlocked != blocked) {
         setState(() => _challengeBlocked = blocked);
       }

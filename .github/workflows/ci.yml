@@ -32,6 +32,28 @@ jobs:
       - run: flutter analyze
       - run: dart format --output=none --set-exit-if-changed lib test
       - run: flutter test
+      - name: Chinese release notes for current manifest version
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import pathlib
+          import re
+
+          manifest = json.loads(
+              pathlib.Path(".release-please-manifest.json").read_text(encoding="utf-8")
+          )
+          version = manifest["."]
+          notes = pathlib.Path(f".github/release-notes/{version}.md")
+          if not notes.exists():
+              print(f"missing Chinese release notes: {notes}")
+              raise SystemExit(1)
+          text = notes.read_text(encoding="utf-8")
+          if "本次更新" not in text or not re.search(r"[\u4e00-\u9fff]", text):
+              print(f"release notes must contain Chinese and a 本次更新 section: {notes}")
+              raise SystemExit(1)
+          print(f"Chinese release notes OK for {version}")
+          PY
       - name: Canonical release asset naming
         shell: bash
         run: |

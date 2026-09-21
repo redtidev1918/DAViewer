@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_controller.dart';
+import '../../core/auth/web_session_status.dart';
 import '../../core/auth/web_session_controller.dart';
 import '../../core/data/da_uri.dart';
 import '../../core/l10n/app_strings.dart';
@@ -31,7 +32,6 @@ final class HomeScreen extends ConsumerWidget {
     final s = strings(ref.watch(appLanguageProvider));
     final auth = ref.watch(authControllerProvider);
     final oauthSignedIn = auth.oauthSignedIn;
-    final cookieHealth = ref.watch(webCookieHealthProvider);
 
     return DefaultTabController(
       length: 2,
@@ -95,60 +95,12 @@ final class HomeScreen extends ConsumerWidget {
         ),
         body: Column(
           children: <Widget>[
-            if (cookieHealth.value == false)
-              _WebSessionBanner(
-                message: s.webSessionBanner,
-                loginLabel: s.login,
-                onLogin: () => context.push('/web-login'),
-              ),
             const UpdateBanner(),
             const Expanded(
               child: TabBarView(
                 children: <Widget>[_PersonalizedFeed(), DailyFeed()],
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-final class _WebSessionBanner extends StatelessWidget {
-  const _WebSessionBanner({
-    required this.message,
-    required this.loginLabel,
-    required this.onLogin,
-  });
-
-  final String message;
-  final String loginLabel;
-  final VoidCallback onLogin;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: scheme.errorContainer,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          children: <Widget>[
-            Icon(
-              Icons.key_off_outlined,
-              size: 18,
-              color: scheme.onErrorContainer,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                message,
-                style: Theme.of(context).textTheme.bodyMedium
-                    ?.copyWith(color: scheme.onErrorContainer),
-              ),
-            ),
-            const SizedBox(width: 8),
-            FilledButton.tonal(onPressed: onLogin, child: Text(loginLabel)),
           ],
         ),
       ),
@@ -260,8 +212,8 @@ final class _PersonalizedFeedState extends ConsumerState<_PersonalizedFeed>
         message: s.recommendedSignInHint,
       );
     }
-    final cookieHealth = ref.watch(webCookieHealthProvider);
-    if (cookieHealth.value == false) {
+    final webStatus = ref.watch(webSessionStatusProvider);
+    if (webStatus.needsLogin) {
       return LoginPrompt(
         s: s,
         onLogin: () => context.push('/web-login'),
