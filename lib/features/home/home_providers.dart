@@ -1,4 +1,4 @@
-import 'package:dakit_flutter/dakit_flutter.dart';
+import 'package:dakit_flutter/dakit_flutter.dart' hide WebSession;
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
