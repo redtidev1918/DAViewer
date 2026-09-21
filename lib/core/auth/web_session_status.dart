@@ -5,6 +5,8 @@ import '../runtime/runtime_provider.dart';
 import 'web_session_controller.dart';
 import 'web_session_verifier.dart';
 
+export '../data/web_session.dart' show webSessionProvider;
+
 /// Single source of truth for the DeviantArt web session.
 enum WebSessionStatusState {
   unknown,
