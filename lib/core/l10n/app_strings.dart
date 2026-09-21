@@ -111,6 +111,9 @@ final class AppStrings {
   String get recommendedFeedLoadFailure => _lang == AppLanguage.zh
       ? '推荐内容暂时无法加载。请下拉刷新，或在设置中检查网络代理。'
       : 'Recommendations could not load. Pull to refresh or check the proxy in Settings.';
+  String get webSessionBanner => _lang == AppLanguage.zh
+      ? '个性化推荐需要 App 内网页会话 Cookie；当前 Cookie 不可用，请进入 App 内网页重新获取。'
+      : 'Personalized recommendations need the in-app web-session Cookie; it is unavailable now. Open the in-app web page to restore it.';
   String get noImage => _lang == AppLanguage.zh ? '暂无图片' : 'No image';
   String get imageLoadFailed =>
       _lang == AppLanguage.zh ? '图片加载失败' : 'Failed to load';
