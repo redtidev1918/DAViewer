@@ -211,6 +211,14 @@ final class _PersonalizedFeedState extends ConsumerState<_PersonalizedFeed>
         message: s.recommendedSignInHint,
       );
     }
+    final cookieHealth = ref.watch(webCookieHealthProvider);
+    if (cookieHealth.value == false) {
+      return LoginPrompt(
+        s: s,
+        onLogin: () => context.push('/web-login'),
+        message: s.recommendedSignInHint,
+      );
+    }
     final feed = ref.watch(personalizedFeedProvider);
     final feedError = feed.error;
     if (feedError is DAKitException &&
