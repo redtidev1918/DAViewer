@@ -3,6 +3,13 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.4.3](https://github.com/redtidev1918/DAViewer/compare/v0.4.2...v0.4.3) (2026-09-21)
+
+
+### Bug Fixes
+
+* **deps:** consume dakit_web 0.2.4 CSRF refresh ([ce64072](https://github.com/redtidev1918/DAViewer/commit/ce6407292311e279c86619f7fc7e7d667b2de4c2))
+
 ## [0.4.2](https://github.com/redtidev1918/DAViewer/compare/v0.4.1...v0.4.2) (2026-09-21)
 
 
