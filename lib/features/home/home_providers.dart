@@ -6,7 +6,7 @@ import '../../core/auth/auth_controller.dart';
 import '../../core/auth/session_state.dart';
 import '../../core/auth/web_session_controller.dart';
 import '../../core/auth/web_session_refresher.dart';
-import '../../core/auth/web_session_verifier.dart';
+import '../../core/auth/web_session_status.dart';
 import '../../core/data/web_session.dart';
 
 import 'package:dakit_web/dakit_web.dart';
@@ -99,56 +99,22 @@ final personalizedFeedProvider =
 /// when the cookie could not be recovered, so the UI can ask for a web login
 /// instead of showing non-personalized content.
 final webCookieHealthProvider = FutureProvider<bool>((ref) async {
-  final webSession = ref.watch(webSessionProvider);
-  final runtime = ref.watch(runtimeProvider);
-  final dio = runtime.dio;
-  if (dio == null) return false;
-  ref.watch(webSessionControllerProvider.select((web) => web.username));
-  final expected = ref.read(webSessionControllerProvider).username;
-  final logger = AppLogger.instance;
-  final before = await _cookieKeepsWebIdentity(webSession, dio, expected);
-  if (before) {
-    logger.info('home', 'web cookie healthy: $expected');
-    return true;
-  }
-  await ref
-      .read(webSessionControllerProvider.notifier)
-      .restorePersistedCookies();
-  final after = await _cookieKeepsWebIdentity(webSession, dio, expected);
-  if (!after) {
-    logger.warning(
+  final controller = ref.read(webSessionStatusProvider.notifier);
+  await controller.check();
+  final status = ref.read(webSessionStatusProvider);
+  if (status.isHealthy) {
+    AppLogger.instance.info(
       'home',
-      'web cookie unavailable after restore; showing web-session banner',
+      'web cookie healthy: ${status.serverUsername}',
     );
   } else {
-    logger.info('home', 'web cookie restored from persisted snapshot');
+    AppLogger.instance.warning(
+      'home',
+      'web session status: ${status.state.name}; showing web-session notice',
+    );
   }
-  return after;
+  return status.isHealthy;
 });
-
-/// Whether the live DeviantArt cookies still carry the signed-in identity the
-/// app thinks it has. `userinfo` is the cookie DeviantArt uses for the web
-/// session, so an empty or mismatched value means the feed is not personalized.
-Future<bool> _cookieKeepsWebIdentity(
-  WebSession webSession,
-  Dio dio,
-  String expectedUsername,
-) async {
-  final cookies = await webSession.cookies();
-  final cookieHeader = cookies.entries
-      .map((entry) => '${entry.key}=${entry.value}')
-      .join('; ');
-  if (cookieHeader.isEmpty) return false;
-  try {
-    final actual = await WebSessionVerifier(dio)
-        .username(cookieHeader: cookieHeader);
-    if (actual.isEmpty) return false;
-    if (expectedUsername.trim().isEmpty) return true;
-    return actual.toLowerCase() == expectedUsername.trim().toLowerCase();
-  } on Object {
-    return false;
-  }
-}
 
 /// Fetches one rfy page, or `null` when the web session is missing or the
 /// request failed (the caller then refreshes the session and retries).

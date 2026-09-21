@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../core/auth/auth_controller.dart';
 import '../core/auth/auth_state.dart';
 import '../core/l10n/app_strings.dart';
+import '../shared/widgets/app_notice_host.dart';
 
 final class AppShell extends ConsumerWidget {
   const AppShell({required this.navigationShell, super.key});
@@ -24,7 +25,12 @@ final class AppShell extends ConsumerWidget {
       }
     });
     return Scaffold(
-      body: navigationShell,
+      body: Stack(
+        children: <Widget>[
+          navigationShell,
+          const Positioned(top: 0, left: 0, right: 0, child: AppNoticeHost()),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: (index) => navigationShell.goBranch(
