@@ -3,6 +3,22 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.4.9](https://github.com/redtidev1918/DAViewer/compare/v0.4.8...v0.4.9) (2026-09-22)
+
+### 修复
+
+- 网页会话改为单一状态机，服务端确认只在本会话内执行一次并带缓存与退避；
+- 检测到 DeviantArt 人机验证上限时提示用户停一下再刷新，App 不会自动重复刷新。
+
+### 新增
+
+- 全局通知层，网页会话横幅由统一的 AppNoticeHost 渲染；
+- App 内网页右上角手动刷新按钮。
+
+### 其他
+
+- Release 页面的更新说明改为中文，并由 CI 校验。
+
 ## [0.4.8](https://github.com/redtidev1918/DAViewer/compare/v0.4.7...v0.4.8) (2026-09-22)
 
 ### 修复
