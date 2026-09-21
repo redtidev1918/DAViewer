@@ -38,36 +38,18 @@ final personalizedFeedProvider =
             message: 'The network layer is not available.',
           );
         }
-        var csrf = ref.read(webSessionControllerProvider).csrf;
-        var cookieHeader = await webSession.cookieHeader();
-        final expectedWebUsername = ref
-            .read(webSessionControllerProvider)
-            .username;
-        if (!await _cookieKeepsWebIdentity(
-          webSession,
-          dio,
-          expectedWebUsername,
-        )) {
-          // The recommendation feed must be personalized; an anonymous (or
-          // stale) cookie header would render the generic daily-like feed.
-          // Re-attempt the persisted-cookie restore before deciding the web
-          // session really is unavailable.
-          await ref
-              .read(webSessionControllerProvider.notifier)
-              .restorePersistedCookies();
-          cookieHeader = await webSession.cookieHeader();
-        }
-        if (!await _cookieKeepsWebIdentity(
-          webSession,
-          dio,
-          expectedWebUsername,
-        )) {
+        // Server verification runs once per session in webCookieHealthProvider
+        // and is cached; do not repeat the homepage request on every fetch or
+        // refresh, which would trip DeviantArt's WAF challenge counter.
+        if (!await ref.read(webCookieHealthProvider.future)) {
           throw const DAKitException(
             kind: DAKitFailureKind.authentication,
             code: 'web.session.unavailable',
             message: 'The personalized feed requires a signed-in web session.',
           );
         }
+        var csrf = ref.read(webSessionControllerProvider).csrf;
+        var cookieHeader = await webSession.cookieHeader();
         var page = await _tryFetchRfy(dio, csrf, cookieHeader, request);
         if (page == null) {
           // An app update can clear the live WebView cookie store even though
