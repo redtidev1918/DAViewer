@@ -3,6 +3,13 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.4.6](https://github.com/redtidev1918/DAViewer/compare/v0.4.5...v0.4.6) (2026-09-21)
+
+
+### Bug Fixes
+
+* **home:** show global web-session banner and log cookie health ([2a83b43](https://github.com/redtidev1918/DAViewer/commit/2a83b437db398a2281a4681a1837d92eabeff23c))
+
 ## [0.4.5](https://github.com/redtidev1918/DAViewer/compare/v0.4.4...v0.4.5) (2026-09-21)
 
 
