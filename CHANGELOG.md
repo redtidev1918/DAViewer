@@ -3,6 +3,13 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.4.1](https://github.com/redtidev1918/DAViewer/compare/v0.4.0...v0.4.1) (2026-09-21)
+
+
+### Miscellaneous Chores
+
+* **main:** release 0.4.1 ([5cfc947](https://github.com/redtidev1918/DAViewer/commit/5cfc9479baff8f35b3f11e1c142cd1450df7cfa4))
+
 ## [0.4.0](https://github.com/redtidev1918/DAViewer/compare/v0.3.0...v0.4.0) (2026-09-20)
 
 
