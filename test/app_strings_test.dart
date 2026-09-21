@@ -49,10 +49,10 @@ void main() {
   test('login strings are localized', () {
     expect(zh.signInOrRegister, '登录或注册');
     expect(en.signInOrRegister, 'Sign in or create an account');
-    expect(zh.signInWelcomeBody, contains('不需要再次登录'));
+    expect(zh.signInWelcomeBody, contains('网页会话 Cookie'));
     expect(zh.loginFailed('网络错误'), '登录失败：网络错误');
     expect(en.loginFailed('Network error'), 'Sign-in failed: Network error');
-    expect(zh.signInWelcomeBody, contains('Facebook'));
+    expect(zh.signInWelcomeBody, contains('OAuth'));
     expect(zh.localLogoutHint, contains('一并退出'));
     expect(zh.home, '推荐');
     expect(en.home, 'For you');
