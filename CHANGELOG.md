@@ -3,6 +3,14 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.4.4](https://github.com/redtidev1918/DAViewer/compare/v0.4.3...v0.4.4) (2026-09-21)
+
+
+### Bug Fixes
+
+* **home:** disambiguate WebSession import ([fef84e2](https://github.com/redtidev1918/DAViewer/commit/fef84e23d68ff6ab1965372e5a251efe7721b558))
+* **home:** require signed-in web cookies for personalized feed ([520828b](https://github.com/redtidev1918/DAViewer/commit/520828bbca45b715288d0c3ec439164b5bb29586))
+
 ## [0.4.3](https://github.com/redtidev1918/DAViewer/compare/v0.4.2...v0.4.3) (2026-09-21)
 
 
