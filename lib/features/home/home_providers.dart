@@ -6,6 +6,7 @@ import '../../core/auth/auth_controller.dart';
 import '../../core/auth/session_state.dart';
 import '../../core/auth/web_session_controller.dart';
 import '../../core/auth/web_session_refresher.dart';
+import '../../core/auth/web_session_verifier.dart';
 import '../../core/data/web_session.dart';
 
 import 'package:dakit_web/dakit_web.dart';
@@ -42,7 +43,11 @@ final personalizedFeedProvider =
         final expectedWebUsername = ref
             .read(webSessionControllerProvider)
             .username;
-        if (!await _cookieKeepsWebIdentity(webSession, expectedWebUsername)) {
+        if (!await _cookieKeepsWebIdentity(
+          webSession,
+          dio,
+          expectedWebUsername,
+        )) {
           // The recommendation feed must be personalized; an anonymous (or
           // stale) cookie header would render the generic daily-like feed.
           // Re-attempt the persisted-cookie restore before deciding the web
@@ -52,7 +57,11 @@ final personalizedFeedProvider =
               .restorePersistedCookies();
           cookieHeader = await webSession.cookieHeader();
         }
-        if (!await _cookieKeepsWebIdentity(webSession, expectedWebUsername)) {
+        if (!await _cookieKeepsWebIdentity(
+          webSession,
+          dio,
+          expectedWebUsername,
+        )) {
           throw const DAKitException(
             kind: DAKitFailureKind.authentication,
             code: 'web.session.unavailable',
@@ -109,10 +118,13 @@ final personalizedFeedProvider =
 /// instead of showing non-personalized content.
 final webCookieHealthProvider = FutureProvider<bool>((ref) async {
   final webSession = ref.watch(webSessionProvider);
+  final runtime = ref.watch(runtimeProvider);
+  final dio = runtime.dio;
+  if (dio == null) return false;
   ref.watch(webSessionControllerProvider.select((web) => web.username));
   final expected = ref.read(webSessionControllerProvider).username;
   final logger = AppLogger.instance;
-  final before = await _cookieKeepsWebIdentity(webSession, expected);
+  final before = await _cookieKeepsWebIdentity(webSession, dio, expected);
   if (before) {
     logger.info('home', 'web cookie healthy: $expected');
     return true;
@@ -120,7 +132,7 @@ final webCookieHealthProvider = FutureProvider<bool>((ref) async {
   await ref
       .read(webSessionControllerProvider.notifier)
       .restorePersistedCookies();
-  final after = await _cookieKeepsWebIdentity(webSession, expected);
+  final after = await _cookieKeepsWebIdentity(webSession, dio, expected);
   if (!after) {
     logger.warning(
       'home',
@@ -137,14 +149,23 @@ final webCookieHealthProvider = FutureProvider<bool>((ref) async {
 /// session, so an empty or mismatched value means the feed is not personalized.
 Future<bool> _cookieKeepsWebIdentity(
   WebSession webSession,
+  Dio dio,
   String expectedUsername,
 ) async {
-  final userInfo = (await webSession.cookies())['userinfo'];
-  if (userInfo == null || userInfo.isEmpty) return false;
-  final actual = WebSession.usernameFromUserInfo(userInfo).trim();
-  if (actual.isEmpty) return false;
-  if (expectedUsername.trim().isEmpty) return true;
-  return actual.toLowerCase() == expectedUsername.trim().toLowerCase();
+  final cookies = await webSession.cookies();
+  final cookieHeader = cookies.entries
+      .map((entry) => '${entry.key}=${entry.value}')
+      .join('; ');
+  if (cookieHeader.isEmpty) return false;
+  try {
+    final actual = await WebSessionVerifier(dio)
+        .username(cookieHeader: cookieHeader);
+    if (actual.isEmpty) return false;
+    if (expectedUsername.trim().isEmpty) return true;
+    return actual.toLowerCase() == expectedUsername.trim().toLowerCase();
+  } on Object {
+    return false;
+  }
 }
 
 /// Fetches one rfy page, or `null` when the web session is missing or the
