@@ -3,6 +3,17 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.4.7](https://github.com/redtidev1918/DAViewer/compare/v0.4.6...v0.4.7) (2026-09-22)
+
+### Bug Fixes
+
+* **auth:** verify the DeviantArt web login with the server instead of trusting
+  only the local `userinfo` cookie ([75d550c](https://github.com/redtidev1918/DAViewer/commit/75d550c5d316b7e8cbbed3ed41f23ee94cf835a6))
+* **auth:** add a refresh button to the in-app web page and explain human
+  verification / blank-page recovery ([f599553](https://github.com/redtidev1918/DAViewer/commit/f599553e083af7f2882ac7a81975f8251d7e7401))
+* **release:** pin ReleaseGraph with the Chinese release-body constraint
+  ([42b3db7](https://github.com/redtidev1918/DAViewer/commit/42b3db701f5f2bbdb57cc6a9deee4e62a4cecbbd))
+
 ## [0.4.6](https://github.com/redtidev1918/DAViewer/compare/v0.4.5...v0.4.6) (2026-09-21)
 
 
