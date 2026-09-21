@@ -111,11 +111,25 @@ final webCookieHealthProvider = FutureProvider<bool>((ref) async {
   final webSession = ref.watch(webSessionProvider);
   ref.watch(webSessionControllerProvider.select((web) => web.username));
   final expected = ref.read(webSessionControllerProvider).username;
-  if (await _cookieKeepsWebIdentity(webSession, expected)) return true;
+  final logger = AppLogger.instance;
+  final before = await _cookieKeepsWebIdentity(webSession, expected);
+  if (before) {
+    logger.info('home', 'web cookie healthy: $expected');
+    return true;
+  }
   await ref
       .read(webSessionControllerProvider.notifier)
       .restorePersistedCookies();
-  return _cookieKeepsWebIdentity(webSession, expected);
+  final after = await _cookieKeepsWebIdentity(webSession, expected);
+  if (!after) {
+    logger.warning(
+      'home',
+      'web cookie unavailable after restore; showing web-session banner',
+    );
+  } else {
+    logger.info('home', 'web cookie restored from persisted snapshot');
+  }
+  return after;
 });
 
 /// Whether the live DeviantArt cookies still carry the signed-in identity the
