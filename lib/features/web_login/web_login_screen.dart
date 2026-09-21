@@ -9,7 +9,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/auth/auth_controller.dart';
 import '../../core/auth/auth_state.dart';
-import '../../core/auth/session_state.dart';
 import '../../core/auth/web_session_controller.dart';
 import '../../core/auth/web_session_status.dart';
 import '../../core/auth/webview_oauth_bridge.dart';

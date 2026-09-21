@@ -3,7 +3,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/auth_controller.dart';
-import '../../core/auth/session_state.dart';
 import '../../core/auth/web_session_controller.dart';
 import '../../core/auth/web_session_refresher.dart';
 import '../../core/auth/web_session_status.dart';
