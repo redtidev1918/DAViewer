@@ -205,10 +205,10 @@ packages:
     dependency: "direct main"
     description:
       name: dakit_api
-      sha256: "8b28fe919b8cbce49eaaad6282db7d991350defe0d7070b7ee0ce82abf2ad9d9"
+      sha256: "20d93aef56a704c7e06a169c763722f14eb71b1299dcd5bc2df0227b287ee729"
       url: "https://pub.dev"
     source: hosted
-    version: "1.1.0"
+    version: "1.0.0"
   dakit_core:
     dependency: "direct main"
     description:
@@ -229,10 +229,10 @@ packages:
     dependency: "direct main"
     description:
       name: dakit_web
-      sha256: "222f0a123d1a5554c1221dcdc3a6544587a4d98619f062fd3843cb85de2c8f21"
+      sha256: "4b73d516a8a48ef5348297852f891bbe9f87d8a73be36e1be9ab1267712672ff"
       url: "https://pub.dev"
     source: hosted
-    version: "0.2.3"
+    version: "0.2.1"
   dbus:
     dependency: transitive
     description:
