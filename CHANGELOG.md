@@ -3,6 +3,19 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.4.8](https://github.com/redtidev1918/DAViewer/compare/v0.4.7...v0.4.8) (2026-09-22)
+
+### 修复
+
+- 网页登录态改为服务端确认，不再只依赖本地 Cookie 判断；
+- 推荐页不再用匿名或每日精选内容冒充个性化推荐；
+- Release 页面的“更新了哪些内容”改为中文说明。
+
+### 新增
+
+- 主页顶部“网页会话 Cookie 不可用”横批，点击直接进入 App 内网页；
+- App 内网页右上角刷新按钮，白屏、卡顿或人机验证卡住时可刷新。
+
 ## [0.4.7](https://github.com/redtidev1918/DAViewer/compare/v0.4.6...v0.4.7) (2026-09-22)
 
 ### Bug Fixes
