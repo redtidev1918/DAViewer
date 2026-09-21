@@ -3,6 +3,13 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.4.5](https://github.com/redtidev1918/DAViewer/compare/v0.4.4...v0.4.5) (2026-09-21)
+
+
+### Bug Fixes
+
+* **home:** require valid userinfo cookie and prompt web login ([aa6dca9](https://github.com/redtidev1918/DAViewer/commit/aa6dca91a9f7e6c935872abae21b98e04f1706a2))
+
 ## [0.4.4](https://github.com/redtidev1918/DAViewer/compare/v0.4.3...v0.4.4) (2026-09-21)
 
 
