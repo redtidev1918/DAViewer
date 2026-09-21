@@ -6,6 +6,7 @@ import '../../core/auth/auth_controller.dart';
 import '../../core/auth/session_state.dart';
 import '../../core/auth/web_session_controller.dart';
 import '../../core/auth/web_session_refresher.dart';
+import '../../core/data/web_session.dart';
 
 import 'package:dakit_web/dakit_web.dart';
 
@@ -38,6 +39,26 @@ final personalizedFeedProvider =
         }
         var csrf = ref.read(webSessionControllerProvider).csrf;
         var cookieHeader = await webSession.cookieHeader();
+        final expectedWebUsername = ref
+            .read(webSessionControllerProvider)
+            .username;
+        if (!await _cookieKeepsWebIdentity(webSession, expectedWebUsername)) {
+          // The recommendation feed must be personalized; an anonymous (or
+          // stale) cookie header would render the generic daily-like feed.
+          // Re-attempt the persisted-cookie restore before deciding the web
+          // session really is unavailable.
+          await ref
+              .read(webSessionControllerProvider.notifier)
+              .restorePersistedCookies();
+          cookieHeader = await webSession.cookieHeader();
+        }
+        if (!await _cookieKeepsWebIdentity(webSession, expectedWebUsername)) {
+          throw const DAKitException(
+            kind: DAKitFailureKind.authentication,
+            code: 'web.session.unavailable',
+            message: 'The personalized feed requires a signed-in web session.',
+          );
+        }
         var page = await _tryFetchRfy(dio, csrf, cookieHeader, request);
         if (page == null) {
           // An app update can clear the live WebView cookie store even though
@@ -79,6 +100,20 @@ final personalizedFeedProvider =
 /// latest CSRF directly from [webSessionControllerProvider].
 (bool?, String) personalizedFeedSessionIdentity(WebSessionState web) =>
     (web.isLoggedIn, web.username);
+
+/// Whether the live DeviantArt cookies still carry the signed-in identity the
+/// app thinks it has. `userinfo` is the cookie DeviantArt uses for the web
+/// session, so an empty or mismatched value means the feed is not personalized.
+Future<bool> _cookieKeepsWebIdentity(
+  WebSession webSession,
+  String expectedUsername,
+) async {
+  final userInfo = (await webSession.cookies())['userinfo'];
+  if (userInfo == null || userInfo.isEmpty) return false;
+  if (expectedUsername.trim().isEmpty) return true;
+  final actual = WebSession.usernameFromUserInfo(userInfo).trim().toLowerCase();
+  return actual == expectedUsername.trim().toLowerCase();
+}
 
 /// Fetches one rfy page, or `null` when the web session is missing or the
 /// request failed (the caller then refreshes the session and retries).
