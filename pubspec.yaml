@@ -14,7 +14,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   dakit_api: ^1.1.0
   dakit_core: ^1.1.0
-  dakit_web: ^0.2.3
+  dakit_web: ^0.2.4
   dakit_flutter: ^1.0.0
   dio: ^5.11.1
   flutter_cache_manager: ^3.4.2
