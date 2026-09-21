@@ -46,6 +46,7 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
   Uri? _pendingAuthUri;
   bool _loading = true;
   bool _closeAfterReport = false;
+  bool _challengeBlocked = false;
   int _reportSeq = 0;
   double _progress = 0;
   late final AuthController _authController;
@@ -139,6 +140,23 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _closeScreen());
   }
 
+  /// Detects DeviantArt's WAF lockout page and surfaces an in-app hint instead
+  /// of letting the user stare at a blank page or refresh into more attempts.
+  Future<void> _detectChallenge(InAppWebViewController controller) async {
+    try {
+      final raw = await controller.evaluateJavascript(
+        source: "document.body ? document.body.innerText : ''",
+      );
+      final blocked =
+          raw is String && raw.contains('Max challenge attempts exceeded');
+      if (mounted && _challengeBlocked != blocked) {
+        setState(() => _challengeBlocked = blocked);
+      }
+    } on Object {
+      // Best effort; the challenge state is refreshed on the next load.
+    }
+  }
+
   /// Pops back to the screen the login came from. When the login screen IS the
   /// root route (first run reached it via the splash redirect), popping would
   /// leave an empty navigator and a black screen — go Home instead.
@@ -227,6 +245,12 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
         children: <Widget>[
           Column(
             children: <Widget>[
+              if (_challengeBlocked)
+                _LoginChallengeBanner(
+                  message: s.webLoginChallengeExceeded,
+                  refreshLabel: s.refresh,
+                  onRefresh: () => _controller?.reload(),
+                ),
               if (auth.error != null)
                 _LoginErrorBanner(
                   message: friendlyLoginErrorMessage(auth.error!, s),
@@ -292,6 +316,7 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                       // overwrite a later signed-in page (home).
                       final uri = url;
                       if (uri != null && uri.host == 'www.deviantart.com') {
+                        unawaited(_detectChallenge(controller));
                         unawaited(_reportWebSession());
                       }
                     },
@@ -319,6 +344,48 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
 /// A slim hint shown while sign-in is in progress. It sets expectations for
 /// DeviantArt's human-verification challenges without trying to detect them
 /// through brittle DOM inspection.
+final class _LoginChallengeBanner extends StatelessWidget {
+  const _LoginChallengeBanner({
+    required this.message,
+    required this.refreshLabel,
+    required this.onRefresh,
+  });
+
+  final String message;
+  final String refreshLabel;
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.errorContainer,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Row(
+          children: <Widget>[
+            Icon(
+              Icons.gpp_bad_outlined,
+              size: 16,
+              color: scheme.onErrorContainer,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: scheme.onErrorContainer),
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton(onPressed: onRefresh, child: Text(refreshLabel)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 final class _VerificationHint extends StatelessWidget {
   const _VerificationHint({required this.s});
 
