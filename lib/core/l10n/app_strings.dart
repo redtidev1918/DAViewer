@@ -67,8 +67,8 @@ final class AppStrings {
   String get signInOrRegister =>
       _lang == AppLanguage.zh ? '登录或注册' : 'Sign in or create an account';
   String get verificationHint => _lang == AppLanguage.zh
-      ? '如页面出现人机验证，请按页面提示完成，随后会自动继续登录。'
-      : 'If a human-verification challenge appears, complete it and sign-in continues automatically.';
+      ? '如页面出现人机验证，请按页面提示完成；如遇白屏或加载卡住，点击右上角刷新继续登录。'
+      : 'If a human-verification challenge appears, complete it; if the page stalls or goes blank, use the refresh button in the top-right corner.';
   String get notLoggedIn => _lang == AppLanguage.zh ? '未登录' : 'Not signed in';
   String get loginFirst =>
       _lang == AppLanguage.zh ? '请先登录。' : 'Please sign in.';
