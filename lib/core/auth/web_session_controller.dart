@@ -102,6 +102,13 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
     await _restoreWebCookies(saved);
   }
 
+  /// Re-attempts the persisted cookie restore after an app update has already
+  /// lost the live WebView cookies. The startup restore can race the WebView/
+  /// proxy readiness; website-only adapters call this again when they find no
+  /// live cookie header instead of surfacing a generic feed error.
+  Future<void> restorePersistedCookies() async =>
+      _restoreWebCookies(await _store.read());
+
   /// Re-injects the persisted deviantart.com cookies when the WebView store
   /// currently has no signed-in `userinfo` cookie. Restoring requires a
   /// signed-in OAuth state; while the OAuth account profile is normally

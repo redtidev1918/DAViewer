@@ -9,6 +9,7 @@ import '../../core/auth/web_session_refresher.dart';
 
 import 'package:dakit_web/dakit_web.dart';
 
+import '../../core/diagnostics/app_logger.dart';
 import '../../core/feed/artwork_feed_controller.dart';
 import '../../core/runtime/runtime_provider.dart';
 import '../artwork/artwork_store.dart';
@@ -39,6 +40,16 @@ final personalizedFeedProvider =
         var cookieHeader = await webSession.cookieHeader();
         var page = await _tryFetchRfy(dio, csrf, cookieHeader, request);
         if (page == null) {
+          // An app update can clear the live WebView cookie store even though
+          // the persisted snapshot and OAuth identity survive. The startup
+          // restore may have raced WebView readiness, so retry it before the
+          // headless CSRF refresh.
+          if (cookieHeader.isEmpty) {
+            await ref
+                .read(webSessionControllerProvider.notifier)
+                .restorePersistedCookies();
+            cookieHeader = await webSession.cookieHeader();
+          }
           // Stale session after a restart: re-read the CSRF from the persisted
           // cookies (headless page load) and retry once.
           await ref.read(webSessionRefresherProvider).refresh();
@@ -77,14 +88,23 @@ Future<Page<Artwork>?> _tryFetchRfy(
   String cookieHeader,
   PageRequest request,
 ) async {
-  if (csrf.isEmpty || cookieHeader.isEmpty) return null;
+  final logger = AppLogger.instance;
+  if (csrf.isEmpty || cookieHeader.isEmpty) {
+    logger.warning(
+      'home',
+      'rfy skipped: csrf=${csrf.isEmpty ? 'missing' : 'ok'} '
+          'cookie=${cookieHeader.isEmpty ? 'missing' : 'ok'}',
+    );
+    return null;
+  }
   try {
     return await RfyFeedFetcher(dio).fetch(
       cookieHeader: cookieHeader,
       csrfToken: csrf,
       cursor: request.cursor,
     );
-  } on Object {
+  } on Object catch (error, stack) {
+    logger.warning('home', 'rfy fetch failed', error, stack);
     return null;
   }
 }
