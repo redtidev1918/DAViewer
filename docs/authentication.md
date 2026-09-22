@@ -26,6 +26,13 @@ DAViewer 只有一个用户身份：官方 DeviantArt OAuth 会话。应用既�
 
 一次内嵌登录同时建立两种会话。WebView 只在 OAuth 回调回到 DeviantArt 首页之后才上报网页会话（CSRF token 与 `userinfo` Cookie），因此应用不会把匿名登录页的未登录状态记录为网页会话。
 
+持久化的 Cookie 快照保留每个 Cookie 的完整元数据（域名、路径、过期时间、
+Secure/HttpOnly），而不是折叠成 `name→value` 表：同名的 `.deviantart.com` 与
+`.www.deviantart.com` Cookie 不会互相覆盖，恢复时按原元数据写回 WebView，从而
+避免应用更新后平台 Cookie 存储丢失导致被迫重新登录。旧的 `name→value` 快照在
+读取时自动迁移。服务端验证（`check`）合并并发调用、共享同一次在途校验，并用
+代际计数丢弃迟到的匿名/失败结果，防止旧校验覆盖更新一次的登录成功状态。
+
 **只有 OAuth 已登录（或刚完成）时，服务端确认的网页会话才会让登录界面关闭。**
 首次登录时网页 Cookie 先确认也绝不提前关闭，登录页会等 OAuth 完成；仅重建
 网页会话（OAuth 已登录）时仍会自动关闭，不会再次索要授权。

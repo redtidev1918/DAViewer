@@ -190,6 +190,9 @@ final class _SearchScreenState extends ConsumerState<SearchScreen> {
                         ref.read(searchFeedProvider(query).notifier).refresh(),
                     onLoadMore: () =>
                         ref.read(searchFeedProvider(query).notifier).loadMore(),
+                    onRetryLoadMore: () => ref
+                        .read(searchFeedProvider(query).notifier)
+                        .retryLoadMore(),
                   )
                 : UserResults(query: query),
           ),

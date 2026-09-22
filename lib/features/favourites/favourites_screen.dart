@@ -45,6 +45,8 @@ final class FavouritesScreen extends ConsumerWidget {
         onRefresh: () => ref.read(currentFavouritesProvider.notifier).refresh(),
         onLoadMore: () =>
             ref.read(currentFavouritesProvider.notifier).loadMore(),
+        onRetryLoadMore: () =>
+            ref.read(currentFavouritesProvider.notifier).retryLoadMore(),
       ),
     );
   }

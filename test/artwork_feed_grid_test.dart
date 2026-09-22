@@ -210,6 +210,35 @@ void main() {
     expect(calls, greaterThan(0));
   });
 
+  testWidgets('failed pagination shows a working retry footer', (tester) async {
+    var retries = 0;
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: ArtworkFeedGrid(
+              feed: ArtworkFeedState(
+                items: <Artwork>[artwork(0)],
+                nextCursor: 'next',
+                error: StateError('boom'),
+                phase: FeedRequestPhase.stopped,
+              ),
+              emptyMessage: 'Empty',
+              onRetryLoadMore: () {
+                retries += 1;
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byIcon(Icons.refresh), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.refresh));
+    expect(retries, 1);
+  });
+
   testWidgets('remaining near the bottom fires only one edge event', (
     tester,
   ) async {

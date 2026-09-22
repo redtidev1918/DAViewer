@@ -196,6 +196,14 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
     }
   }
 
+  /// Retries a failed pagination page. A user tap is an explicit retry, so it
+  /// resets the backoff that would otherwise keep a scroll-triggered [loadMore]
+  /// from firing.
+  Future<void> retryLoadMore() {
+    _resetPaginationBackoff();
+    return loadMore();
+  }
+
   /// Re-fetches the first page without clearing the current items, so the feed
   /// updates in place without a spinner flicker (e.g. when the app resumes).
   Future<void> refreshSilently() async {

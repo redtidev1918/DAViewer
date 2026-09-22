@@ -58,6 +58,8 @@ final class FolderScreen extends ConsumerWidget {
             ref.read(folderContentsProvider(request).notifier).refresh(),
         onLoadMore: () =>
             ref.read(folderContentsProvider(request).notifier).loadMore(),
+        onRetryLoadMore: () =>
+            ref.read(folderContentsProvider(request).notifier).retryLoadMore(),
       ),
     );
   }

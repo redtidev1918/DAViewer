@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/diagnostics/app_logger.dart';
 import '../../core/diagnostics/error_text.dart';
 import '../../core/feed/artwork_feed_controller.dart';
+import '../../core/l10n/app_strings.dart';
 import '../../features/artwork/artwork_navigation.dart';
 import 'app_empty_state.dart';
 import 'app_error_state.dart';
@@ -20,6 +21,7 @@ final class ArtworkFeedGrid extends ConsumerStatefulWidget {
     this.scrollController,
     this.onRefresh,
     this.onLoadMore,
+    this.onRetryLoadMore,
     this.emptyActionLabel,
     this.emptyOnAction,
     this.errorMessage,
@@ -33,6 +35,11 @@ final class ArtworkFeedGrid extends ConsumerStatefulWidget {
   final ScrollController? scrollController;
   final Future<void> Function()? onRefresh;
   final VoidCallback? onLoadMore;
+
+  /// User-facing retry for a failed pagination page. Distinct from
+  /// [onLoadMore] because a plain scroll-triggered loadMore is still inside
+  /// its backoff window and would appear to do nothing.
+  final VoidCallback? onRetryLoadMore;
   final String? errorActionLabel;
   final VoidCallback? errorOnAction;
 
@@ -97,6 +104,11 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
       // aspect ratio, which looks more like a modern image feed.
       final width = MediaQuery.of(context).size.width;
       final crossAxisCount = (width / 200).round().clamp(2, 4);
+      final showTrailing =
+          widget.feed.isLoading ||
+          (widget.feed.phase == FeedRequestPhase.stopped &&
+              widget.feed.error != null &&
+              widget.feed.items.isNotEmpty);
       body = MasonryGridView.count(
         controller: widget.scrollController,
         padding: const EdgeInsets.all(12),
@@ -104,13 +116,27 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
         crossAxisCount: crossAxisCount,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        itemCount: widget.feed.items.length + (widget.feed.isLoading ? 1 : 0),
+        itemCount: widget.feed.items.length + (showTrailing ? 1 : 0),
         itemBuilder: (context, index) {
           if (index >= widget.feed.items.length) {
-            return const Center(
+            if (widget.feed.isLoading) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+            final onRetry = widget.onRetryLoadMore ?? widget.onLoadMore;
+            if (onRetry == null) return const SizedBox.shrink();
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: FilledButton.tonalIcon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh),
+                  label: Text(strings(ref.watch(appLanguageProvider)).retry),
+                ),
               ),
             );
           }

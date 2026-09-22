@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
+import '../data/web_session.dart';
 import '../diagnostics/app_logger.dart';
 
 /// Persists a lightweight snapshot of the DeviantArt *web* session (CSRF +
@@ -35,9 +36,12 @@ final class WebSessionStore {
       if (!await file.exists()) return const <String, Object?>{};
       final text = await file.readAsString();
       final data = jsonDecode(text);
-      return data is Map<String, dynamic>
-          ? data.cast<String, Object?>()
-          : const <String, Object?>{};
+      if (data is! Map<String, dynamic>) return const <String, Object?>{};
+      final result = data.cast<String, Object?>();
+      if (result.containsKey('cookies')) {
+        result['cookies'] = parsePersistedCookies(result['cookies']);
+      }
+      return result;
     } on Object catch (error, stack) {
       AppLogger.instance.warning(
         'web-session',
@@ -51,19 +55,21 @@ final class WebSessionStore {
 
   /// Patches the snapshot. Omitted fields keep their latest persisted values.
   /// [cookies] is written only when the caller explicitly supplies a valid,
-  /// non-empty map; `null` never clears an existing Cookie snapshot.
+  /// non-empty list; `null` never clears an existing Cookie snapshot.
   Future<void> update({
     String? csrf,
     bool? isLoggedIn,
     String? username,
-    Map<String, String>? cookies,
+    List<PersistedWebCookie>? cookies,
   }) => _queue(
     () => _performUpdate((map) {
       if (csrf != null) map['csrf'] = csrf;
       if (isLoggedIn != null) map['isLoggedIn'] = isLoggedIn;
       if (username != null) map['username'] = username;
       if (cookies != null && cookies.isNotEmpty) {
-        map['cookies'] = cookies;
+        map['cookies'] = <Map<String, Object?>>[
+          for (final cookie in cookies) cookie.toJson(),
+        ];
       }
     }),
   );
@@ -103,7 +109,7 @@ final class WebSessionStore {
       AppLogger.instance.info(
         'web-session',
         'persist snapshot '
-            'cookies=${cookies is Map ? cookies.length : 0} '
+            'cookies=${cookies is List ? cookies.length : 0} '
             'generation=${DateTime.now().millisecondsSinceEpoch ~/ 1000}',
       );
     } on Object catch (error, stack) {

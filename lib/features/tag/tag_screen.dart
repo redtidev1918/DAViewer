@@ -138,6 +138,9 @@ final class _TagScreenState extends ConsumerState<TagScreen> {
                 onLoadMore: () => ref
                     .read(tagFeedProvider((widget.tag, _sort)).notifier)
                     .loadMore(),
+                onRetryLoadMore: () => ref
+                    .read(tagFeedProvider((widget.tag, _sort)).notifier)
+                    .retryLoadMore(),
               ),
             ),
           ),

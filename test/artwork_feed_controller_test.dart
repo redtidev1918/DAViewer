@@ -237,6 +237,42 @@ void main() {
     },
   );
 
+  test('retryLoadMore resets the backoff and retries immediately', () async {
+    var calls = 0;
+    var now = DateTime(2026, 1, 1);
+    final controller = ArtworkFeedController(
+      (request) async {
+        calls += 1;
+        if (request.cursor == null) {
+          return Page<Artwork>(
+            items: <Artwork>[artwork(1)],
+            hasMore: true,
+            nextCursor: 'next',
+          );
+        }
+        if (calls == 2) throw StateError('boom');
+        return Page<Artwork>(items: <Artwork>[artwork(2)], hasMore: false);
+      },
+      autoLoad: false,
+      now: () => now,
+      paginationBackoff: const <Duration>[Duration(minutes: 1)],
+    );
+
+    await controller.refresh();
+    await controller.loadMore();
+    expect(controller.state.phase, FeedRequestPhase.stopped);
+
+    // A scroll-triggered loadMore inside the backoff window stays quiet.
+    await controller.loadMore();
+    expect(calls, 2);
+
+    // An explicit user retry resets the backoff and fires immediately.
+    await controller.retryLoadMore();
+    expect(calls, 3);
+    expect(controller.state.items, hasLength(2));
+    expect(controller.state.phase, FeedRequestPhase.idle);
+  });
+
   test('dispose stops new pagination requests', () async {
     var calls = 0;
     final controller = ArtworkFeedController((request) async {

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
+import '../data/web_session.dart';
+
 /// A value-safe summary of deviantart.com cookies for lifecycle diagnostics.
 /// Raw Cookie values, full CSRF tokens, and full Cookie headers are never
 /// logged; only a SHA-256 fingerprint plus structural metadata is recorded.
@@ -90,6 +92,25 @@ String webSessionFingerprint(List<Cookie> cookies) {
 String webSessionMapFingerprint(Map<String, String> cookies) {
   final keys = cookies.keys.toList()..sort();
   final lines = keys.map((key) => '$key=${cookies[key]}');
+  return sha256.convert(utf8.encode(lines.join('\n'))).toString();
+}
+
+/// Fingerprint for the structured persisted cookie list, so a snapshot with
+/// the same names/values but different domains, paths, or expiry is never
+/// treated as unchanged.
+String webSessionPersistedFingerprint(List<PersistedWebCookie> cookies) {
+  final sorted = cookies.toList()
+    ..sort(
+      (a, b) => '${a.name}|${a.domain}|${a.path}'.compareTo(
+        '${b.name}|${b.domain}|${b.path}',
+      ),
+    );
+  final lines = sorted.map(
+    (cookie) =>
+        '${cookie.name}|${cookie.domain}|${cookie.path}|${cookie.value}|'
+        '${cookie.isSecure}|${cookie.isHttpOnly}|${cookie.isSessionOnly}|'
+        '${cookie.expiresDate ?? ''}',
+  );
   return sha256.convert(utf8.encode(lines.join('\n'))).toString();
 }
 
