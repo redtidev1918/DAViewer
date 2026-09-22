@@ -53,6 +53,6 @@ because the project does not purchase Apple Developer Program signing.
 
 ## 当前状态
 
-NOT READY。剩余阻塞是真实 Mac 交互 smoke（首页分页、Notice、WebView
-lifecycle）、原始 `collections/all` runtime 因果复现、R3 的 token-refresh 完整
-证明，以及 Git/DAKit 发布收口；Keychain 付费签名不再作为阻塞项。
+`v0.4.10` 已按项目决策发布，DAKit `dakit_api 1.1.1` 已上传 pub.dev。已知剩余
+runtime caveats（Mac 交互 smoke、部分回归证据）记录在
+`docs/architecture/data-lifecycle-audit.md`；Keychain 付费签名不再作为阻塞项。
