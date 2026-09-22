@@ -131,6 +131,22 @@ void main() {
     );
   });
 
+  test('prefers viewable full content over a blurred preview', () {
+    final content = asset(
+      'content',
+      MediaKind.image,
+      width: 2400,
+      uri: Uri.parse('https://x/content.jpg'),
+    );
+    final preview = asset(
+      'preview',
+      MediaKind.image,
+      width: 800,
+      uri: Uri.parse('https://x/preview.jpg'),
+    );
+    expect(selectDisplayAsset(<MediaAsset>[content, preview])?.id, 'content');
+  });
+
   testWidgets('multi-image pages consume swipes before the next artwork', (
     tester,
   ) async {

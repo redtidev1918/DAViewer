@@ -1,7 +1,9 @@
 import 'package:dakit_flutter/dakit_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/diagnostics/app_logger.dart';
 import '../../core/diagnostics/error_text.dart';
 import '../../core/feed/artwork_feed_controller.dart';
 import '../../features/artwork/artwork_navigation.dart';
@@ -11,7 +13,7 @@ import 'app_refresh_indicator.dart';
 import 'artwork_card.dart';
 import 'skeleton.dart';
 
-final class ArtworkFeedGrid extends ConsumerWidget {
+final class ArtworkFeedGrid extends ConsumerStatefulWidget {
   const ArtworkFeedGrid({
     required this.feed,
     required this.emptyMessage,
@@ -21,6 +23,8 @@ final class ArtworkFeedGrid extends ConsumerWidget {
     this.emptyActionLabel,
     this.emptyOnAction,
     this.errorMessage,
+    this.errorActionLabel,
+    this.errorOnAction,
     super.key,
   });
 
@@ -29,6 +33,8 @@ final class ArtworkFeedGrid extends ConsumerWidget {
   final ScrollController? scrollController;
   final Future<void> Function()? onRefresh;
   final VoidCallback? onLoadMore;
+  final String? errorActionLabel;
+  final VoidCallback? errorOnAction;
 
   /// Optional call-to-action shown when the feed is empty (e.g. "Discover").
   final String? emptyActionLabel;
@@ -40,25 +46,50 @@ final class ArtworkFeedGrid extends ConsumerWidget {
   final String? errorMessage;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ArtworkFeedGrid> createState() => _ArtworkFeedGridState();
+}
+
+final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
+  static const Duration _pointerScrollGrace = Duration(milliseconds: 400);
+
+  DateTime? _lastPointerScrollAt;
+
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is PointerScrollEvent) {
+      _lastPointerScrollAt = DateTime.now();
+    }
+  }
+
+  bool _isManualScroll(ScrollUpdateNotification notification) {
+    if (notification.dragDetails != null) return true;
+    final lastPointerScroll = _lastPointerScrollAt;
+    return lastPointerScroll != null &&
+        DateTime.now().difference(lastPointerScroll) <= _pointerScrollGrace;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     Widget body;
 
-    if (feed.error != null && feed.items.isEmpty) {
+    if (widget.feed.error != null && widget.feed.items.isEmpty) {
       body = AppErrorState(
-        message: errorMessage ?? friendlyErrorMessage(feed.error!),
-        onRetry: onRefresh == null
+        message:
+            widget.errorMessage ?? friendlyErrorMessage(widget.feed.error!),
+        onRetry: widget.onRefresh == null
             ? null
             : () {
-                onRefresh?.call();
+                widget.onRefresh?.call();
               },
+        actionLabel: widget.errorActionLabel,
+        onAction: widget.errorOnAction,
       );
-    } else if (feed.items.isEmpty && feed.isLoading) {
+    } else if (widget.feed.items.isEmpty && widget.feed.isLoading) {
       body = const SkeletonGrid();
-    } else if (feed.items.isEmpty) {
+    } else if (widget.feed.items.isEmpty) {
       body = AppEmptyState(
-        message: emptyMessage,
-        actionLabel: emptyActionLabel,
-        onAction: emptyOnAction,
+        message: widget.emptyMessage,
+        actionLabel: widget.emptyActionLabel,
+        onAction: widget.emptyOnAction,
       );
     } else {
       // Masonry (waterfall) layout: cards render at their image's natural
@@ -66,15 +97,15 @@ final class ArtworkFeedGrid extends ConsumerWidget {
       final width = MediaQuery.of(context).size.width;
       final crossAxisCount = (width / 200).round().clamp(2, 4);
       body = MasonryGridView.count(
-        controller: scrollController,
+        controller: widget.scrollController,
         padding: const EdgeInsets.all(12),
         physics: const AlwaysScrollableScrollPhysics(),
         crossAxisCount: crossAxisCount,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        itemCount: feed.items.length + (feed.isLoading ? 1 : 0),
+        itemCount: widget.feed.items.length + (widget.feed.isLoading ? 1 : 0),
         itemBuilder: (context, index) {
-          if (index >= feed.items.length) {
+          if (index >= widget.feed.items.length) {
             return const Center(
               child: Padding(
                 padding: EdgeInsets.all(16),
@@ -82,13 +113,13 @@ final class ArtworkFeedGrid extends ConsumerWidget {
               ),
             );
           }
-          final artwork = feed.items[index];
+          final artwork = widget.feed.items[index];
           return ArtworkCard(
             artwork: artwork,
             onTap: () => openArtworkFromList(
               context,
               ref,
-              artworks: feed.items,
+              artworks: widget.feed.items,
               artwork: artwork,
             ),
           );
@@ -98,10 +129,10 @@ final class ArtworkFeedGrid extends ConsumerWidget {
 
     // Wrap in a refreshable scroll view so pull-to-refresh works even when
     // the grid is empty or not yet filled.
-    final refreshable = onRefresh == null
+    final refreshable = widget.onRefresh == null
         ? body
         : AppRefreshIndicator(
-            onRefresh: onRefresh!,
+            onRefresh: widget.onRefresh!,
             child: body is ScrollView
                 ? body
                 : LayoutBuilder(
@@ -116,16 +147,33 @@ final class ArtworkFeedGrid extends ConsumerWidget {
                   ),
           );
 
-    if (onLoadMore == null) return refreshable;
+    if (widget.onLoadMore == null) return refreshable;
 
-    return NotificationListener<ScrollNotification>(
-      onNotification: (notification) {
-        if (notification.metrics.extentAfter < 400) {
-          onLoadMore?.call();
-        }
-        return false;
-      },
-      child: refreshable,
+    return Listener(
+      onPointerSignal: _handlePointerSignal,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          // Only real user scroll may page the feed. Programmatic layout,
+          // rebuilds, or state updates must never call loadMore: without this
+          // guard a masonry grid whose content does not fill the viewport
+          // would repeatedly page through the whole collection on its own.
+          // Trackpad and mouse-wheel scrolling emit PointerScrollEvent with no
+          // dragDetails, so those are tracked separately instead of being
+          // filtered out as if they were programmatic.
+          if (notification is! ScrollUpdateNotification) return false;
+          if (!_isManualScroll(notification)) return false;
+          if (notification.metrics.extentAfter < 400) {
+            AppLogger.instance.info(
+              'feed',
+              'loadMore trigger drag=${notification.dragDetails != null} '
+                  'extentAfter=${notification.metrics.extentAfter.toStringAsFixed(1)}',
+            );
+            widget.onLoadMore?.call();
+          }
+          return false;
+        },
+        child: refreshable,
+      ),
     );
   }
 }

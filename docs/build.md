@@ -22,6 +22,9 @@ Flutter 3.47 默认使用 AGP 9.1.0，但稳定版 `flutter_inappwebview`（6.1.
 - 推送到 `main` 触发 CI 质量检查与 Android/macOS/Windows 构建；推送 `v*` tag 会创建 GitHub Release，其说明取自 `RELEASE_NOTES.md` 中对应的面向用户章节。缺少该章节会**阻止**发版，而不是退化成提交信息或内部实现说明。
 - 发布用 APK 始终使用上传密钥库签名（CI 机密 `KEYSTORE_B64` / `KEYSTORE_PROPERTIES`）；缺少本地 `android/key.properties` 的 release 构建会**故意失败**，从而不可能用 debug 签名的 APK 覆盖此前上传签名的发布版。
 - macOS 发布 tag 需要私有预览证书机密。CI 用该稳定自签名身份签名、重新应用仓库内声明的 entitlements、校验两种 CPU 架构，并让应用保持运行 8 秒完成启动冒烟测试。非发布构建可回退到 ad-hoc 签名。产物仍带 `macos-unsigned-preview` 标记，因为预览身份不是 Apple Developer ID，包也未公证。
+- 项目**不购买 Apple Developer Program**；稳定签名与公证明确不在发布范围内。
+  本地 `ad-hoc / 无 TeamIdentifier` 是接受的环境限制，不作为 Release Gate
+  阻塞项。
 
 ### 一键发版
 

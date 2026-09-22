@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/auth/auth_controller.dart';
 import '../core/auth/auth_state.dart';
+import '../core/auth/web_session_status.dart';
 import '../core/l10n/app_strings.dart';
 import '../shared/route_observer.dart';
 import '../features/artist/artist_screen.dart';
@@ -29,6 +30,7 @@ import 'app_shell.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authRevision = ValueNotifier<int>(0);
+  ref.listen(webSessionReadyProvider, (_, _) => authRevision.value++);
   final router = GoRouter(
     initialLocation: '/splash',
     refreshListenable: authRevision,
@@ -146,6 +148,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
     redirect: (context, state) {
+      // Stay on Splash until the persisted Web Session snapshot has been
+      // restored; redirecting earlier disposes Splash mid-initialization and
+      // can leave webSessionReady=false forever, which blocks Home entirely.
+      if (state.matchedLocation == '/splash' &&
+          !ref.read(webSessionReadyProvider)) {
+        return null;
+      }
       final auth = ref.read(authControllerProvider);
       return authRedirect(auth.status, state.matchedLocation);
     },

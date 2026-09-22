@@ -90,6 +90,11 @@ cdhash from requesting the Mac password after each update. Token and recovery
 storage use the `DAViewer Account` Keychain service; older ad-hoc items are
 never queried, so an inaccessible legacy record cannot block authorization.
 
+The project does **not purchase Apple Developer Program** and does not require
+paid developer signing. Local `ad-hoc / no TeamIdentifier` is an accepted
+environment limitation; stable signing and notarization are intentionally out
+of scope and are not a Keychain acceptance or Release Gate blocker.
+
 The Home **推荐 / For you** tab is the website's personalized `rfy/deviations`
 feed, fetched with the WebView's Cookie and CSRF token. It requires a signed-in
 web session; when the web session is absent the tab shows the sign-in prompt.

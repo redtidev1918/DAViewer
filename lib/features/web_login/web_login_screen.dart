@@ -12,12 +12,14 @@ import '../../core/auth/auth_state.dart';
 import '../../core/auth/web_session_controller.dart';
 import '../../core/auth/web_session_status.dart';
 import '../../core/auth/webview_oauth_bridge.dart';
+import '../../core/diagnostics/app_logger.dart';
 
 import 'package:dakit_web/dakit_web.dart';
 
 import '../../core/diagnostics/error_text.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/runtime/runtime_provider.dart';
+import '../home/home_providers.dart';
 
 /// Hosts the embedded DeviantArt WebView.
 ///
@@ -57,6 +59,7 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
   @override
   void initState() {
     super.initState();
+    AppLogger.instance.info('webview', 'login screen created');
     _authController = ref.read(authControllerProvider.notifier);
     final bridge = _bridge;
     if (bridge != null) {
@@ -77,10 +80,12 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
   @override
   void dispose() {
     unawaited(_launchSub?.cancel());
+    AppLogger.instance.info('webview', 'login screen disposed');
     super.dispose();
   }
 
   void _loadAuthRequest(Uri uri) {
+    AppLogger.instance.info('webview', 'loading oauth authorize: $uri');
     final controller = _controller;
     if (controller == null) {
       _pendingAuthUri = uri;
@@ -92,7 +97,9 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
   /// Reads the web session (CSRF + login state + username) from the WebView
   /// page and reports it to the auth controller. The page must be read here
   /// because a plain HTTP client is rejected by deviantart.com's bot filter.
-  Future<void> _reportWebSession() async {
+  Future<void> _reportWebSession({
+    bool serverConfirmedNavigation = false,
+  }) async {
     final controller = _controller;
     if (controller == null) return;
     final seq = ++_reportSeq;
@@ -104,31 +111,57 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
       if (raw is! String || raw.isEmpty) return;
       final data = jsonDecode(raw) as Map<String, dynamic>;
       final csrf = (data['csrf'] as String?) ?? '';
+      if (csrf.isEmpty) {
+        AppLogger.instance.warning(
+          'webview',
+          'login page has no CSRF token; web session not reported',
+        );
+        return;
+      }
       // Pages without a session state (the OAuth callback) have no CSRF token;
       // skip them so they don't overwrite a good session.
-      if (csrf.isEmpty) return;
       // Read the login identity from the long-lived `userinfo` cookie instead
       // of the page's __INITIAL_STATE__, which the login/authorize pages do
       // not populate reliably.
       final username = await ref.read(webSessionProvider).webUsername();
       final isLoggedIn = username.isNotEmpty;
-      debugPrint(
-        '[web-session] csrf=${csrf.length} isLoggedIn=$isLoggedIn '
-        'username=$username',
+      AppLogger.instance.info(
+        'webview',
+        'web session report csrf=${csrf.length} '
+            'isLoggedIn=$isLoggedIn username=$username',
       );
       await ref
           .read(webSessionControllerProvider.notifier)
           .report(csrf: csrf, username: username);
-      // A signed-in web session (the `userinfo` cookie) means login succeeded
-      // and the cookie is captured — leave the login screen automatically.
-      // This also covers the "OAuth already signed in, web session lost"
-      // re-login case, where the OAuth state never transitions and the old
-      // listener-based close never fired.
+      AppLogger.instance.info('webview', 'web session reported to controller');
+      // A redirect from /users/login to the signed-in home page is the
+      // server's own verification that the cookie is valid. An extra HTTP
+      // probe would hit the WAF and can report anonymous for a valid WebView
+      // session, so that is not used as the close gate.
       if (isLoggedIn && mounted) {
-        ref
-            .read(webSessionStatusProvider.notifier)
-            .markHealthy(serverUsername: username);
-        WidgetsBinding.instance.addPostFrameCallback((_) => _closeScreen());
+        if (!serverConfirmedNavigation) {
+          AppLogger.instance.info(
+            'webview',
+            'signed-in report on login path; waiting for home navigation',
+          );
+        } else {
+          AppLogger.instance.info(
+            'webview',
+            'server confirmed web session via signed-in home navigation',
+          );
+          ref
+              .read(webSessionStatusProvider.notifier)
+              .markHealthy(serverUsername: username);
+          // The web identity may already be recorded from a persisted cookie,
+          // so a healthy transition is the actionable login signal here.
+          ref.invalidate(personalizedFeedProvider);
+          AppLogger.instance.info(
+            'webview',
+            'invalidated personalized feed after confirmed login',
+          );
+          _closeAfterReport = false;
+          WidgetsBinding.instance.addPostFrameCallback((_) => _closeScreen());
+        }
       } else {
         _maybeClose();
       }
@@ -153,7 +186,10 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
       final blocked =
           raw is String && raw.contains('Max challenge attempts exceeded');
       if (blocked) {
+        AppLogger.instance.warning('webview', 'challenge page detected');
         ref.read(webSessionStatusProvider.notifier).markLocked();
+      } else {
+        AppLogger.instance.info('webview', 'challenge check passed');
       }
       if (mounted && _challengeBlocked != blocked) {
         setState(() => _challengeBlocked = blocked);
@@ -192,14 +228,6 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
           mounted &&
           !_closeAfterReport) {
         _closeAfterReport = true;
-        // Fallback: if the home page never reports (navigation stalls), close
-        // after a generous timeout so the user isn't stuck.
-        Future<void>.delayed(const Duration(seconds: 8), () {
-          if (mounted && _closeAfterReport) {
-            _closeAfterReport = false;
-            _closeScreen();
-          }
-        });
       }
     });
 
@@ -213,7 +241,10 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
         actions: <Widget>[
           IconButton(
             tooltip: s.refresh,
-            onPressed: () => _controller?.reload(),
+            onPressed: () {
+              AppLogger.instance.info('webview', 'manual refresh requested');
+              _controller?.reload();
+            },
             icon: const Icon(Icons.refresh),
           ),
           // Settings, proxy, diagnostics, updates, and About must stay
@@ -266,6 +297,12 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                 child: ColoredBox(
                   color: theme.scaffoldBackgroundColor,
                   child: InAppWebView(
+                    // A stable key keeps one WebView/controller across sibling
+                    // banner insertions. Without it, showing the challenge or
+                    // verification hint would shift child slots and recreate
+                    // the WebView, which reloads deviantart.com and can feed a
+                    // challenge into an automatic reload loop.
+                    key: const ValueKey('web-login-webview'),
                     initialUrlRequest: URLRequest(
                       url: WebUri(_loginUri.toString()),
                     ),
@@ -280,6 +317,7 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                       // keyboard resizes the surface.
                     ),
                     onWebViewCreated: (controller) {
+                      AppLogger.instance.info('webview', 'controller created');
                       _controller = controller;
                       final pending = _pendingAuthUri;
                       if (pending != null) {
@@ -313,9 +351,17 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                           return NavigationActionPolicy.ALLOW;
                         },
                     onLoadStart: (controller, url) {
+                      AppLogger.instance.info(
+                        'webview',
+                        'load start: ${url ?? '<null>'}',
+                      );
                       if (mounted) setState(() => _loading = true);
                     },
                     onLoadStop: (controller, url) {
+                      AppLogger.instance.info(
+                        'webview',
+                        'load stop: ${url ?? '<null>'}',
+                      );
                       if (mounted) setState(() => _loading = false);
                       // Report from any deviantart.com page. A sequence counter makes
                       // the latest page win, so an earlier anonymous page (login) cannot
@@ -323,7 +369,11 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                       final uri = url;
                       if (uri != null && uri.host == 'www.deviantart.com') {
                         unawaited(_detectChallenge(controller));
-                        unawaited(_reportWebSession());
+                        unawaited(
+                          _reportWebSession(
+                            serverConfirmedNavigation: uri.path == '/',
+                          ),
+                        );
                       }
                     },
                     onProgressChanged: (controller, progress) {

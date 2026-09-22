@@ -8,10 +8,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_controller.dart';
 import '../../core/auth/web_session_status.dart';
-import '../../core/auth/web_session_controller.dart';
 import '../../core/data/da_uri.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../shared/widgets/artwork_feed_grid.dart';
+import '../../shared/widgets/skeleton.dart';
 import '../notifications/notifications_providers.dart';
 import 'home_feeds.dart';
 import 'home_providers.dart';
@@ -202,42 +202,28 @@ final class _PersonalizedFeedState extends ConsumerState<_PersonalizedFeed>
   Widget build(BuildContext context) {
     super.build(context); // required by AutomaticKeepAliveClientMixin
     final s = strings(ref.watch(appLanguageProvider));
-    final webSignedIn = ref.watch(
-      webSessionControllerProvider.select((web) => web.isLoggedIn == true),
-    );
-    if (!webSignedIn) {
-      return LoginPrompt(
-        s: s,
-        onLogin: () => context.push('/web-login'),
-        message: s.recommendedSignInHint,
-      );
-    }
-    final webStatus = ref.watch(webSessionStatusProvider);
-    if (webStatus.needsLogin) {
-      return LoginPrompt(
-        s: s,
-        onLogin: () => context.push('/web-login'),
-        message: s.recommendedSignInHint,
-      );
+    if (!ref.watch(webSessionReadyProvider)) {
+      return const SkeletonGrid();
     }
     final feed = ref.watch(personalizedFeedProvider);
-    final feedError = feed.error;
-    if (feedError is DAKitException &&
-        feedError.code == 'web.session.unavailable') {
-      return LoginPrompt(
-        s: s,
-        onLogin: () => context.push('/web-login'),
-        message: s.recommendedSignInHint,
-      );
-    }
+    final needsWebLogin =
+        feed.error is DAKitException &&
+        (feed.error! as DAKitException).code == 'web.session.unavailable';
 
     return ArtworkFeedGrid(
       scrollController: _scrollController,
       feed: feed,
       emptyMessage: s.noRecommendations,
       errorMessage: s.recommendedFeedLoadFailure,
-      onRefresh: () => ref.read(personalizedFeedProvider.notifier).refresh(),
+      onRefresh: () async {
+        // User-initiated retry must bypass any verification cooldown, otherwise
+        // the button appears to do nothing after a failed session check.
+        await ref.read(webSessionStatusProvider.notifier).check(force: true);
+        await ref.read(personalizedFeedProvider.notifier).refresh();
+      },
       onLoadMore: () => ref.read(personalizedFeedProvider.notifier).loadMore(),
+      errorActionLabel: needsWebLogin ? s.login : null,
+      errorOnAction: needsWebLogin ? () => context.push('/web-login') : null,
     );
   }
 }

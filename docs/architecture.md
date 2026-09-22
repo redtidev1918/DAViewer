@@ -91,7 +91,7 @@ WebView 的网页会话（Cookie 与 CSRF）属于基础设施状态，不是认
 - `pubspec.yaml` 是发布流程唯一编辑的版本来源。Flutter 通过 `FLUTTER_BUILD_NAME` 暴露给应用。
 - 每个 tag 必须在 `RELEASE_NOTES.md` 中有对应的顶层章节；CI 用该章节作为 GitHub Release 正文。
 - CI 执行 analyze、格式检查、测试，并构建 Android、macOS 与 Windows。
-- Android 发版需要已配置的上传密钥库。macOS 产物使用私有稳定的自签名预览身份以保持 Keychain 连续性，但仍不是 Apple 签名、也未公证；在具备 Developer ID 签名与公证之前，保留 `macos-unsigned-preview` 标记。
+- Android 发版需要已配置的上传密钥库。macOS 产物使用私有稳定的自签名预览身份以保持 Keychain 连续性，但仍不是 Apple 签名、也未公证。项目**不购买 Apple Developer Program**，Developer ID 签名与公证明确不在范围内；产物保留 `macos-unsigned-preview` 标记，不将此作为发布阻塞项。
 - 发布只保留最新的 GitHub Release 可见。Git tag 作为源码历史记录保留，发布任务不会删除它们。
 
 ## 应用本地状态

@@ -39,6 +39,10 @@ DAViewer 只有一个用户身份：官方 DeviantArt OAuth 会话。应用既�
 
 macOS 预览版使用同一个私有稳定的 CI 签名身份。该身份是自签名的，不被 Apple 信任也未公证，但它能避免每次更新后变化的 ad-hoc cdhash 索要 Mac 密码。token 与恢复存储使用 `DAViewer Account` Keychain 服务；更早的 ad-hoc 项永不查询，因此无法访问的历史记录不会阻塞授权。
 
+项目**不购买 Apple Developer Program**，也不要求付费开发者签名。本地
+`ad-hoc / 无 TeamIdentifier` 是接受的环境限制；稳定签名与公证明确不在本项目的
+发布范围内，不作为 Keychain 验收或 Release Gate 的阻塞项。
+
 首页 **推荐 / For you** 标签是网站的个性化 `rfy/deviations` 信息流，使用 WebView 的 Cookie 与 CSRF token 拉取。它需要已登录的网页会话；网页会话缺失时该标签展示登录提示。**每日精选 / Daily** 标签使用官方 OAuth API，不依赖网页会话。产品上不得把这两个数据源表述为等价。
 
 ## 公开网页适配器

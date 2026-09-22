@@ -1,11 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../runtime/runtime_provider.dart';
 import 'session_state.dart';
 import 'web_session_controller.dart';
-import 'web_session_verifier.dart';
 
 export 'session_state.dart' show webSessionProvider;
+
+/// Set by the splash screen after the persisted Web Session snapshot has been
+/// restored. Personalized/data providers that depend on the web identity wait
+/// for this flag so a cold-start identity restore cannot recreate them twice
+/// (unknown → restored) and emit a duplicate initial request.
+final webSessionReadyProvider = StateProvider<bool>((ref) => false);
 
 /// Single source of truth for the DeviantArt web session.
 enum WebSessionStatusState {
@@ -67,27 +71,22 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   int _failures = 0;
   bool _checking = false;
 
-  /// Runs the server-side verification at most once per cache window and
-  /// never during a backoff period. UI rebuilds and feed fetches must call
-  /// this method; they must not construct their own [WebSessionVerifier].
-  Future<void> check() async {
+  /// Restores a persisted server-confirmed session snapshot, never during a
+  /// backoff period. The next feed request is the acceptance gate: expired
+  /// cookies surface as a feed error instead of forcing a WAF probe.
+  Future<void> check({bool force = false}) async {
     if (_checking) return;
     final last = _lastSuccess;
-    if (last != null &&
+    if (!force &&
+        last != null &&
         state.isHealthy &&
         DateTime.now().difference(last) < _cacheDuration) {
       return;
     }
-    if (state.inCooldown) return;
+    if (!force && state.inCooldown) return;
 
     _checking = true;
     try {
-      final runtime = _ref.read(runtimeProvider);
-      final dio = runtime.dio;
-      if (dio == null) {
-        _setUnavailable();
-        return;
-      }
       // Restore the persisted snapshot if the live WebView store lost it
       // (for example after an app update), before asking the server.
       await _ref
@@ -99,26 +98,22 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         _setAnonymous();
         return;
       }
-      final cookieHeader = cookies.entries
-          .map((entry) => '${entry.key}=${entry.value}')
-          .join('; ');
-      final serverUsername = await WebSessionVerifier(dio)
-          .username(cookieHeader: cookieHeader);
-      if (serverUsername.isEmpty) {
+      // The persisted snapshot only exists because a previous session was
+      // confirmed during an actual WebView login. Re-verifying it with a
+      // separate HTTP request is exactly what makes the WAF report anonymous
+      // on cold start. The authoritative acceptance happens on the next rfy
+      // request: if the cookie expired, that fetch fails and surfaces error.
+      final controllerState = _ref.read(webSessionControllerProvider);
+      if (controllerState.isLoggedIn != true ||
+          controllerState.username.trim().isEmpty) {
         _setAnonymous();
-        return;
-      }
-      final expected = _ref.read(webSessionControllerProvider).username;
-      if (expected.trim().isNotEmpty &&
-          serverUsername.toLowerCase() != expected.trim().toLowerCase()) {
-        _setStale(serverUsername);
         return;
       }
       _lastSuccess = DateTime.now();
       _failures = 0;
       state = WebSessionStatus(
         state: WebSessionStatusState.healthy,
-        serverUsername: serverUsername,
+        serverUsername: controllerState.username,
         lastCheckedAt: DateTime.now(),
       );
     } on Object {
@@ -148,14 +143,6 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   void _setAnonymous() {
     _failures = 0;
     state = const WebSessionStatus(state: WebSessionStatusState.anonymous);
-  }
-
-  void _setStale(String serverUsername) {
-    _failures = 0;
-    state = WebSessionStatus(
-      state: WebSessionStatusState.stale,
-      serverUsername: serverUsername,
-    );
   }
 
   void _setUnavailable() {

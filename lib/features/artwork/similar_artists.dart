@@ -12,13 +12,26 @@ import 'artwork_detail_providers.dart';
 /// concept with a `biMetadata` `type:"artist"` hint but streams the list
 /// post-hydration), so this section derives the honest equivalent from the
 /// related artwork's authors. Tapping opens the artist's profile.
-final class SimilarArtistsSection extends ConsumerWidget {
+final class SimilarArtistsSection extends ConsumerStatefulWidget {
   const SimilarArtistsSection({required this.artworkId, super.key});
 
   final String artworkId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SimilarArtistsSection> createState() =>
+      _SimilarArtistsSectionState();
+}
+
+final class _SimilarArtistsSectionState
+    extends ConsumerState<SimilarArtistsSection>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final artworkId = widget.artworkId;
     final artists = ref.watch(similarArtistsProvider(artworkId)).valueOrNull;
     if (artists == null || artists.isEmpty) return const SizedBox.shrink();
     final s = strings(ref.watch(appLanguageProvider));

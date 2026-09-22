@@ -102,4 +102,128 @@ void main() {
     expect(calls, 1);
     expect(controller.state.items.single.id, 'art-1');
   });
+
+  test('failed pagination enters bounded backoff until success', () async {
+    var calls = 0;
+    var now = DateTime(2026, 1, 1);
+    final controller = ArtworkFeedController(
+      (request) async {
+        calls += 1;
+        if (request.cursor == null) {
+          return Page<Artwork>(
+            items: <Artwork>[artwork(1)],
+            hasMore: true,
+            nextCursor: 'next',
+          );
+        }
+        if (calls == 2) throw StateError('boom');
+        return Page<Artwork>(items: <Artwork>[artwork(2)], hasMore: false);
+      },
+      autoLoad: false,
+      now: () => now,
+      paginationBackoff: const <Duration>[Duration(minutes: 1)],
+    );
+
+    await controller.refresh();
+    await controller.loadMore();
+    expect(calls, 2);
+    expect(controller.state.error, isA<StateError>());
+    expect(controller.state.isLoading, isFalse);
+
+    await controller.loadMore();
+    expect(calls, 2, reason: 'backoff must block repeat pagination requests');
+
+    now = now.add(const Duration(minutes: 1, seconds: 1));
+    await controller.loadMore();
+    expect(calls, 3);
+    expect(controller.state.items, hasLength(2));
+    expect(controller.state.error, isNull);
+
+    // A success resets the failure counter, so a later failure gets the same
+    // bounded window instead of an ever-growing one.
+    calls = 0;
+    now = now.add(const Duration(minutes: 1, seconds: 1));
+    final failing = ArtworkFeedController(
+      (request) async {
+        calls += 1;
+        if (request.cursor == null) {
+          return Page<Artwork>(
+            items: <Artwork>[artwork(1)],
+            hasMore: true,
+            nextCursor: 'next',
+          );
+        }
+        throw StateError('boom');
+      },
+      autoLoad: false,
+      now: () => now,
+      paginationBackoff: const <Duration>[Duration(minutes: 1)],
+    );
+
+    await failing.refresh();
+    await failing.loadMore();
+    await failing.loadMore();
+    expect(calls, 2);
+  });
+
+  test('duplicate loadMore shares one in-flight pagination request', () async {
+    var calls = 0;
+    final gate = Completer<Page<Artwork>>();
+    final controller = ArtworkFeedController((request) async {
+      calls += 1;
+      if (request.cursor == null) {
+        return Page<Artwork>(
+          items: <Artwork>[artwork(1)],
+          hasMore: true,
+          nextCursor: 'next',
+        );
+      }
+      return gate.future;
+    }, autoLoad: false);
+
+    await controller.refresh();
+    final first = controller.loadMore();
+    final second = controller.loadMore();
+    expect(calls, 2);
+
+    gate.complete(Page<Artwork>(items: <Artwork>[artwork(2)], hasMore: false));
+    await Future.wait(<Future<void>>[first, second]);
+    expect(calls, 2);
+    expect(controller.state.items, hasLength(2));
+  });
+
+  test('dispose stops new pagination requests', () async {
+    var calls = 0;
+    final controller = ArtworkFeedController((request) async {
+      calls += 1;
+      return Page<Artwork>(
+        items: <Artwork>[artwork(1)],
+        hasMore: true,
+        nextCursor: 'next',
+      );
+    }, autoLoad: false);
+
+    await controller.refresh();
+    controller.dispose();
+    await controller.loadMore();
+    expect(calls, 1);
+  });
+
+  test('manual refresh after failure clears error with one request', () async {
+    var calls = 0;
+    final controller = ArtworkFeedController((request) async {
+      calls += 1;
+      if (calls == 1) throw StateError('boom');
+      return Page<Artwork>(items: <Artwork>[artwork(1)], hasMore: false);
+    }, autoLoad: false);
+
+    await controller.refresh();
+    expect(controller.state.error, isA<StateError>());
+
+    await controller.refresh();
+
+    expect(calls, 2);
+    expect(controller.state.error, isNull);
+    expect(controller.state.items.single.id, 'art-1');
+  });
 }

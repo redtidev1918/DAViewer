@@ -19,6 +19,8 @@ final class AppNoticeHost extends ConsumerStatefulWidget {
 }
 
 final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
+  final Set<String> _dismissedNoticeIds = <String>{};
+
   @override
   void initState() {
     super.initState();
@@ -33,20 +35,28 @@ final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
     final session = ref.watch(webSessionStatusProvider);
     final s = strings(ref.watch(appLanguageProvider));
 
+    // Dismissal suppresses only the current session-state occurrence. After a
+    // healthy period the same state is a new occurrence and may prompt again.
+    if (session.isHealthy && _dismissedNoticeIds.isNotEmpty) {
+      _dismissedNoticeIds.clear();
+    }
+
     final sessionNotice = _sessionNotice(session, s);
-    final effective = sessionNotice ?? notice;
+    final visibleSessionNotice =
+        sessionNotice != null && _dismissedNoticeIds.contains(sessionNotice.id)
+        ? null
+        : sessionNotice;
+    final effective = visibleSessionNotice ?? notice;
     return Align(
-      alignment: Alignment.topCenter,
+      alignment: Alignment.bottomCenter,
       child: SafeArea(
-        bottom: false,
+        top: false,
         child: effective == null
             ? const SizedBox.shrink()
             : _NoticeOverlay(
                 notice: effective,
                 strings: s,
-                onDismiss: () => ref
-                    .read(appNoticeControllerProvider.notifier)
-                    .clear(effective.id),
+                onDismiss: () => _dismiss(effective, sessionNotice),
               ),
       ),
     );
@@ -54,11 +64,12 @@ final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
 
   AppNotice? _sessionNotice(WebSessionStatus status, AppStrings s) {
     if (!status.needsLogin) return null;
+    final id = 'web-session-${status.state.name}';
     final message = status.isLocked
         ? s.webLoginChallengeExceeded
         : s.webSessionBanner;
     return AppNotice(
-      id: 'web-session',
+      id: id,
       message: message,
       actionLabel: s.login,
       action: _openWebLogin,
@@ -70,6 +81,14 @@ final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
     // the root, so routing through the context captured by the state is safe.
     final router = GoRouter.of(context);
     router.push('/web-login');
+  }
+
+  void _dismiss(AppNotice notice, AppNotice? sessionNotice) {
+    if (identical(notice, sessionNotice)) {
+      setState(() => _dismissedNoticeIds.add(notice.id));
+      return;
+    }
+    ref.read(appNoticeControllerProvider.notifier).clear(notice.id);
   }
 }
 

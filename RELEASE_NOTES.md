@@ -3,6 +3,20 @@
 这里只写下载者需要知道的变化，一行一条。内部实现、协议与调试细节请见
 `CHANGELOG.md`。
 
+## 0.4.10
+
+- 修复首页推荐会话恢复：登录成功后再也不要求重登，冷启动不再被验证请求卡成无限刷新。
+- 登录页只在 DeviantArt 跳转登录后首页后关闭，失效 Cookie 会让推荐流明确报错而不是假登录。
+- macOS 支持鼠标/触控板拖动多图与横向作品排布。
+- “更多画师作品”改为专用紧凑卡片，修复竖图 overflow 与空白。
+- 首页重试按钮现在真正重新发起服务端会话检查和推荐请求。
+
+- Fixes homepage recommendation session restore: no forced re-login after a confirmed login, and cold start no longer freezes on verification.
+- Login closes only after DeviantArt redirects to the signed-in home page; expired cookies surface as an explicit feed error.
+- Adds macOS mouse/trackpad drag support for multi-image paging and horizontal artwork rails.
+- Replaces the More From Artist rail with a dedicated compact card, fixing portrait overflow and blank space.
+- Home Retry now really re-runs session verification and reloads recommendations.
+
 ## 0.4.0
 
 - 新增本地访问历史：最近浏览的作品自动去重记录，最多保留 200 条；历史只保存在本机，不上传或同步。

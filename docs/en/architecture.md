@@ -195,8 +195,10 @@ must stay reachable from the login screen.
 - CI analyzes, checks formatting, tests, and builds Android, macOS, and Windows.
 - Android releases require the configured upload keystore. macOS artifacts use
   a private stable self-signed preview identity for Keychain continuity, but
-  remain non-Apple-signed and unnotarized; they keep the
-  `macos-unsigned-preview` marker until Developer ID signing and notarization.
+  remain non-Apple-signed and unnotarized. The project does **not purchase
+  Apple Developer Program**; Developer ID signing and notarization are
+  intentionally out of scope, so artifacts keep the `macos-unsigned-preview`
+  marker and this is not a release blocker.
 - Publishing keeps only the newest GitHub Release visible. Git tags remain as
   the source-history record and are not deleted by the release job.
 

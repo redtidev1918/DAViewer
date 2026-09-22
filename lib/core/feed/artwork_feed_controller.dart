@@ -23,8 +23,21 @@ final class ArtworkFeedState {
 /// (so screens never sit on a spinner), then supports pull-to-refresh and
 /// infinite scroll via [refresh] / [loadMore].
 final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
-  ArtworkFeedController(this._fetch, {bool autoLoad = true, this.pageSize = 24})
-    : super(const ArtworkFeedState(isLoading: true)) {
+  ArtworkFeedController(
+    this._fetch, {
+    bool autoLoad = true,
+    this.pageSize = 24,
+    DateTime Function()? now,
+    List<Duration>? paginationBackoff,
+  }) : _now = now ?? DateTime.now,
+       _paginationBackoff =
+           paginationBackoff ??
+           const <Duration>[
+             Duration(seconds: 10),
+             Duration(seconds: 30),
+             Duration(minutes: 1),
+           ],
+       super(const ArtworkFeedState(isLoading: true)) {
     if (autoLoad) {
       unawaited(refresh());
     }
@@ -35,7 +48,30 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
   /// Items requested per page. Feeds whose first page should surface more
   /// distinct authors (e.g. the watched feed's avatar strip) use a larger size.
   final int pageSize;
+  final DateTime Function() _now;
+  final List<Duration> _paginationBackoff;
   Future<void>? _activeFirstPageFetch;
+  int _paginationFailures = 0;
+  DateTime? _paginationBackoffUntil;
+
+  bool get _inPaginationBackoff {
+    final until = _paginationBackoffUntil;
+    return until != null && _now().isBefore(until);
+  }
+
+  void _resetPaginationBackoff() {
+    _paginationFailures = 0;
+    _paginationBackoffUntil = null;
+  }
+
+  void _enterPaginationBackoff() {
+    _paginationFailures += 1;
+    final index = (_paginationFailures - 1).clamp(
+      0,
+      _paginationBackoff.length - 1,
+    );
+    _paginationBackoffUntil = _now().add(_paginationBackoff[index]);
+  }
 
   Future<void> refresh() => _runFirstPageFetch(silent: false);
 
@@ -58,6 +94,7 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
     try {
       final page = await _fetch(PageRequest(limit: pageSize));
       if (!mounted) return;
+      _resetPaginationBackoff();
       state = ArtworkFeedState(items: page.items, nextCursor: page.nextCursor);
     } catch (error) {
       if (!mounted) return;
@@ -67,6 +104,7 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
 
   Future<void> loadMore() async {
     if (!mounted || state.isLoading || !state.hasMore) return;
+    if (_inPaginationBackoff) return;
     final cursor = state.nextCursor;
     state = ArtworkFeedState(
       items: state.items,
@@ -76,12 +114,14 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
     try {
       final page = await _fetch(PageRequest(cursor: cursor, limit: pageSize));
       if (!mounted) return;
+      _resetPaginationBackoff();
       state = ArtworkFeedState(
         items: <Artwork>[...state.items, ...page.items],
         nextCursor: page.nextCursor,
       );
     } catch (error) {
       if (!mounted) return;
+      _enterPaginationBackoff();
       state = ArtworkFeedState(
         items: state.items,
         nextCursor: cursor,

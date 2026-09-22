@@ -28,7 +28,12 @@ final class AppShell extends ConsumerWidget {
       body: Stack(
         children: <Widget>[
           navigationShell,
-          const Positioned(top: 0, left: 0, right: 0, child: AppNoticeHost()),
+          const Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: AppNoticeHost(),
+          ),
         ],
       ),
       bottomNavigationBar: NavigationBar(

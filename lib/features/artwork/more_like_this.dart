@@ -25,8 +25,11 @@ final class MoreLikeThisSection extends ConsumerStatefulWidget {
       _MoreLikeThisSectionState();
 }
 
-final class _MoreLikeThisSectionState
-    extends ConsumerState<MoreLikeThisSection> {
+final class _MoreLikeThisSectionState extends ConsumerState<MoreLikeThisSection>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   String? _autoRetriedFor;
   String? _loggedFailure;
   bool _recovering = false;
@@ -46,6 +49,7 @@ final class _MoreLikeThisSectionState
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final s = strings(ref.watch(appLanguageProvider));
     final related = ref.watch(moreLikeThisProvider(widget.artworkId));
     final currentItems = related.valueOrNull?.artworks;

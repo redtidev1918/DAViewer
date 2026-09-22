@@ -34,7 +34,7 @@ final class CollectionContentsKey {
 final collectionContentsProvider = FutureProvider.autoDispose
     .family<List<Artwork>, CollectionContentsKey>((ref, key) async {
       final runtime = ref.watch(runtimeProvider);
-      final webSession = ref.watch(webSessionProvider);
+      final webSession = ref.read(webSessionProvider);
       var csrf = ref.watch(
         webSessionControllerProvider.select((web) => web.csrf),
       );
@@ -57,7 +57,7 @@ final collectionContentsProvider = FutureProvider.autoDispose
 final collectionCoverProvider = FutureProvider.autoDispose
     .family<Uri?, CollectionContentsKey>((ref, key) async {
       final runtime = ref.watch(runtimeProvider);
-      final webSession = ref.watch(webSessionProvider);
+      final webSession = ref.read(webSessionProvider);
       var csrf = ref.watch(
         webSessionControllerProvider.select((web) => web.csrf),
       );

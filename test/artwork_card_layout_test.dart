@@ -21,6 +21,23 @@ Artwork _bannerArtwork() => Artwork(
   ],
 );
 
+Artwork _portraitArtwork() => Artwork(
+  id: 'portrait',
+  title: 'A very tall portrait artwork',
+  author: const UserProfile(id: 'artist-id', username: 'artist'),
+  pageUri: Uri.parse('https://example.test/art/portrait'),
+  media: const <MediaAsset>[
+    MediaAsset(
+      id: 'preview',
+      kind: MediaKind.image,
+      role: MediaRole.preview,
+      availability: MediaAvailability.available,
+      width: 240,
+      height: 720,
+    ),
+  ],
+);
+
 void main() {
   testWidgets('mobile banner previews keep more visual height', (tester) async {
     late double ratio;
@@ -62,5 +79,25 @@ void main() {
     final title = tester.widget<Text>(find.text('A very wide artwork title'));
     expect(title.maxLines, 2);
     expect(find.text('@artist'), findsOneWidget);
+  });
+
+  testWidgets('narrow portrait rail card fits without overflow', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 140,
+              height: 360,
+              child: ArtworkCard(artwork: _portraitArtwork()),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
   });
 }

@@ -198,7 +198,7 @@ void installGlobalErrorHandlers(AppLogger logger) {
   FlutterError.onError = (FlutterErrorDetails details) {
     logger.error(
       'flutter',
-      details.exceptionAsString(),
+      details.toString(),
       details.exception,
       details.stack,
     );

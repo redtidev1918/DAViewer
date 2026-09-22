@@ -14,6 +14,8 @@ import '../../core/feed/artwork_feed_controller.dart';
 import '../../core/runtime/runtime_provider.dart';
 import '../artwork/artwork_store.dart';
 
+int _personalizedProviderSeq = 0;
+
 /// The website-personalized `rfy/deviations` recommendation feed, fetched with
 /// the embedded WebView's web session (Cookie + CSRF). Requires a signed-in web
 /// session and rebuilds when the web session identity changes.
@@ -22,12 +24,26 @@ import '../artwork/artwork_store.dart';
 /// the CSRF once from the stored cookies before giving up.
 final personalizedFeedProvider =
     StateNotifierProvider<ArtworkFeedController, ArtworkFeedState>((ref) {
+      final providerId = ++_personalizedProviderSeq;
+      AppLogger.instance.info(
+        'home',
+        'personalized provider created id=$providerId',
+      );
       final runtime = ref.watch(runtimeProvider);
-      final webSession = ref.watch(webSessionProvider);
+      // Request execution reads the current cookie snapshot; it must not make
+      // the feed provider lifecycle depend on browser-session churn (csrf,
+      // cookie refresh, metadata).
+      final webSession = ref.read(webSessionProvider);
       ref.watch(
         webSessionControllerProvider.select(personalizedFeedSessionIdentity),
       );
       final controller = ArtworkFeedController((request) async {
+        AppLogger.instance.info(
+          'home',
+          'personalized feed fetch '
+              'reason=${request.cursor == null ? 'initial_or_refresh' : 'pagination'} '
+              'cursor=${request.cursor ?? 'initial'}',
+        );
         final dio = runtime.dio;
         if (dio == null) {
           throw const DAKitException(
@@ -36,16 +52,29 @@ final personalizedFeedProvider =
             message: 'The network layer is not available.',
           );
         }
-        // Server verification runs once per session in webCookieHealthProvider
-        // and is cached; do not repeat the homepage request on every fetch or
-        // refresh, which would trip DeviantArt's WAF challenge counter.
-        if (!await ref.read(webCookieHealthProvider.future)) {
+        // Server verification runs before every personalized request. It is not
+        // a cached FutureProvider: a stale cookie must not keep returning the
+        // same false after the user re-logins or explicitly retries.
+        final statusController = ref.read(webSessionStatusProvider.notifier);
+        await statusController.check();
+        if (!ref.read(webSessionStatusProvider).isHealthy) {
+          AppLogger.instance.warning(
+            'home',
+            'web session status: '
+                '${ref.read(webSessionStatusProvider).state.name}; '
+                'showing web-session notice',
+          );
           throw const DAKitException(
             kind: DAKitFailureKind.authentication,
             code: 'web.session.unavailable',
             message: 'The personalized feed requires a signed-in web session.',
           );
         }
+        AppLogger.instance.info(
+          'home',
+          'web cookie healthy: '
+              '${ref.read(webSessionStatusProvider).serverUsername}',
+        );
         var csrf = ref.read(webSessionControllerProvider).csrf;
         var cookieHeader = await webSession.cookieHeader();
         var page = await _tryFetchRfy(dio, csrf, cookieHeader, request);
@@ -77,6 +106,10 @@ final personalizedFeedProvider =
         ref.read(artworkStoreProvider.notifier).putAll(page.items);
         return page;
       });
+      AppLogger.instance.info(
+        'home',
+        'personalized controller created provider=$providerId',
+      );
       return controller;
     });
 
@@ -89,30 +122,6 @@ final personalizedFeedProvider =
 /// latest CSRF directly from [webSessionControllerProvider].
 (bool?, String) personalizedFeedSessionIdentity(WebSessionState web) =>
     (web.isLoggedIn, web.username);
-
-/// Live health of the personalized-feed web session. Unlike OAuth sign-in,
-/// the recommendation feed additionally needs the signed-in `userinfo`
-/// DeviantArt cookie; without it the endpoint silently returns the generic
-/// daily-like feed. This provider re-attempts restoration and reports false
-/// when the cookie could not be recovered, so the UI can ask for a web login
-/// instead of showing non-personalized content.
-final webCookieHealthProvider = FutureProvider<bool>((ref) async {
-  final controller = ref.read(webSessionStatusProvider.notifier);
-  await controller.check();
-  final status = ref.read(webSessionStatusProvider);
-  if (status.isHealthy) {
-    AppLogger.instance.info(
-      'home',
-      'web cookie healthy: ${status.serverUsername}',
-    );
-  } else {
-    AppLogger.instance.warning(
-      'home',
-      'web session status: ${status.state.name}; showing web-session notice',
-    );
-  }
-  return status.isHealthy;
-});
 
 /// Fetches one rfy page, or `null` when the web session is missing or the
 /// request failed (the caller then refreshes the session and retries).

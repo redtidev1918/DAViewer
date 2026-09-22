@@ -40,6 +40,10 @@ sub-packages are compatible with the new AGP/Swift toolchain.
   launch smoke test. Non-release builds may fall back to ad-hoc signing.
   Artifacts remain `macos-unsigned-preview` because the preview identity is not
   an Apple Developer ID and the package is not notarized.
+- The project does **not purchase Apple Developer Program**; stable signing and
+  notarization are intentionally out of release scope. Local
+  `ad-hoc / no TeamIdentifier` is an accepted environment limitation and is not
+  a Release Gate blocker.
 
 ### One-click release
 

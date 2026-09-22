@@ -279,23 +279,25 @@ final class _MediaMessage extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return ColoredBox(
       color: AppTheme.placeholderColor,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          Icon(icon, size: 48, color: scheme.onSurfaceVariant),
-          if (message.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                message,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium
-                    ?.copyWith(color: scheme.onSurfaceVariant),
-              ),
-            ),
-          ],
-        ],
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(icon, size: 48, color: scheme.onSurfaceVariant),
+              if (message.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -620,21 +622,24 @@ final class _VideoPlayerState extends State<_VideoPlayer>
         child: ColoredBox(
           color: Colors.black,
           child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                const Icon(Icons.videocam_off, color: Colors.white, size: 42),
-                const SizedBox(height: 8),
-                Text(
-                  s.videoLoadFailed,
-                  style: const TextStyle(color: Colors.white),
-                ),
-                TextButton.icon(
-                  onPressed: _initialize,
-                  icon: const Icon(Icons.refresh),
-                  label: Text(s.retry),
-                ),
-              ],
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  const Icon(Icons.videocam_off, color: Colors.white, size: 42),
+                  const SizedBox(height: 8),
+                  Text(
+                    s.videoLoadFailed,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  TextButton.icon(
+                    onPressed: _initialize,
+                    icon: const Icon(Icons.refresh),
+                    label: Text(s.retry),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

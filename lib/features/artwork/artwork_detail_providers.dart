@@ -8,6 +8,7 @@ import '../../core/auth/session_state.dart';
 import '../../core/auth/web_session_controller.dart';
 import '../../core/auth/web_session_refresher.dart';
 import '../../core/data/data_access.dart';
+import '../../core/diagnostics/app_logger.dart';
 
 import 'package:dakit_web/dakit_web.dart';
 
@@ -41,7 +42,7 @@ final deviationInitProvider = FutureProvider.autoDispose
       if (csrf.isEmpty) {
         throw StateError('Public browser session is unavailable');
       }
-      final webSession = ref.watch(webSessionProvider);
+      final webSession = ref.read(webSessionProvider);
       final cookieHeader = await webSession.cookieHeader();
       final cached = ref.read(artworkStoreProvider)[artworkId];
       final username =
@@ -220,7 +221,7 @@ final journalHtmlProvider = FutureProvider.autoDispose.family<String?, String>((
     csrf = ref.read(webSessionControllerProvider).csrf;
   }
   if (csrf.isEmpty) return null;
-  final webSession = ref.watch(webSessionProvider);
+  final webSession = ref.read(webSessionProvider);
   final cookieHeader = await webSession.cookieHeader();
   final runtime = ref.watch(runtimeProvider);
   return JournalContentFetcher(runtime.dio!).fetchHtml(
@@ -402,7 +403,7 @@ final moreLikeThisProvider = FutureProvider.autoDispose
       Object? websiteError;
       if (numericId != null) {
         try {
-          final webSession = ref.watch(webSessionProvider);
+          final webSession = ref.read(webSessionProvider);
           final cookieHeader = await webSession.cookieHeader();
           final artworks = await WebMoreLikeThisFetcher(runtime.dio!).fetch(
             pageUri: artwork.pageUri,
@@ -511,11 +512,16 @@ final moreFromArtistProvider = FutureProvider.autoDispose
       try {
         final page = await dataAccessFor(runtime)
             .gallery(username, const PageRequest(limit: 24));
-        return List<Artwork>.unmodifiable(
+        final visible = List<Artwork>.unmodifiable(
           page.items.where(
             (item) => item.id != artworkId && item.media.isNotEmpty,
           ),
         );
+        AppLogger.instance.info(
+          'more-from-artist',
+          'gallery/all raw=${page.items.length} final=${visible.length}',
+        );
+        return visible;
       } on Object {
         // Best-effort rail: an unavailable gallery is not an error for the page.
         return const <Artwork>[];

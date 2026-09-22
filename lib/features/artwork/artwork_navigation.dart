@@ -1,4 +1,5 @@
 import 'package:dakit_core/dakit_core.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -158,6 +159,14 @@ final class _ArtworkSwipeRegionState extends State<ArtworkSwipeRegion> {
     }
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
+      // Mouse drag belongs to the inner PageView / horizontal list. The outer
+      // artwork swipe region only claims touch-style drags so the two do not
+      // fight inside the detail page on desktop.
+      supportedDevices: const <PointerDeviceKind>{
+        PointerDeviceKind.touch,
+        PointerDeviceKind.stylus,
+        PointerDeviceKind.invertedStylus,
+      },
       onHorizontalDragStart: (_) {
         setState(() {
           _distance = 0;

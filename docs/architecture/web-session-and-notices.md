@@ -39,8 +39,9 @@ features/home/...                 只消费状态，不直接打服务端验证
 
 ## 提醒
 
-`AppNoticeController` 持有当前提醒并去重。`AppNoticeHost` 使用 Scaffold
-MaterialBanner 展示，动作统一回调（例如打开 App 内网页）。
+`AppNoticeController` 持有业务提醒并去重；会话提醒直接派生自
+`WebSessionStatusProvider`。`AppNoticeHost` 用底部 overlay 展示，避免覆盖
+AppBar 与内容；关闭状态由 host 自己持有，不再复用业务提醒控制器。
 
 ## Release notes
 
