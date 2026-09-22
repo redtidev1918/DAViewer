@@ -1,5 +1,46 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:daviewer/core/updates/update_checker.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+final class _UpdateAdapter implements HttpClientAdapter {
+  _UpdateAdapter(this.responses);
+
+  final Map<String, Map<String, Object?>> responses;
+
+  @override
+  void close({bool force = false}) {}
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final host = options.uri.host;
+    final path = options.uri.path;
+    final response = responses['$host$path'];
+    if (response == null) {
+      throw StateError('Unexpected request: $host$path');
+    }
+    final headers = <String, List<String>>{};
+    final contentType = response['contentType'];
+    if (contentType is String) {
+      headers[Headers.contentTypeHeader] = <String>[contentType];
+    }
+    final location = response['location'];
+    if (location is String) {
+      headers['location'] = <String>[location];
+    }
+    return ResponseBody.fromString(
+      response['body'] as String? ?? '',
+      response['status'] as int? ?? 200,
+      headers: headers,
+    );
+  }
+}
 
 void main() {
   test('compareVersions orders semantic versions', () {
@@ -125,5 +166,76 @@ Verify your download against `SHA256SUMS`.
       ),
       isNull,
     );
+  });
+
+  test(
+    'extractReleaseNotesSection reads the matching RELEASE_NOTES section',
+    () {
+      const markdown = '''
+## 0.4.12
+
+- 修复认证事务生命周期。
+
+- Fixes the authentication transaction lifecycle.
+
+## 0.4.10
+
+- 旧版本说明。
+''';
+
+      expect(
+        extractReleaseNotesSection(markdown, '0.4.12'),
+        contains('修复认证事务生命周期'),
+      );
+      expect(
+        extractReleaseNotesSection(markdown, '0.4.12'),
+        isNot(contains('旧版本说明')),
+      );
+      expect(extractReleaseNotesSection(markdown, '9.9.9'), isNull);
+    },
+  );
+
+  test('releaseInfoFromRawNotes fills notes without the GitHub API', () async {
+    const releaseNotes = '''
+## 0.4.12
+
+- 重构登录事务生命周期。
+
+- Rebuilds the login transaction lifecycle.
+''';
+    final dio = Dio()
+      ..httpClientAdapter = _UpdateAdapter(<String, Map<String, Object?>>{
+        'raw.githubusercontent.com/redtidev1918/DAViewer/main/RELEASE_NOTES.md':
+            <String, Object?>{
+              'status': 200,
+              'body': releaseNotes,
+              'contentType': 'text/plain',
+            },
+      });
+
+    final info = await releaseInfoFromRawNotes(dio: dio, version: '0.4.12');
+
+    expect(info.version, '0.4.12');
+    expect(info.notes, contains('重构登录事务生命周期'));
+  });
+
+  test('fetchLatestReleaseInfo uses the API JSON path first', () async {
+    final dio = Dio()
+      ..httpClientAdapter = _UpdateAdapter(<String, Map<String, Object?>>{
+        'api.github.com/repos/redtidev1918/DAViewer/releases/latest':
+            <String, Object?>{
+              'status': 200,
+              'body': jsonEncode(<String, Object?>{
+                'tag_name': 'v0.4.12',
+                'body': '## 0.4.12\n\n- API 说明。',
+              }),
+              'contentType': 'application/json',
+            },
+      });
+
+    final info = await fetchLatestReleaseInfo(dio: dio);
+
+    expect(info?.version, '0.4.12');
+    expect(info?.notes, contains('API 说明'));
   });
 }

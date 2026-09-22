@@ -1,7 +1,7 @@
 name: daviewer
 description: "DAViewer — an open-source third-party DeviantArt client built on DAKit."
 publish_to: 'none'
-version: 0.4.12+204
+version: 0.4.13+205
 
 environment:
   sdk: ^3.13.1

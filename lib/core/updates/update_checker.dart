@@ -18,6 +18,10 @@ const String appVersion = String.fromEnvironment(
 /// no user data are involved; this is the same URL a browser would fetch.
 const String _latestReleaseUrl =
     'https://github.com/redtidev1918/DAViewer/releases/latest';
+const String _apiLatestUrl =
+    'https://api.github.com/repos/redtidev1918/DAViewer/releases/latest';
+const String _releaseNotesRawUrl =
+    'https://raw.githubusercontent.com/redtidev1918/DAViewer/main/RELEASE_NOTES.md';
 
 /// Compares two dot-separated semantic versions; positive when `a` is newer.
 int compareVersions(String a, String b) {
@@ -109,19 +113,91 @@ String? versionFromReleaseUri(Uri uri) {
   return null;
 }
 
-/// Reads the current latest release without depending on the anonymous GitHub
-/// API rate limit. The HTML `releases/latest` endpoint redirects to the
-/// concrete tag, e.g. `/releases/tag/v0.4.10`; the tag is the version.
+/// Extracts the `## <version>` user-facing section from [RELEASE_NOTES.md].
+/// Returns `null` when the repository notes have no matching section.
+String? extractReleaseNotesSection(String markdown, String version) {
+  final needle = '## $version';
+  final lines = markdown.split('\n');
+  var start = -1;
+  for (var i = 0; i < lines.length; i += 1) {
+    if (lines[i].trim() == needle) {
+      start = i + 1;
+      break;
+    }
+  }
+  if (start < 0) return null;
+  final notes = <String>[];
+  final heading = RegExp(r'^##\s+');
+  for (var i = start; i < lines.length; i += 1) {
+    if (heading.hasMatch(lines[i])) break;
+    notes.add(lines[i]);
+  }
+  final section = notes.join('\n').trim();
+  return section.isEmpty ? null : section;
+}
+
+/// Fetches the raw `RELEASE_NOTES.md` section for [version]. Used when the
+/// GitHub API is rate-limited: the app still reports the version found via the
+/// HTML redirect and fills in the user-facing notes from the repository file.
+Future<UpdateInfo> releaseInfoFromRawNotes({
+  required Dio dio,
+  required String version,
+}) async {
+  try {
+    final response = await dio.get<String>(
+      _releaseNotesRawUrl,
+      options: Options(responseType: ResponseType.plain),
+    );
+    final notes = extractReleaseNotesSection(response.data ?? '', version);
+    return UpdateInfo(version: version, notes: notes);
+  } on Object {
+    return UpdateInfo(version: version);
+  }
+}
+
+/// Reads the current latest release with two fallbacks:
+///
+/// 1. GitHub API JSON, which includes the rendered Release body.
+/// 2. The HTML `releases/latest` redirect for the version, then the raw
+///    `RELEASE_NOTES.md` for the user-facing section when the API is
+///    rate-limited. The raw file still gives full notes without an API call.
 Future<UpdateInfo?> fetchLatestReleaseInfo({required Dio dio}) async {
-  final response = await dio.get<Object?>(
-    _latestReleaseUrl,
-    options: Options(responseType: ResponseType.plain, followRedirects: true),
-  );
-  final data = response.data;
-  if (data is Map) return parseLatestRelease(data);
-  final version = versionFromReleaseUri(response.realUri);
-  if (version != null) return UpdateInfo(version: version);
-  return null;
+  UpdateInfo? apiInfo;
+  try {
+    final response = await dio.get<Object?>(
+      _apiLatestUrl,
+      options: Options(responseType: ResponseType.json, followRedirects: true),
+    );
+    apiInfo = parseLatestRelease(response.data);
+    if (apiInfo != null && apiInfo.notes != null) return apiInfo;
+  } on Object {
+    // API blocked or rate-limited; fall through to the HTML route.
+  }
+
+  UpdateInfo? versionOnly;
+  try {
+    final response = await dio.get<Object?>(
+      _latestReleaseUrl,
+      options: Options(responseType: ResponseType.plain, followRedirects: true),
+    );
+    final data = response.data;
+    if (data is Map) {
+      final info = parseLatestRelease(data);
+      if (info != null) return info;
+    }
+    final version = versionFromReleaseUri(response.realUri);
+    if (version != null) {
+      versionOnly = UpdateInfo(version: version);
+      if (apiInfo != null && apiInfo.version == version) {
+        versionOnly = apiInfo;
+      }
+    }
+  } on Object {
+    // No HTML route either.
+  }
+  if (versionOnly == null) return apiInfo;
+
+  return releaseInfoFromRawNotes(dio: dio, version: versionOnly.version);
 }
 
 final updateCheckControllerProvider =

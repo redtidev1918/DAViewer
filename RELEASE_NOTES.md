@@ -3,6 +3,12 @@
 这里只写下载者需要知道的变化，一行一条。内部实现、协议与调试细节请见
 `CHANGELOG.md`。
 
+## 0.4.13
+
+- 修复“有更新但暂无更新说明”：GitHub API 正常时读取 Release 正文；API 限流时改用 HTML 重定向确认版本，并从仓库 `RELEASE_NOTES.md` 读取对应版本说明。
+
+- Fixes “update available but no release notes”: uses the GitHub API body first, then falls back to the release redirect plus `RELEASE_NOTES.md`.
+
 ## 0.4.12
 
 - 修复“登录成功但设置/每日精选/关注仍显示未登录”：重新打开登录页会取消陈旧 OAuth 事务并新建流程；首次登录不会在只确认网页 Cookie 时提前关闭。
