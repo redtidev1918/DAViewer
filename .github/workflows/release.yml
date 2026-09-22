@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   release:
-    uses: redtidev1918/releasegraph/.github/workflows/reusable-release.yml@c035ba8a92fd3a268143608d0043a680576ae812 # ReleaseGraph c035ba8 (Chinese release-body constraint)
+    uses: redtidev1918/releasegraph/.github/workflows/reusable-release.yml@995e4922a5a8eb90d98ff74431933b7bff993e93 # ReleaseGraph 995e492 (repair incomplete public releases)
     with:
       version: ${{ inputs.version || '' }}
       dry_run: ${{ github.event_name == 'pull_request' || inputs.dry_run || false }}
