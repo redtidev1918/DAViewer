@@ -229,10 +229,10 @@ packages:
     dependency: "direct main"
     description:
       name: dakit_web
-      sha256: "86b195eeb94026b78a428d53cebabfceb0d00506be4d59fd2e0af71d475436a3"
+      sha256: a706f7aba81b5627d9df07e71752ac947abb0d88704327ced2ce1a06f5d4f629
       url: "https://pub.dev"
     source: hosted
-    version: "0.2.4"
+    version: "0.2.5"
   dbus:
     dependency: transitive
     description:

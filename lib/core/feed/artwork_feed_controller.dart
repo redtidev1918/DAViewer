@@ -35,6 +35,7 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
     this._fetch, {
     bool autoLoad = true,
     this.pageSize = 24,
+    this.requestTimeout = const Duration(seconds: 30),
     DateTime Function()? now,
     List<Duration>? paginationBackoff,
   }) : _now = now ?? DateTime.now,
@@ -56,6 +57,10 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
   /// Items requested per page. Feeds whose first page should surface more
   /// distinct authors (e.g. the watched feed's avatar strip) use a larger size.
   final int pageSize;
+  /// Hard cap on one page fetch (headers + body + decode). dio's receiveTimeout
+  /// only covers waiting for the response header, so a stalled body stream can
+  /// otherwise keep a feed permanently in-flight with no spinner or backoff.
+  final Duration requestTimeout;
   final DateTime Function() _now;
   final List<Duration> _paginationBackoff;
   final RepositoryRequestGate<Page<Artwork>> _requestGate =
@@ -85,7 +90,23 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
 
   Future<Page<Artwork>> _fetchPage(PageRequest request, {bool force = false}) {
     final key = '${request.cursor ?? 'first'}:${request.limit}';
-    return _requestGate.load(key, () => _fetch(request), force: force);
+    final gate = _requestGate;
+    return gate.load(key, () => _fetch(request), force: force).timeout(
+      requestTimeout,
+      onTimeout: () {
+        // Drop the in-flight entry so a retry after backoff starts a fresh
+        // request. The abandoned request is not cancelled (no cancel token is
+        // threaded through _fetch); its connection is reclaimed when dio's own
+        // timeout or the OS closes it. ponytail: single shared timeout; per-feed
+        // cancellation tokens if abandoned requests accumulate.
+        gate.cancel(key);
+        throw const DAKitException(
+          kind: DAKitFailureKind.network,
+          code: 'feed.request.timeout',
+          message: 'The feed request timed out.',
+        );
+      },
+    );
   }
 
   Future<void> refresh() => _runFirstPageFetch(silent: false);

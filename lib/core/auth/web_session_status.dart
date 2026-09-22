@@ -132,12 +132,6 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         _setAnonymous();
         return;
       }
-      // This is the bounded retry for a login report whose first Cookie read
-      // was unavailable: now that the live store is readable, persist it before
-      // the app can be backgrounded or updated.
-      await _ref
-          .read(webSessionControllerProvider.notifier)
-          .ensurePersistentSnapshot(capturedCookies: cookies);
       final cookieHeader = WebSession.cookieHeaderFrom(cookies);
       if (cookieHeader.isEmpty) {
         final empty = await webSession.snapshot(source: 'check-empty-cookie');
@@ -176,6 +170,14 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         serverUsername: serverUsername,
         lastCheckedAt: DateTime.now(),
       );
+      // Persist only a server-confirmed live cookie set. An unconfirmed health
+      // check must never overwrite the snapshot: a degraded live store during a
+      // WAF challenge can still carry a matching `userinfo` cookie while the
+      // auth cookies are mid-rotation, and re-persisting that set would make
+      // the next cold start restore dead credentials (forced re-login).
+      await _ref
+          .read(webSessionControllerProvider.notifier)
+          .ensurePersistentSnapshot(capturedCookies: cookies);
     } on Object {
       _setUnavailable();
     } finally {

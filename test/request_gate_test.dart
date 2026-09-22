@@ -77,4 +77,27 @@ void main() {
       'recovered',
     );
   });
+
+  test('cancel drops an in-flight request so a later call starts fresh', () async {
+    final gate = RepositoryRequestGate<String>();
+    final gateValue = Completer<String>();
+    var calls = 0;
+
+    final first = gate.load('stalled', () {
+      calls += 1;
+      return gateValue.future;
+    });
+    expect(calls, 1);
+    gate.cancel('stalled');
+
+    final second = gate.load('stalled', () async {
+      calls += 1;
+      return 'fresh';
+    });
+    expect(await second, 'fresh');
+    expect(calls, 2, reason: 'cancel must not leave a stale in-flight request');
+
+    gateValue.complete('late');
+    expect(await first, 'late');
+  });
 }
