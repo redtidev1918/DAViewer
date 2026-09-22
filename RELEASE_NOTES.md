@@ -3,6 +3,12 @@
 这里只写下载者需要知道的变化，一行一条。内部实现、协议与调试细节请见
 `CHANGELOG.md`。
 
+## 0.4.16
+
+- 增加 Cookie 生命周期诊断：登录、分页、启动恢复和服务端验证前后记录数量/名称/domain/fingerprint，不记录 Cookie 值。
+
+- Adds Cookie lifecycle diagnostics (counts, names, domains, SHA-256 fingerprints only) around login, pagination, startup restore and server verification.
+
 ## 0.4.14
 
 - 锁定/需要订阅的作品在预览卡显示锁图标，详情页标题下方明确提示查看受限原因，不再与 NSFW 打码混淆。

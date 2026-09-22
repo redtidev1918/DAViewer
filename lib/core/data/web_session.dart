@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
+import '../auth/web_session_diagnostics.dart';
+
 /// Reads deviantart.com cookies owned by the hidden public browser so
 /// website-only metadata adapters can reuse its anonymous session.
 ///
@@ -27,6 +29,29 @@ final class WebSession {
     } on Object {
       // Same as [cookieHeader]: an early-startup failure is treated as empty.
       return const <String, String>{};
+    }
+  }
+
+  /// Reads structural Cookie metadata for lifecycle diagnostics. Never logs
+  /// values; fingerprints are SHA-256 of sorted name/domain/path/value fields.
+  Future<WebSessionCookieSnapshot> snapshot({required String source}) async {
+    try {
+      final cookies = await _cookieManager().getCookies(
+        url: WebUri(_home.toString()),
+      );
+      return cookieSnapshot(source: source, cookies: cookies);
+    } on Object {
+      return WebSessionCookieSnapshot(
+        source: source,
+        count: 0,
+        names: const <String>[],
+        domains: const <String>{},
+        withExpiry: 0,
+        sessionOnlyCount: 0,
+        secureCount: 0,
+        httpOnlyCount: 0,
+        fingerprint: 'unavailable',
+      );
     }
   }
 

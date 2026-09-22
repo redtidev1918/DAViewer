@@ -2,10 +2,12 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/web_session.dart';
+import '../diagnostics/app_logger.dart';
 import '../runtime/runtime_provider.dart';
 import 'auth_controller.dart';
 import 'auth_state.dart';
 import 'session_state.dart';
+import 'web_session_diagnostics.dart';
 import 'web_session_store.dart';
 
 /// Browser state used only by hidden website adapters. It is not a second App
@@ -121,6 +123,12 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
     if (rawCookies is! Map || rawCookies.isEmpty) return;
     final savedUsername = (saved['username'] as String?)?.trim() ?? '';
     if (savedUsername.isEmpty) return;
+    AppLogger.instance.info(
+      'web-session',
+      'restore candidate savedUsername=$savedUsername '
+          'count=${rawCookies.length} fingerprint='
+          '${webSessionMapFingerprint(_stringMap(rawCookies))}',
+    );
     // The OAuth account profile is loaded in the background during startup
     // (AuthController deliberately does not block the splash on /user/whoami).
     // Wait for it to settle so a cold start after a platform cookie-store
@@ -157,6 +165,10 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
       }
       final restoredUser = await _ref.read(webSessionProvider).webUsername();
       if (restoredUser.isNotEmpty) {
+        final after = await _ref
+            .read(webSessionProvider)
+            .snapshot(source: 'restore-after-inject');
+        AppLogger.instance.info('web-session', after.logLine());
         state = WebSessionState(
           csrf: state.csrf,
           isLoggedIn: true,
@@ -209,6 +221,12 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
       loggedIn: loggedIn,
       captured: capturedCookies,
       saved: savedCookies,
+    );
+    AppLogger.instance.info(
+      'web-session',
+      'persist decision loggedIn=$loggedIn captured=${capturedCookies.length} '
+          'saved=${savedCookies.length} selected=${cookies.length} '
+          'fingerprint=${webSessionMapFingerprint(cookies)}',
     );
     state = WebSessionState(
       csrf: csrf,
@@ -268,6 +286,10 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
   /// Snapshots the current deviantart.com cookies (name → value).
   Future<Map<String, String>> _captureCookies() async {
     try {
+      final snapshot = await _ref
+          .read(webSessionProvider)
+          .snapshot(source: 'capture-before');
+      AppLogger.instance.info('web-session', snapshot.logLine());
       final cookieManager = _ref
           .read(runtimeProvider)
           .webViewProxyManager

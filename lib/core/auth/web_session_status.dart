@@ -4,6 +4,7 @@ import '../diagnostics/app_logger.dart';
 import '../runtime/runtime_provider.dart';
 import 'session_state.dart';
 import 'web_session_controller.dart';
+import 'web_session_diagnostics.dart';
 import 'web_session_verifier.dart';
 
 export 'session_state.dart' show webSessionProvider;
@@ -119,9 +120,13 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       }
       final cookieHeader = await webSession.cookieHeader();
       if (cookieHeader.isEmpty) {
+        final empty = await webSession.snapshot(source: 'check-empty-cookie');
+        AppLogger.instance.warning('auth', empty.logLine());
         _setAnonymous();
         return;
       }
+      final before = await webSession.snapshot(source: 'check-before-verify');
+      AppLogger.instance.info('auth', before.logLine());
       // The persisted snapshot only exists because a previous session was
       // confirmed during an actual WebView login. The home page answer decides
       // whether that session is still who the server thinks it is.
@@ -131,10 +136,15 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       if (serverUsername.isEmpty ||
           serverUsername.trim().toLowerCase() !=
               claimedUsername.toLowerCase()) {
+        final after = await webSession.snapshot(
+          source: 'check-after-anonymous',
+        );
         AppLogger.instance.warning(
           'auth',
           'server rejected web session: claimed=$claimedUsername '
-              'server=${serverUsername.isEmpty ? 'anonymous' : serverUsername}',
+              'server=${serverUsername.isEmpty ? 'anonymous' : serverUsername} '
+              'cookieCount=${cookieHeaderCount(cookieHeader)} '
+              'cookieFingerprint=${cookieHeaderFingerprint(cookieHeader)} ${after.logLine()}',
         );
         _setAnonymous();
         return;

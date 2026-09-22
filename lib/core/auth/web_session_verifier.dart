@@ -4,6 +4,9 @@ import 'package:dio/dio.dart';
 
 import 'package:dakit_web/dakit_web.dart';
 
+import '../diagnostics/app_logger.dart';
+import 'web_session_diagnostics.dart';
+
 /// What the DeviantArt home page said about the Cookie header.
 enum WebSessionVerificationState { signedIn, anonymous, unavailable }
 
@@ -42,6 +45,12 @@ final class WebSessionVerifier {
   static const String _marker = 'window.__INITIAL_STATE__ = JSON.parse("';
 
   Future<WebSessionVerification> verify({required String cookieHeader}) async {
+    AppLogger.instance.info(
+      'auth',
+      'web session verifier request cookieCount='
+          '${cookieHeaderCount(cookieHeader)} cookieFingerprint='
+          '${cookieHeaderFingerprint(cookieHeader)}',
+    );
     try {
       final response = await _dio.get<String>(
         _home.toString(),
@@ -57,16 +66,32 @@ final class WebSessionVerifier {
       );
       final status = response.statusCode ?? 0;
       if (status != 200) {
+        AppLogger.instance.info(
+          'auth',
+          'web session verifier response status=$status '
+              'classification=${WebSessionVerificationState.unavailable.name}',
+        );
         return const WebSessionVerification.unavailable();
       }
       final html = response.data ?? '';
       if (!html.contains(_marker)) {
+        AppLogger.instance.info(
+          'auth',
+          'web session verifier response status=$status '
+              'classification=${WebSessionVerificationState.unavailable.name}',
+        );
         return const WebSessionVerification.unavailable();
       }
       final username = usernameFromInitialState(html);
-      return username.isEmpty
+      final result = username.isEmpty
           ? const WebSessionVerification.anonymous()
           : WebSessionVerification.signedIn(username);
+      AppLogger.instance.info(
+        'auth',
+        'web session verifier response status=$status '
+            'classification=${result.state.name}',
+      );
+      return result;
     } on Object {
       return const WebSessionVerification.unavailable();
     }
