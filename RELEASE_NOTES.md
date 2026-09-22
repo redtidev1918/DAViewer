@@ -11,6 +11,12 @@
 - Locked or subscription-gated artwork now shows a lock badge and an explicit detail-page reason, separate from NSFW blur.
 - Fixes occasional black screen after an APK update with bounded startup budgets.
 
+## 0.4.15
+
+- 修复更新 APK 后 Cookie 恢复完成前被误判为匿名：恢复完成后会自动重新服务端验证并刷新首页推荐。
+
+- Fixes cookie loss after an APK update: the restored web session is re-verified with the server and the home feed refreshes automatically.
+
 ## 0.4.13
 
 - 修复“有更新但暂无更新说明”：GitHub API 正常时读取 Release 正文；API 限流时改用 HTML 重定向确认版本，并从仓库 `RELEASE_NOTES.md` 读取对应版本说明。

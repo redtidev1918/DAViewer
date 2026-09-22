@@ -48,11 +48,11 @@ because the project does not purchase Apple Developer Program signing.
 - Release：未签名或本地非稳定签名
 - 免费开发环境下系统偶尔要求一次 Keychain 授权
 
-这属于签名模型造成的系统行为，不因“没有稳定签名”阻塞 `v0.4.14`。若应用自身
+这属于签名模型造成的系统行为，不因“没有稳定签名”阻塞 `v0.4.15`。若应用自身
 出现循环 `read/delete/create` Keychain item，仍属于 P1 缺陷。
 
 ## 当前状态
 
-`v0.4.14` 已按项目决策发布，DAKit `dakit_api 1.1.1` 已上传 pub.dev。已知剩余
+`v0.4.15` 已按项目决策发布，DAKit `dakit_api 1.1.1` 已上传 pub.dev。已知剩余
 runtime caveats（Mac 交互 smoke、部分回归证据）记录在
 `docs/architecture/data-lifecycle-audit.md`；Keychain 付费签名不再作为阻塞项。
