@@ -39,6 +39,12 @@ final class RepositoryRequestGate<T> {
     _cache.remove(key);
   }
 
+  /// Drops an in-flight request so a later call with the same key starts a
+  /// fresh request instead of awaiting the abandoned completer forever.
+  void cancel(String key) {
+    _inflight.remove(key);
+  }
+
   void clear() {
     _cache.clear();
   }

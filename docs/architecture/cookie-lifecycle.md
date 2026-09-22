@@ -27,7 +27,12 @@ failed or empty read is logged and never replaces the existing snapshot.
 A transient empty WebView read must never empty the persisted snapshot. A
 visible login reports its Cookie snapshot from the same read that produced its
 username; if that snapshot is missing or invalid, the old persisted snapshot is
-kept and a later health check retries with `ensurePersistentSnapshot`. Background
+kept, and a health check retries with `ensurePersistentSnapshot` only after the
+server confirms the current cookie set is signed in as the claimed account.
+An unconfirmed health check never overwrites the snapshot: a degraded live
+store during a WAF challenge can still carry a matching `userinfo` cookie while
+the auth cookies are mid-rotation, and re-persisting that set would make the
+next cold start restore dead credentials (forced re-login). Background
 refreshes never rewrite Cookies.
 
 A server-health check that reads zero live Cookies while a claimed signed-in
