@@ -25,6 +25,12 @@ bool shouldPreserveSessionAfterRestoreFailure(Object error) {
   return !isDefinitiveCredentialFailure(error);
 }
 
+/// A recorded explicit logout must never be undone by a leftover secure-storage
+/// token. Unknown/missing evidence keeps the legacy token-restore path so a
+/// first install or an unreadable preferences file does not sign a user out.
+bool shouldRestoreOAuthSessionAfterEvidence(OAuthSessionEvidence evidence) =>
+    evidence != OAuthSessionEvidence.signedOut;
+
 /// DeviantArt has returned both RFC `invalid_grant` and the non-standard
 /// `invalid_request: The refresh_token is invalid` for a revoked refresh token.
 /// Treat both as definitive so cold start cannot preserve a fake signed-in
@@ -96,11 +102,35 @@ final class AuthController extends StateNotifier<AuthState> {
           return;
         }
 
-        // 2. Restore the persisted token. The token's presence is the
-        //    authoritative signal — the evidence flag can be stale after a
-        //    transient issue, so always attempt the restore and let the error
-        //    type decide. `validTokens` throws oauth.session.missing (no stored
-        //    token) on first run or after a real logout, which is definitive.
+        // 2. A recorded explicit logout is authoritative even when
+        //    secure-storage cleanup failed: the user asked to leave, so a
+        //    leftover local token must never revive the signed-in UI on the
+        //    next launch. `unknown` keeps the old behavior for fresh installs
+        //    and unreadable preferences.
+        final evidence = await AppPreferences.loadOAuthSessionEvidence();
+        if (!shouldRestoreOAuthSessionAfterEvidence(evidence)) {
+          _log.info(
+            'auth',
+            'initialize: explicit logout recorded; not restoring OAuth',
+          );
+          try {
+            await runtime.oauth!.session.logout(revoke: false);
+          } on Object catch (error, stack) {
+            _log.warning(
+              'auth',
+              'initialize: stale OAuth token clear failed',
+              error,
+              stack,
+            );
+          }
+          _initializing = false;
+          return;
+        }
+
+        // 3. Restore the persisted token. Transient failures preserve the
+        //    session; a definitive credential error moves to signed-out, and
+        //    the web login screen re-verifies OAuth before it rebuilds the
+        //    web Cookie.
         final tokens = await runtime.oauth!
             .validTokens(forceRefresh: false)
             .timeout(const Duration(seconds: 15));
@@ -184,6 +214,51 @@ final class AuthController extends StateNotifier<AuthState> {
     });
     _loginOperation = tracked;
     return tracked;
+  }
+
+  /// Starts a fresh OAuth login from the login screen. A stale in-flight
+  /// transaction from an earlier visit must never block the new one, otherwise
+  /// the user can complete the WebView login but the app stays signed out.
+  Future<void> retryLogin() async {
+    if (state.status == AuthStatus.signedIn) return;
+    await cancelLogin();
+    await login();
+  }
+
+  /// Confirms the OAuth token is still accepted by DeviantArt, forcing one
+  /// refresh so a server-revoked token cannot keep the signed-in UI alive.
+  /// Transient network/storage failures keep the session; a definitive
+  /// credential failure signs out so the same WebView login can restore both.
+  Future<bool> confirmOAuthSession() async {
+    final runtime = _runtime;
+    if (!runtime.isConfigured || runtime.oauth == null) return false;
+    try {
+      await runtime.oauth!
+          .validTokens(forceRefresh: true)
+          .timeout(const Duration(seconds: 15));
+      await AppPreferences.saveOAuthSessionKnown(true);
+      return true;
+    } on DAKitException catch (error) {
+      if (isDefinitiveCredentialFailure(error)) {
+        await AppPreferences.saveOAuthSessionKnown(false);
+        state = const AuthState(status: AuthStatus.signedOut);
+        return false;
+      }
+      _log.warning(
+        'auth',
+        'oauth confirm temporarily unavailable; keeping session',
+        error,
+      );
+      return true;
+    } on Object catch (error, stack) {
+      _log.warning(
+        'auth',
+        'oauth confirm failed transiently; keeping session',
+        error,
+        stack,
+      );
+      return true;
+    }
   }
 
   Future<void> _performLogin() async {

@@ -3,6 +3,16 @@
 这里只写下载者需要知道的变化，一行一条。内部实现、协议与调试细节请见
 `CHANGELOG.md`。
 
+## 0.4.11
+
+- 修复“登录成功但设置/每日精选/关注仍显示未登录”：重新打开登录页会取消陈旧 OAuth 事务并新建流程；首次登录不会在只确认网页 Cookie 时提前关闭。
+- 首页个性化推荐的网页会话改为 DeviantArt 首页服务端验证；匿名或过期 Cookie 会明确提示登录并更新 Cookie。
+- 显式退出登录后不会再被遗留 token 复活；进入网页登录页会先校验 OAuth 是否仍有效。
+
+- Fixes “login succeeded but Settings / Daily / Watched still show signed out”: reopening the login screen starts a fresh OAuth flow and waits for OAuth before closing.
+- Personalized home recommendations now verify the web session against the DeviantArt home page.
+- An explicit logout can no longer be undone by a leftover local token on the next launch.
+
 ## 0.4.10
 
 - 修复首页推荐会话恢复：登录成功后再也不要求重登，冷启动不再被验证请求卡成无限刷新。

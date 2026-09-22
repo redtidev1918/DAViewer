@@ -24,6 +24,10 @@ embedded login screen:
    login also establishes the web session used by the personalized `rfy` feed
    and the collection adapters. No second sign-in is requested.
 
+Opening the login screen always cancels any stale OAuth transaction from an
+earlier visit and starts a fresh PKCE flow. A user who only refreshed the web
+Cookie must never leave the official-API pages behind in a signed-out state.
+
 The app does not simulate a provider-button click, embed a password form, copy
 cookies out of a system browser, or inspect human-verification DOM. It does set
 a desktop User-Agent so the full desktop login page is served. Google, Apple, or
@@ -46,12 +50,11 @@ session (CSRF token and the `userinfo` cookie) only after the OAuth callback has
 navigated back to the DeviantArt home page, so the app never records a
 signed-out web session from the anonymous login page.
 
-The login screen **dismisses itself as soon as a signed-in web session is
-reported** — it does not wait for an OAuth state transition. This covers both a
-first-time login and the "OAuth already signed in, web session lost" case
-(which the cookie vault exists for): the user never has to hunt for a Done
-button, and re-establishing only the web session never asks for a second
-OAuth approval.
+The login screen **dismisses itself only when OAuth is (or has just become)
+signed in and the server confirms the web session**. A first-time login never
+closes on the web Cookie alone; the screen waits for the OAuth transaction.
+When only the web session was lost and OAuth is already signed in, it still
+closes automatically without asking for a second approval.
 
 While waiting, the user can cancel and reopen. Cancelling or starting a new
 attempt clears the pending transaction so a stale callback cannot absorb a later
@@ -83,6 +86,11 @@ DeviantArt's browsing preferences.
    for existing users.
 4. Explicit logout clears the current OAuth store, session evidence, and the
    WebView cookies.
+
+`oauthSessionKnown=false` is authoritative after an explicit logout: a leftover
+secure-storage token must not revive the signed-in UI on the next cold start.
+Web-session usability is also confirmed by the DeviantArt home page
+(`@publicSession.user.username`); a local Cookie alone is not proof.
 
 macOS previews use one private, stable CI signing identity. The identity is
 self-signed, not Apple trusted or notarized, but it prevents a changing ad-hoc

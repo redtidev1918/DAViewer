@@ -214,7 +214,9 @@ final class _PersonalizedFeedState extends ConsumerState<_PersonalizedFeed>
       scrollController: _scrollController,
       feed: feed,
       emptyMessage: s.noRecommendations,
-      errorMessage: s.recommendedFeedLoadFailure,
+      errorMessage: needsWebLogin
+          ? s.recommendedSignInHint
+          : s.recommendedFeedLoadFailure,
       onRefresh: () async {
         // User-initiated retry must bypass any verification cooldown, otherwise
         // the button appears to do nothing after a failed session check.

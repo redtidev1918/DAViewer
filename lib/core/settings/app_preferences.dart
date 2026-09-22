@@ -5,6 +5,12 @@ import 'package:path_provider/path_provider.dart';
 
 import '../diagnostics/app_logger.dart';
 
+/// Cold-start OAuth session evidence: `unknown` when nothing has been
+/// recorded (fresh install or unreadable preferences), `signedIn` after a
+/// successful save, and `signedOut` only after an explicit logout or a
+/// definitive rejection.
+enum OAuthSessionEvidence { unknown, signedIn, signedOut }
+
 /// Persists non-sensitive user preferences (language, theme mode and proxy) to a small
 /// JSON file in the application-support directory, mirroring the pattern used
 /// by [SearchHistoryStore]. Values are stored as plain strings so this store
@@ -84,16 +90,22 @@ final class AppPreferences {
     }
   });
 
-  /// Non-sensitive evidence that this installation has successfully stored an
-  /// OAuth session before. Tokens remain in secure storage; this flag only
-  /// lets cold-start recovery distinguish an existing user from first run when
-  /// the network or Keychain is temporarily unavailable.
-  static Future<bool> loadOAuthSessionKnown() async {
+  /// Cold-start OAuth session evidence: `unknown` when nothing has been
+  /// recorded (fresh install or unreadable preferences), `signedIn` after a
+  /// successful save, and `signedOut` only after an explicit logout or a
+  /// definitive rejection. The enum lets recovery distinguish a missing flag
+  /// from a recorded logout until the token store itself answers.
+  static Future<OAuthSessionEvidence> loadOAuthSessionEvidence() async {
     try {
       final file = await _file();
-      if (!await file.exists()) return false;
+      if (!await file.exists()) return OAuthSessionEvidence.unknown;
       final decoded = jsonDecode(await file.readAsString());
-      return decoded is Map && decoded['oauthSessionKnown'] == true;
+      if (decoded is Map) {
+        final known = decoded['oauthSessionKnown'];
+        if (known == true) return OAuthSessionEvidence.signedIn;
+        if (known == false) return OAuthSessionEvidence.signedOut;
+      }
+      return OAuthSessionEvidence.unknown;
     } on Object catch (error, stack) {
       AppLogger.instance.warning(
         'prefs',
@@ -101,7 +113,7 @@ final class AppPreferences {
         error,
         stack,
       );
-      return false;
+      return OAuthSessionEvidence.unknown;
     }
   }
 

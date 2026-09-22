@@ -48,6 +48,7 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
   Uri? _pendingAuthUri;
   bool _loading = true;
   bool _closeAfterReport = false;
+  bool _serverConfirmedWebSession = false;
   bool _challengeBlocked = false;
   int _reportSeq = 0;
   double _progress = 0;
@@ -69,10 +70,18 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
     // the DeviantArt web session and the OAuth authorization. Any "login"
     // button just opens this screen; once the WebView is subscribed here, we
     // auto-start the OAuth authorize so it completes in this same WebView.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
       final auth = ref.read(authControllerProvider);
-      if (!auth.oauthSignedIn && !auth.isLoggingIn && mounted) {
-        _authController.login();
+      if (!auth.oauthSignedIn) {
+        // A stale transaction from an earlier login visit must not block the
+        // new one, otherwise OAuth stays signed out after a successful page.
+        await _authController.retryLogin();
+        return;
+      }
+      final stillValid = await _authController.confirmOAuthSession();
+      if (!stillValid && mounted) {
+        await _authController.retryLogin();
       }
     });
   }
@@ -145,22 +154,31 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
             'signed-in report on login path; waiting for home navigation',
           );
         } else {
-          AppLogger.instance.info(
-            'webview',
-            'server confirmed web session via signed-in home navigation',
-          );
+          _serverConfirmedWebSession = true;
           ref
               .read(webSessionStatusProvider.notifier)
               .markHealthy(serverUsername: username);
-          // The web identity may already be recorded from a persisted cookie,
-          // so a healthy transition is the actionable login signal here.
           ref.invalidate(personalizedFeedProvider);
-          AppLogger.instance.info(
-            'webview',
-            'invalidated personalized feed after confirmed login',
-          );
-          _closeAfterReport = false;
-          WidgetsBinding.instance.addPostFrameCallback((_) => _closeScreen());
+          final oauthSignedIn = ref.read(authControllerProvider).oauthSignedIn;
+          if (shouldCloseWebLoginAfterWebSession(
+            serverConfirmedNavigation: true,
+            oauthSignedIn: oauthSignedIn,
+            closeAfterOAuthReport: _closeAfterReport,
+          )) {
+            AppLogger.instance.info(
+              'webview',
+              'server confirmed web session via signed-in home navigation',
+            );
+            _closeAfterReport = false;
+            WidgetsBinding.instance.addPostFrameCallback((_) => _closeScreen());
+          } else {
+            AppLogger.instance.info(
+              'webview',
+              oauthSignedIn
+                  ? 'signed-in web session reported; waiting for OAuth'
+                  : 'signed-in web session reported; waiting for OAuth to finish',
+            );
+          }
         }
       } else {
         _maybeClose();
@@ -228,6 +246,10 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
           mounted &&
           !_closeAfterReport) {
         _closeAfterReport = true;
+        if (_serverConfirmedWebSession) {
+          _closeAfterReport = false;
+          WidgetsBinding.instance.addPostFrameCallback((_) => _closeScreen());
+        }
       }
     });
 
@@ -395,6 +417,17 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
       ),
     );
   }
+}
+
+/// A server-confirmed signed-in home page only closes the login screen after
+/// OAuth is (or has just become) signed in. Closing on the web Cookie alone
+/// would leave official-API tabs asking for another login.
+bool shouldCloseWebLoginAfterWebSession({
+  required bool serverConfirmedNavigation,
+  required bool oauthSignedIn,
+  required bool closeAfterOAuthReport,
+}) {
+  return serverConfirmedNavigation && (oauthSignedIn || closeAfterOAuthReport);
 }
 
 /// A slim hint shown while sign-in is in progress. It sets expectations for

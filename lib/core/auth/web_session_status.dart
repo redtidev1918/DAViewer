@@ -1,7 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../diagnostics/app_logger.dart';
+import '../runtime/runtime_provider.dart';
 import 'session_state.dart';
 import 'web_session_controller.dart';
+import 'web_session_verifier.dart';
 
 export 'session_state.dart' show webSessionProvider;
 
@@ -55,6 +58,16 @@ final webSessionStatusProvider =
       (ref) => WebSessionStatusController(ref),
     );
 
+/// Confirms the signed-in identity against the DeviantArt home page with the
+/// current Cookie header, instead of trusting the local snapshot alone.
+final webSessionVerifierProvider = Provider<WebSessionVerifier>((ref) {
+  final dio = ref.watch(runtimeProvider).dio;
+  if (dio == null) {
+    throw StateError('runtime dio is not available');
+  }
+  return WebSessionVerifier(dio);
+});
+
 final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   WebSessionStatusController(this._ref) : super(const WebSessionStatus());
 
@@ -98,14 +111,31 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         _setAnonymous();
         return;
       }
-      // The persisted snapshot only exists because a previous session was
-      // confirmed during an actual WebView login. Re-verifying it with a
-      // separate HTTP request is exactly what makes the WAF report anonymous
-      // on cold start. The authoritative acceptance happens on the next rfy
-      // request: if the cookie expired, that fetch fails and surfaces error.
       final controllerState = _ref.read(webSessionControllerProvider);
-      if (controllerState.isLoggedIn != true ||
-          controllerState.username.trim().isEmpty) {
+      final claimedUsername = controllerState.username.trim();
+      if (controllerState.isLoggedIn != true || claimedUsername.isEmpty) {
+        _setAnonymous();
+        return;
+      }
+      final cookieHeader = await webSession.cookieHeader();
+      if (cookieHeader.isEmpty) {
+        _setAnonymous();
+        return;
+      }
+      // The persisted snapshot only exists because a previous session was
+      // confirmed during an actual WebView login. The home page answer decides
+      // whether that session is still who the server thinks it is.
+      final serverUsername = await _ref
+          .read(webSessionVerifierProvider)
+          .username(cookieHeader: cookieHeader);
+      if (serverUsername.isEmpty ||
+          serverUsername.trim().toLowerCase() !=
+              claimedUsername.toLowerCase()) {
+        AppLogger.instance.warning(
+          'auth',
+          'server rejected web session: claimed=$claimedUsername '
+              'server=${serverUsername.isEmpty ? 'anonymous' : serverUsername}',
+        );
         _setAnonymous();
         return;
       }
@@ -113,7 +143,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       _failures = 0;
       state = WebSessionStatus(
         state: WebSessionStatusState.healthy,
-        serverUsername: controllerState.username,
+        serverUsername: serverUsername,
         lastCheckedAt: DateTime.now(),
       );
     } on Object {

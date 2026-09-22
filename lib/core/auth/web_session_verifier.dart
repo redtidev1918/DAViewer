@@ -4,6 +4,28 @@ import 'package:dio/dio.dart';
 
 import 'package:dakit_web/dakit_web.dart';
 
+/// What the DeviantArt home page said about the Cookie header.
+enum WebSessionVerificationState { signedIn, anonymous, unavailable }
+
+final class WebSessionVerification {
+  const WebSessionVerification.signedIn(this.username)
+    : state = WebSessionVerificationState.signedIn;
+
+  const WebSessionVerification.anonymous()
+    : state = WebSessionVerificationState.anonymous,
+      username = '';
+
+  const WebSessionVerification.unavailable()
+    : state = WebSessionVerificationState.unavailable,
+      username = '';
+
+  final WebSessionVerificationState state;
+  final String username;
+
+  bool get isSignedIn => state == WebSessionVerificationState.signedIn;
+  bool get isAnonymous => state == WebSessionVerificationState.anonymous;
+}
+
 /// Confirms the DeviantArt web login with the server, not with the local
 /// cookie store.
 ///
@@ -19,22 +41,39 @@ final class WebSessionVerifier {
   static final Uri _home = Uri.parse('https://www.deviantart.com/');
   static const String _marker = 'window.__INITIAL_STATE__ = JSON.parse("';
 
+  Future<WebSessionVerification> verify({required String cookieHeader}) async {
+    try {
+      final response = await _dio.get<String>(
+        _home.toString(),
+        options: Options(
+          responseType: ResponseType.plain,
+          headers: <String, dynamic>{
+            'Accept': 'text/html,application/xhtml+xml',
+            if (cookieHeader.isNotEmpty) 'Cookie': cookieHeader,
+            'User-Agent': webUserAgent,
+          },
+          validateStatus: (_) => true,
+        ),
+      );
+      final status = response.statusCode ?? 0;
+      if (status != 200) {
+        return const WebSessionVerification.unavailable();
+      }
+      final html = response.data ?? '';
+      if (!html.contains(_marker)) {
+        return const WebSessionVerification.unavailable();
+      }
+      final username = usernameFromInitialState(html);
+      return username.isEmpty
+          ? const WebSessionVerification.anonymous()
+          : WebSessionVerification.signedIn(username);
+    } on Object {
+      return const WebSessionVerification.unavailable();
+    }
+  }
+
   Future<String> username({required String cookieHeader}) async {
-    final response = await _dio.get<String>(
-      _home.toString(),
-      options: Options(
-        responseType: ResponseType.plain,
-        headers: <String, dynamic>{
-          'Accept': 'text/html,application/xhtml+xml',
-          if (cookieHeader.isNotEmpty) 'Cookie': cookieHeader,
-          'User-Agent': webUserAgent,
-        },
-        validateStatus: (_) => true,
-      ),
-    );
-    final status = response.statusCode ?? 0;
-    if (status == 202 || status >= 400) return '';
-    return usernameFromInitialState(response.data ?? '');
+    return (await verify(cookieHeader: cookieHeader)).username;
   }
 
   /// Parses the username DeviantArt itself rendered for this cookie session.

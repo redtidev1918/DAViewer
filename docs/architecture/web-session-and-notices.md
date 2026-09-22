@@ -28,11 +28,16 @@ features/home/...                 只消费状态，不直接打服务端验证
 
 `unknown → healthy | anonymous | stale | locked | unavailable`
 
-- `healthy`：服务端确认登录，推荐页可用；
-- `anonymous`：服务端返回匿名，需要 App 内网页会话；
+- `healthy`：DeviantArt 首页服务端确认 Cookie 属于当前账号，推荐页可用；
+- `anonymous`：服务端明确返回匿名/过期，需要 App 内网页会话并更新 Cookie；
 - `stale`：存在本地 Cookie，但服务端不再识别；
 - `locked`：WAF 挑战上限，停止自动请求；
-- `unavailable`：验证失败且处于退避期。
+- `unavailable`：验证请求被 WAF/网络拦截且处于退避期，不误判为匿名。
+
+服务端验证由 `WebSessionVerifier` 读取首页 `@publicSession.user.username`，
+返回 `signedIn / anonymous / unavailable` 三态：只有首页确认了登录用户名才进入
+`healthy`；WAF 或非 200 响应进入 `unavailable` 并走退避，不会伪装成登录提醒。
+本地存在 Cookie 只代表有机会验证，不代表会话有效。
 
 只有 `healthy` 允许推荐请求。忘记验证结果由 `WebSessionStatusProvider`
 统一管理；任何页面都不得直接调用服务端验证。

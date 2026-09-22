@@ -13,6 +13,10 @@ DAViewer 只有一个用户身份：官方 DeviantArt OAuth 会话。应用既�
 3. 账号登录、注册、找回密码以及当前提供的全部服务商（DeviantArt、Google、Apple、Facebook）都由 DeviantArt 页面负责。应用内没有单独的「社交登录」路径。
 4. `dakit://oauth/callback` 在 WebView 内被拦截并完成同一事务。WebView 保留其 Cookie 与 CSRF token，因此这一次登录同时建立了后续个性化 `rfy` 信息流与合集适配器所需的网页会话，不再要求第二次登录。
 
+每次打开内嵌登录页都会取消上一次遗留的陈旧 OAuth 事务并新建 PKCE 事务，
+避免用户在“上一次登录已挂在 isLoggingIn”的状态下只刷新了网页 Cookie，
+随后官方 API 页面仍然显示未登录。
+
 应用不模拟服务商按钮点击、不内嵌密码表单、不从系统浏览器拷贝 Cookie，也不探测人机验证的 DOM。它只设置桌面 User-Agent，以便返回完整的桌面登录页。Google、Apple、Facebook 仍可能在自己的页面内展示账号选择或 CAPTCHA 校验；那属于服务商页面，应用不去绕过。
 
 ## 会话角色
@@ -22,7 +26,9 @@ DAViewer 只有一个用户身份：官方 DeviantArt OAuth 会话。应用既�
 
 一次内嵌登录同时建立两种会话。WebView 只在 OAuth 回调回到 DeviantArt 首页之后才上报网页会话（CSRF token 与 `userinfo` Cookie），因此应用不会把匿名登录页的未登录状态记录为网页会话。
 
-**一旦上报了已登录的网页会话，登录界面立即自行关闭**——它不等 OAuth 状态迁移。这同时覆盖首次登录与「OAuth 已登录但网页会话丢失」两种情况（Cookie 保险库正是为此存在）：用户不必寻找「完成」按钮，且仅重建网页会话时不会再次索要 OAuth 授权。
+**只有 OAuth 已登录（或刚完成）时，服务端确认的网页会话才会让登录界面关闭。**
+首次登录时网页 Cookie 先确认也绝不提前关闭，登录页会等 OAuth 完成；仅重建
+网页会话（OAuth 已登录）时仍会自动关闭，不会再次索要授权。
 
 等待期间用户可以取消并重新打开。取消或开启新尝试都会清除待处理事务，避免过期回调吞掉后续登录。设置、代理、诊断、更新、关于、语言与外观在登录前均可达。
 
@@ -36,6 +42,11 @@ DAViewer 只有一个用户身份：官方 DeviantArt OAuth 会话。应用既�
 2. 只有凭据缺失或被吊销才判定为未登录。临时性的网络、上游、超时、解析与 Keychain 不可用故障都保留既有会话。
 3. 只有在安全存储成功读写 token 之后，才记录非敏感的会话证据。这能避免首次运行的网络错误把匿名用户送进首页，同时保住老用户的离线恢复能力。
 4. 显式登出会清除当前 OAuth 存储、会话证据与 WebView Cookie。
+
+`oauthSessionKnown=false` 是显式登出的权威证据：即使清理 token 时安全存储失败，
+下次冷启动也不会因为遗留 token 重新进入 `signedIn`。
+网页 Cookie 的可用性也由 DeviantArt 首页服务端验证
+（`@publicSession.user.username`），本地存在 Cookie 不等于会话有效。
 
 macOS 预览版使用同一个私有稳定的 CI 签名身份。该身份是自签名的，不被 Apple 信任也未公证，但它能避免每次更新后变化的 ad-hoc cdhash 索要 Mac 密码。token 与恢复存储使用 `DAViewer Account` Keychain 服务；更早的 ad-hoc 项永不查询，因此无法访问的历史记录不会阻塞授权。
 
