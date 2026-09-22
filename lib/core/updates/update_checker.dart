@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../runtime/runtime_provider.dart';
@@ -16,7 +17,7 @@ const String appVersion = String.fromEnvironment(
 /// The public GitHub release used to detect newer builds. No authentication and
 /// no user data are involved; this is the same URL a browser would fetch.
 const String _latestReleaseUrl =
-    'https://api.github.com/repos/redtidev1918/DAViewer/releases/latest';
+    'https://github.com/redtidev1918/DAViewer/releases/latest';
 
 /// Compares two dot-separated semantic versions; positive when `a` is newer.
 int compareVersions(String a, String b) {
@@ -98,6 +99,31 @@ final class UpdateInfo {
   final String? notes;
 }
 
+String? versionFromReleaseUri(Uri uri) {
+  for (var i = uri.pathSegments.length - 1; i >= 0; i -= 1) {
+    final segment = uri.pathSegments[i];
+    if (!segment.startsWith('v')) continue;
+    final version = segment.substring(1);
+    if (isSemver(version)) return version;
+  }
+  return null;
+}
+
+/// Reads the current latest release without depending on the anonymous GitHub
+/// API rate limit. The HTML `releases/latest` endpoint redirects to the
+/// concrete tag, e.g. `/releases/tag/v0.4.10`; the tag is the version.
+Future<UpdateInfo?> fetchLatestReleaseInfo({required Dio dio}) async {
+  final response = await dio.get<Object?>(
+    _latestReleaseUrl,
+    options: Options(responseType: ResponseType.plain, followRedirects: true),
+  );
+  final data = response.data;
+  if (data is Map) return parseLatestRelease(data);
+  final version = versionFromReleaseUri(response.realUri);
+  if (version != null) return UpdateInfo(version: version);
+  return null;
+}
+
 final updateCheckControllerProvider =
     StateNotifierProvider<UpdateCheckController, UpdateCheckState>(
       (ref) => UpdateCheckController(ref),
@@ -131,8 +157,7 @@ final class UpdateCheckController extends StateNotifier<UpdateCheckState> {
         state = const UpdateCheckState();
         return;
       }
-      final response = await dio.get<Object?>(_latestReleaseUrl);
-      final info = parseLatestRelease(response.data);
+      final info = await fetchLatestReleaseInfo(dio: dio);
       if (info == null || !isSemver(appVersion)) {
         state = const UpdateCheckState();
         return;

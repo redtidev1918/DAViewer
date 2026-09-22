@@ -10,12 +10,14 @@
 - macOS 支持鼠标/触控板拖动多图与横向作品排布。
 - “更多画师作品”改为专用紧凑卡片，修复竖图 overflow 与空白。
 - 首页重试按钮现在真正重新发起服务端会话检查和推荐请求。
+- 更新检查不再依赖匿名 GitHub API，避免限流导致“已是最新版本”。
 
 - Fixes homepage recommendation session restore: no forced re-login after a confirmed login, and cold start no longer freezes on verification.
 - Login closes only after DeviantArt redirects to the signed-in home page; expired cookies surface as an explicit feed error.
 - Adds macOS mouse/trackpad drag support for multi-image paging and horizontal artwork rails.
 - Replaces the More From Artist rail with a dedicated compact card, fixing portrait overflow and blank space.
 - Home Retry now really re-runs session verification and reloads recommendations.
+- Update checks no longer depend on the anonymous GitHub API, so rate limits cannot cause a false “already up to date”.
 
 ## 0.4.0
 

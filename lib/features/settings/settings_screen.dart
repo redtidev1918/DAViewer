@@ -404,10 +404,7 @@ Future<void> _checkUpdates(
   final dio = ref.read(runtimeProvider).dio;
   if (dio == null) return;
   try {
-    final response = await dio.get<Object?>(
-      'https://api.github.com/repos/redtidev1918/DAViewer/releases/latest',
-    );
-    final info = parseLatestRelease(response.data);
+    final info = await fetchLatestReleaseInfo(dio: dio);
     if (!context.mounted) return;
     if (info == null) {
       ScaffoldMessenger.of(context)

@@ -109,4 +109,21 @@ Verify your download against `SHA256SUMS`.
     );
     expect(parseLatestRelease(<String, Object?>{'body': 'notes only'}), isNull);
   });
+
+  test('versionFromReleaseUri reads version without GitHub API', () {
+    expect(
+      versionFromReleaseUri(
+        Uri.parse(
+          'https://github.com/redtidev1918/DAViewer/releases/tag/v0.4.10',
+        ),
+      ),
+      '0.4.10',
+    );
+    expect(
+      versionFromReleaseUri(
+        Uri.parse('https://github.com/redtidev1918/DAViewer/releases/latest'),
+      ),
+      isNull,
+    );
+  });
 }
