@@ -117,9 +117,6 @@ final class AppStrings {
   String get webSessionBanner => _lang == AppLanguage.zh
       ? '个性化推荐需要 App 内网页会话 Cookie；当前 Cookie 不可用，请进入 App 内网页重新获取。'
       : 'Personalized recommendations need the in-app web-session Cookie; it is unavailable now. Open the in-app web page to restore it.';
-  String get webSessionUnverifiedBanner => _lang == AppLanguage.zh
-      ? '网页会话尚未通过服务端验证，推荐可能不是个性化内容；点击登录刷新一次 Cookie。'
-      : 'Web session is not server-verified yet; recommendations may not be personalized. Sign in once to refresh the Cookie.';
   String get noImage => _lang == AppLanguage.zh ? '暂无图片' : 'No image';
   String get imageLoadFailed =>
       _lang == AppLanguage.zh ? '图片加载失败' : 'Failed to load';

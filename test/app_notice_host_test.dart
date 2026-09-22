@@ -54,7 +54,7 @@ void main() {
     );
   });
 
-  testWidgets('an unverified web session surfaces a login reminder', (
+  testWidgets('an unverified web session does not nag the user', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -86,7 +86,7 @@ void main() {
         const WebSessionStatus(state: WebSessionStatusState.unverified);
     await tester.pump();
 
-    expect(find.textContaining('尚未通过服务端验证'), findsOneWidget);
+    expect(find.textContaining('网页会话'), findsNothing);
   });
 
   testWidgets('a dismissed session notice may return after a healthy period', (
