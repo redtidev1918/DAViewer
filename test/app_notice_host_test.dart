@@ -54,6 +54,41 @@ void main() {
     );
   });
 
+  testWidgets('an unverified web session does not nag the user', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            appBar: AppBar(title: const Text('App Bar')),
+            body: Stack(
+              children: <Widget>[
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: AppNoticeHost(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(AppNoticeHost)),
+    );
+    container.read(webSessionStatusProvider.notifier).state =
+        const WebSessionStatus(state: WebSessionStatusState.unverified);
+    await tester.pump();
+
+    expect(find.textContaining('网页会话'), findsNothing);
+  });
+
   testWidgets('a dismissed session notice may return after a healthy period', (
     tester,
   ) async {

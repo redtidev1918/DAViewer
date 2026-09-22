@@ -12,6 +12,7 @@ import 'package:dakit_web/dakit_web.dart';
 import '../../core/diagnostics/app_logger.dart';
 import '../../core/feed/artwork_feed_controller.dart';
 import '../../core/runtime/runtime_provider.dart';
+import '../artwork/artwork_access.dart';
 import '../artwork/artwork_store.dart';
 
 int _personalizedProviderSeq = 0;
@@ -52,17 +53,16 @@ final personalizedFeedProvider =
             message: 'The network layer is not available.',
           );
         }
-        // Server verification runs before every personalized request. It is not
-        // a cached FutureProvider: a stale cookie must not keep returning the
-        // same false after the user re-logins or explicitly retries.
-        final statusController = ref.read(webSessionStatusProvider.notifier);
-        await statusController.check();
-        if (!ref.read(webSessionStatusProvider).isHealthy) {
+        // Gate on the WebView-confirmed session, not a WAF-sensitive Dio home
+        // probe on every request. A bare probe that reports anonymous is not
+        // proof the WebView signed out; a confirmed session proceeds to the
+        // actual rfy fetch. Explicit Retry still re-runs the server check.
+        final webSessionState = ref.read(webSessionControllerProvider);
+        if (webSessionState.isLoggedIn != true ||
+            webSessionState.username.trim().isEmpty) {
           AppLogger.instance.warning(
             'home',
-            'web session status: '
-                '${ref.read(webSessionStatusProvider).state.name}; '
-                'showing web-session notice',
+            'web session not confirmed; showing web-session notice',
           );
           throw const DAKitException(
             kind: DAKitFailureKind.authentication,
@@ -72,8 +72,7 @@ final personalizedFeedProvider =
         }
         AppLogger.instance.info(
           'home',
-          'web cookie healthy: '
-              '${ref.read(webSessionStatusProvider).serverUsername}',
+          'web session confirmed: ${webSessionState.username}',
         );
         var csrf = ref.read(webSessionControllerProvider).csrf;
         var cookieHeader = await webSession.cookieHeader();
@@ -140,14 +139,29 @@ Future<Page<Artwork>?> _tryFetchRfy(
     );
     return null;
   }
+  final stopwatch = Stopwatch()..start();
   try {
-    return await RfyFeedFetcher(dio).fetch(
+    final page = await RfyFeedFetcher(dio).fetch(
       cookieHeader: cookieHeader,
       csrfToken: csrf,
       cursor: request.cursor,
     );
+    logger.info(
+      'home',
+      'personalized feed success elapsedMs=${stopwatch.elapsedMilliseconds} '
+          'cursor=${request.cursor ?? 'initial'} '
+          'items=${page.items.length} '
+          'gated=${page.items.where((a) => artworkViewLock(a) != null).length}',
+    );
+    return page;
   } on Object catch (error, stack) {
-    logger.warning('home', 'rfy fetch failed', error, stack);
+    logger.warning(
+      'home',
+      'personalized feed failure elapsedMs=${stopwatch.elapsedMilliseconds} '
+          'cursor=${request.cursor ?? 'initial'}',
+      error,
+      stack,
+    );
     return null;
   }
 }

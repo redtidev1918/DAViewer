@@ -157,6 +157,32 @@ Future<ProviderContainer> _statusContainer(String homeHtml) async {
   return container;
 }
 
+Future<ProviderContainer> _anonymousSessionContainer() async {
+  final container = ProviderContainer(
+    overrides: <Override>[
+      webSessionProvider.overrideWithValue(
+        WebSession(
+          () => _FakeCookieManager(<Cookie>[
+            Cookie(name: 'userinfo', value: 'saved-user'),
+            Cookie(name: 'csrf', value: 'token'),
+          ]),
+        ),
+      ),
+      webSessionControllerProvider.overrideWith(
+        (ref) => WebSessionController(ref),
+      ),
+      webSessionVerifierProvider.overrideWithValue(
+        WebSessionVerifier(
+          Dio()..httpClientAdapter = _HomeHtmlAdapter(_anonymousHomeHtml),
+        ),
+      ),
+    ],
+  );
+  container.read(webSessionControllerProvider.notifier).state =
+      const WebSessionState(csrf: 'token', isLoggedIn: false);
+  return container;
+}
+
 void main() {
   group('WebSessionStatus', () {
     test('only healthy is usable by the personalized feed', () {
@@ -166,6 +192,12 @@ void main() {
       );
       const stale = WebSessionStatus(state: WebSessionStatusState.stale);
       const locked = WebSessionStatus(state: WebSessionStatusState.locked);
+      const unverified = WebSessionStatus(
+        state: WebSessionStatusState.unverified,
+      );
+      const unavailable = WebSessionStatus(
+        state: WebSessionStatusState.unavailable,
+      );
 
       expect(healthy.isHealthy, isTrue);
       expect(healthy.needsLogin, isFalse);
@@ -173,6 +205,13 @@ void main() {
       expect(stale.needsLogin, isTrue);
       expect(locked.isLocked, isTrue);
       expect(locked.needsLogin, isTrue);
+      // A confirmed WebView session that a bare HTTP probe could not confirm
+      // is not a logged-out signal and must not nag the user, because the
+      // probe cannot pass PerimeterX and contradicts a working personalized
+      // feed. A WAF/network answer is never treated as logged out either.
+      expect(unverified.isHealthy, isFalse);
+      expect(unverified.needsLogin, isFalse);
+      expect(unavailable.needsLogin, isFalse);
     });
 
     test('cooldown blocks a repeat check', () {
@@ -199,16 +238,55 @@ void main() {
       },
     );
 
-    test('marks anonymous when the server sees an anonymous session', () async {
-      final container = await _statusContainer(_anonymousHomeHtml);
-      addTearDown(container.dispose);
+    test(
+      'a bare anonymous probe keeps a confirmed session as unverified',
+      () async {
+        final container = await _statusContainer(_anonymousHomeHtml);
+        addTearDown(container.dispose);
 
-      await container.read(webSessionStatusProvider.notifier).check();
+        await container.read(webSessionStatusProvider.notifier).check();
 
-      final status = container.read(webSessionStatusProvider);
-      expect(status.state, WebSessionStatusState.anonymous);
-      expect(status.needsLogin, isTrue);
-    });
+        final status = container.read(webSessionStatusProvider);
+        expect(status.state, WebSessionStatusState.unverified);
+        // The confirmed WebView session survives and the probe result stays
+        // internal: it must not drive a login reminder that contradicts a
+        // working personalized feed.
+        expect(status.needsLogin, isFalse);
+        // The confirmed WebView session itself must survive the false-negative
+        // probe; only explicit logout clears it.
+        final controllerState = container.read(webSessionControllerProvider);
+        expect(controllerState.isLoggedIn, isTrue);
+        expect(controllerState.username, 'artist');
+      },
+    );
+
+    test(
+      'an anonymous probe without a confirmed session is anonymous',
+      () async {
+        final container = await _anonymousSessionContainer();
+        addTearDown(container.dispose);
+
+        await container.read(webSessionStatusProvider.notifier).check();
+
+        final status = container.read(webSessionStatusProvider);
+        expect(status.state, WebSessionStatusState.anonymous);
+        expect(status.needsLogin, isTrue);
+      },
+    );
+
+    test(
+      'a WAF/network probe answer is unavailable, never anonymous',
+      () async {
+        final container = await _statusContainer('<html/>');
+        addTearDown(container.dispose);
+
+        await container.read(webSessionStatusProvider.notifier).check();
+
+        final status = container.read(webSessionStatusProvider);
+        expect(status.state, WebSessionStatusState.unavailable);
+        expect(status.needsLogin, isFalse);
+      },
+    );
 
     test('empty live cookies with a saved snapshot are unavailable, not signed out', () {
       expect(

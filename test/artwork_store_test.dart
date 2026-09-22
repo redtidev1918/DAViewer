@@ -1,4 +1,5 @@
 import 'package:dakit_core/dakit_core.dart';
+import 'package:daviewer/features/artwork/artwork_access.dart';
 import 'package:daviewer/features/artwork/artwork_store.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -117,5 +118,87 @@ void main() {
       incoming: hydrated.copyWith(tags: const <String>['a', 'b', 'c']),
     );
     expect(richer.tags, const <String>['a', 'b', 'c']);
+  });
+
+  test('sparse payload never erases a confirmed view gate', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final store = container.read(artworkStoreProvider.notifier);
+
+    final gated = _artwork().copyWith(
+      media: const <MediaAsset>[
+        MediaAsset(
+          id: '1:preview',
+          kind: MediaKind.image,
+          role: MediaRole.preview,
+          availability: MediaAvailability.purchaseRequired,
+        ),
+      ],
+      downloadAvailability: MediaAvailability.purchaseRequired,
+    );
+    store.putAll(<Artwork>[gated]);
+
+    // A later hydrated/detail payload that carried no access metadata must not
+    // turn the artwork back into "known available".
+    store.putAll(<Artwork>[
+      _artwork().copyWith(
+        media: const <MediaAsset>[
+          MediaAsset(
+            id: '1:preview',
+            kind: MediaKind.image,
+            role: MediaRole.preview,
+            availability: MediaAvailability.available,
+          ),
+        ],
+        downloadAvailability: MediaAvailability.available,
+      ),
+    ]);
+
+    final merged = container.read(artworkStoreProvider)['1']!;
+    expect(artworkViewLock(merged), MediaAvailability.purchaseRequired);
+    expect(merged.downloadAvailability, MediaAvailability.purchaseRequired);
+  });
+
+  test('a genuinely available payload is not re-gated', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final store = container.read(artworkStoreProvider.notifier);
+
+    final free = _artwork().copyWith(
+      media: const <MediaAsset>[
+        MediaAsset(
+          id: '1:preview',
+          kind: MediaKind.image,
+          role: MediaRole.preview,
+          availability: MediaAvailability.available,
+        ),
+      ],
+      downloadAvailability: MediaAvailability.available,
+    );
+    store.putAll(<Artwork>[free]);
+    store.putAll(<Artwork>[_artwork().copyWith(title: 'updated')]);
+
+    final merged = container.read(artworkStoreProvider)['1']!;
+    expect(artworkViewLock(merged), isNull);
+    expect(merged.title, 'updated');
+  });
+
+  test('applyViewLock gates preview and download availability', () {
+    final artwork = _artwork().copyWith(
+      media: const <MediaAsset>[
+        MediaAsset(
+          id: '1:preview',
+          kind: MediaKind.image,
+          role: MediaRole.preview,
+          availability: MediaAvailability.available,
+        ),
+      ],
+      downloadAvailability: MediaAvailability.available,
+    );
+
+    final gated = applyViewLock(artwork, MediaAvailability.purchaseRequired);
+    expect(artworkViewLock(gated), MediaAvailability.purchaseRequired);
+    expect(gated.media.single.availability, MediaAvailability.purchaseRequired);
+    expect(gated.downloadAvailability, MediaAvailability.purchaseRequired);
   });
 }
