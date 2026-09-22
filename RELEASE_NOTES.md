@@ -3,6 +3,20 @@
 这里只写下载者需要知道的变化，一行一条。内部实现、协议与调试细节请见
 `CHANGELOG.md`。
 
+## 0.5.0
+
+- 修复首页推荐下拉刷新过慢：下拉直接刷新推荐流，不再先做一次 WAF 敏感的首页探测（每次省约 1.5 秒）；失效会话仍会明确提示重新登录。
+- 修复订阅/付费作品的锁标丢失：推荐流与详情的合并不再用缺少访问信息的后续数据覆盖已确认的订阅锁，卡片锁标与详情订阅提示稳定保留。
+- 修复网页登录 challenge 循环：人机验证尝试超限后停止自动重载，不再无限重试触发验证。
+- 新增网页会话未确认提示：会话未经服务端确认时首页明确提醒登录并刷新 Cookie，不再静默匿名。
+- 新增推荐请求耗时与每页锁定作品计数诊断日志。
+
+- Fixes slow pull-to-refresh on the recommendation feed: refresh goes straight to the rfy request instead of a WAF-sensitive home-page probe first.
+- Fixes lost subscription locks: feed-to-detail merging no longer overwrites a confirmed subscription gate with later payloads lacking access metadata.
+- Fixes the web-login challenge loop: the page stops auto-reloading after the bot-check attempt limit is exceeded.
+- Adds an explicit "web session not yet confirmed" reminder on Home instead of silently going anonymous.
+- Adds diagnostic logs with request timing and a per-page count of gated artworks.
+
 ## 0.4.16
 
 - 增加 Cookie 生命周期诊断：登录、分页、启动恢复和服务端验证前后记录数量/名称/domain/fingerprint，不记录 Cookie 值。
