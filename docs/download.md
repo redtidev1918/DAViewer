@@ -22,4 +22,10 @@
 
 > Android / macOS / Windows 原生客户端，基于 DAKit。截图从左到右：首页信息流 · 作品详情 · 相关作品。
 
-> 本仓库没有附带二进制资产；安装方式见文档。
+| 平台 | 文件 | 大小 | 下载 |
+|---|---|---|---|
+| Android | `DAViewer-v0.4.10.apk` | 62.8 MB | [⬇️ 下载](https://github.com/redtidev1918/DAViewer/releases/download/v0.4.10/DAViewer-v0.4.10.apk) |
+| Windows | `DAViewer-v0.4.10-windows.zip` | 13.7 MB | [⬇️ 下载](https://github.com/redtidev1918/DAViewer/releases/download/v0.4.10/DAViewer-v0.4.10-windows.zip) |
+| macOS | `DAViewer-v0.4.10-macos-unsigned-preview.zip` | 23.8 MB | [⬇️ 下载](https://github.com/redtidev1918/DAViewer/releases/download/v0.4.10/DAViewer-v0.4.10-macos-unsigned-preview.zip) |
+| 通用 | `RELEASE-METADATA.json` | 2 KB | [⬇️ 下载](https://github.com/redtidev1918/DAViewer/releases/download/v0.4.10/RELEASE-METADATA.json) |
+| 通用 | `SHA256SUMS` | 0 KB | [⬇️ 下载](https://github.com/redtidev1918/DAViewer/releases/download/v0.4.10/SHA256SUMS) |
