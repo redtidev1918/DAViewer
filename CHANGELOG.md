@@ -3,6 +3,90 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.4.9](https://github.com/redtidev1918/DAViewer/compare/v0.4.8...v0.4.9) (2026-09-22)
+
+### 修复
+
+- 网页会话改为单一状态机，服务端确认只在本会话内执行一次并带缓存与退避；
+- 检测到 DeviantArt 人机验证上限时提示用户停一下再刷新，App 不会自动重复刷新。
+
+### 新增
+
+- 全局通知层，网页会话横幅由统一的 AppNoticeHost 渲染；
+- App 内网页右上角手动刷新按钮。
+
+### 其他
+
+- Release 页面的更新说明改为中文，并由 CI 校验。
+
+## [0.4.8](https://github.com/redtidev1918/DAViewer/compare/v0.4.7...v0.4.8) (2026-09-22)
+
+### 修复
+
+- 网页登录态改为服务端确认，不再只依赖本地 Cookie 判断；
+- 推荐页不再用匿名或每日精选内容冒充个性化推荐；
+- Release 页面的“更新了哪些内容”改为中文说明。
+
+### 新增
+
+- 主页顶部“网页会话 Cookie 不可用”横批，点击直接进入 App 内网页；
+- App 内网页右上角刷新按钮，白屏、卡顿或人机验证卡住时可刷新。
+
+## [0.4.7](https://github.com/redtidev1918/DAViewer/compare/v0.4.6...v0.4.7) (2026-09-22)
+
+### Bug Fixes
+
+* **auth:** verify the DeviantArt web login with the server instead of trusting
+  only the local `userinfo` cookie ([75d550c](https://github.com/redtidev1918/DAViewer/commit/75d550c5d316b7e8cbbed3ed41f23ee94cf835a6))
+* **auth:** add a refresh button to the in-app web page and explain human
+  verification / blank-page recovery ([f599553](https://github.com/redtidev1918/DAViewer/commit/f599553e083af7f2882ac7a81975f8251d7e7401))
+* **release:** pin ReleaseGraph with the Chinese release-body constraint
+  ([42b3db7](https://github.com/redtidev1918/DAViewer/commit/42b3db701f5f2bbdb57cc6a9deee4e62a4cecbbd))
+
+## [0.4.6](https://github.com/redtidev1918/DAViewer/compare/v0.4.5...v0.4.6) (2026-09-21)
+
+
+### Bug Fixes
+
+* **home:** show global web-session banner and log cookie health ([2a83b43](https://github.com/redtidev1918/DAViewer/commit/2a83b437db398a2281a4681a1837d92eabeff23c))
+
+## [0.4.5](https://github.com/redtidev1918/DAViewer/compare/v0.4.4...v0.4.5) (2026-09-21)
+
+
+### Bug Fixes
+
+* **home:** require valid userinfo cookie and prompt web login ([aa6dca9](https://github.com/redtidev1918/DAViewer/commit/aa6dca91a9f7e6c935872abae21b98e04f1706a2))
+
+## [0.4.4](https://github.com/redtidev1918/DAViewer/compare/v0.4.3...v0.4.4) (2026-09-21)
+
+
+### Bug Fixes
+
+* **home:** disambiguate WebSession import ([fef84e2](https://github.com/redtidev1918/DAViewer/commit/fef84e23d68ff6ab1965372e5a251efe7721b558))
+* **home:** require signed-in web cookies for personalized feed ([520828b](https://github.com/redtidev1918/DAViewer/commit/520828bbca45b715288d0c3ec439164b5bb29586))
+
+## [0.4.3](https://github.com/redtidev1918/DAViewer/compare/v0.4.2...v0.4.3) (2026-09-21)
+
+
+### Bug Fixes
+
+* **deps:** consume dakit_web 0.2.4 CSRF refresh ([ce64072](https://github.com/redtidev1918/DAViewer/commit/ce6407292311e279c86619f7fc7e7d667b2de4c2))
+
+## [0.4.2](https://github.com/redtidev1918/DAViewer/compare/v0.4.1...v0.4.2) (2026-09-21)
+
+
+### Bug Fixes
+
+* **deps:** roll back DAKit api/web to v0.4.0 baseline ([a038d40](https://github.com/redtidev1918/DAViewer/commit/a038d40583fd03d1b7ba2db1dbc958f74d8a6999))
+* **home:** retry persisted web-session restore before rfy refresh ([4f5481d](https://github.com/redtidev1918/DAViewer/commit/4f5481d98c55bd2e7fad26a3fd8c12ed9d96405e))
+
+## [0.4.1](https://github.com/redtidev1918/DAViewer/compare/v0.4.0...v0.4.1) (2026-09-21)
+
+
+### Miscellaneous Chores
+
+* **main:** release 0.4.1 ([5cfc947](https://github.com/redtidev1918/DAViewer/commit/5cfc9479baff8f35b3f11e1c142cd1450df7cfa4))
+
 ## [0.4.0](https://github.com/redtidev1918/DAViewer/compare/v0.3.0...v0.4.0) (2026-09-20)
 
 
