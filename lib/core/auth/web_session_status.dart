@@ -21,6 +21,10 @@ enum WebSessionStatusState {
   unknown,
   healthy,
   anonymous,
+
+  /// A confirmed WebView session exists but a bare HTTP probe could not
+  /// confirm it (WAF/challenge/transient answer). Not a logged-out signal.
+  unverified,
   stale,
   locked,
   unavailable,
@@ -44,7 +48,6 @@ final class WebSessionStatus {
   bool get needsLogin =>
       state == WebSessionStatusState.anonymous ||
       state == WebSessionStatusState.stale ||
-      state == WebSessionStatusState.unavailable ||
       state == WebSessionStatusState.locked;
 
   bool get isLocked => state == WebSessionStatusState.locked;
@@ -165,45 +168,74 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       AppLogger.instance.info('auth', before.logLine());
       // The persisted snapshot only exists because a previous session was
       // confirmed during an actual WebView login. The home page answer decides
-      // whether that session is still who the server thinks it is.
-      final serverUsername = await _ref
+      // whether that session is still who the server thinks it is, but a bare
+      // HTTP probe is not a real browser: an anonymous/unavailable answer must
+      // never downgrade a WebView-confirmed session.
+      final verification = await _ref
           .read(webSessionVerifierProvider)
-          .username(cookieHeader: cookieHeader);
+          .verify(cookieHeader: cookieHeader);
       // A newer login/lockout superseded this check; never let a stale answer
       // overwrite the newer session state.
       if (!_isCurrent(generation)) return;
-      if (serverUsername.isEmpty ||
-          serverUsername.trim().toLowerCase() !=
+      switch (verification.state) {
+        case WebSessionVerificationState.signedIn:
+          if (verification.username.trim().toLowerCase() !=
               claimedUsername.toLowerCase()) {
-        final after = await webSession.snapshot(
-          source: 'check-after-anonymous',
-        );
-        AppLogger.instance.warning(
-          'auth',
-          'server rejected web session: claimed=$claimedUsername '
-              'server=${serverUsername.isEmpty ? 'anonymous' : serverUsername} '
-              'cookieCount=${cookieHeaderCount(cookieHeader)} '
-              'cookieFingerprint=${cookieHeaderFingerprint(cookieHeader)} ${after.logLine()}',
-        );
-        _setAnonymous();
-        return;
+            final after = await webSession.snapshot(
+              source: 'check-after-anonymous',
+            );
+            AppLogger.instance.warning(
+              'auth',
+              'server rejected web session: claimed=$claimedUsername '
+                  'server=${verification.username} '
+                  'cookieCount=${cookieHeaderCount(cookieHeader)} '
+                  'cookieFingerprint=${cookieHeaderFingerprint(cookieHeader)} '
+                  '${after.logLine()}',
+            );
+            _setAnonymous();
+            return;
+          }
+          _lastSuccess = DateTime.now();
+          _failures = 0;
+          state = WebSessionStatus(
+            state: WebSessionStatusState.healthy,
+            serverUsername: verification.username,
+            lastCheckedAt: DateTime.now(),
+          );
+          // Persist only a server-confirmed live cookie set. An unconfirmed
+          // health check must never overwrite the snapshot: a degraded live
+          // store during a WAF challenge can still carry a matching
+          // `userinfo` cookie while the auth cookies are mid-rotation, and
+          // re-persisting that set would make the next cold start restore dead
+          // credentials (forced re-login).
+          await _ref
+              .read(webSessionControllerProvider.notifier)
+              .ensurePersistentSnapshot(capturedCookies: cookies);
+        case WebSessionVerificationState.anonymous:
+          // A bare HTTP probe reporting anonymous is not proof the WebView is
+          // signed out (PerimeterX can serve an anonymous page for a valid
+          // session). Keep the confirmed WebView session as unverified; only
+          // an explicitly confirmed anonymous/logout state is authoritative.
+          if (controllerState.isLoggedIn == true &&
+              claimedUsername.isNotEmpty) {
+            final after = await webSession.snapshot(
+              source: 'check-after-anonymous',
+            );
+            AppLogger.instance.warning(
+              'auth',
+              'web session probe unconfirmed (anonymous): '
+                  'claimed=$claimedUsername '
+                  'cookieCount=${cookieHeaderCount(cookieHeader)} '
+                  'cookieFingerprint=${cookieHeaderFingerprint(cookieHeader)} '
+                  '${after.logLine()}',
+            );
+            _setUnverified();
+          } else {
+            _setAnonymous();
+          }
+        case WebSessionVerificationState.unavailable:
+          _setUnavailable();
       }
-      if (!_isCurrent(generation)) return;
-      _lastSuccess = DateTime.now();
-      _failures = 0;
-      state = WebSessionStatus(
-        state: WebSessionStatusState.healthy,
-        serverUsername: serverUsername,
-        lastCheckedAt: DateTime.now(),
-      );
-      // Persist only a server-confirmed live cookie set. An unconfirmed health
-      // check must never overwrite the snapshot: a degraded live store during a
-      // WAF challenge can still carry a matching `userinfo` cookie while the
-      // auth cookies are mid-rotation, and re-persisting that set would make
-      // the next cold start restore dead credentials (forced re-login).
-      await _ref
-          .read(webSessionControllerProvider.notifier)
-          .ensurePersistentSnapshot(capturedCookies: cookies);
     } on Object {
       if (_isCurrent(generation)) _setUnavailable();
     }
@@ -241,11 +273,18 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     state = const WebSessionStatus(state: WebSessionStatusState.anonymous);
   }
 
-  void _setUnavailable() {
+  /// A confirmed WebView session that a bare HTTP probe could not confirm.
+  /// Kept out of [WebSessionStatus.needsLogin] so a WAF false-negative never
+  /// sends the user back into the login challenge loop.
+  void _setUnverified() => _setTransient(WebSessionStatusState.unverified);
+
+  void _setUnavailable() => _setTransient(WebSessionStatusState.unavailable);
+
+  void _setTransient(WebSessionStatusState state) {
     _failures += 1;
     final index = (_failures - 1).clamp(0, _backoff.length - 1);
-    state = WebSessionStatus(
-      state: WebSessionStatusState.unavailable,
+    this.state = WebSessionStatus(
+      state: state,
       cooldownUntil: DateTime.now().add(_backoff[index]),
     );
   }

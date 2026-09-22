@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -10,11 +11,10 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/auth/auth_controller.dart';
 import '../../core/auth/auth_state.dart';
 import '../../core/auth/web_session_controller.dart';
+import '../../core/auth/web_session_platform.dart';
 import '../../core/auth/web_session_status.dart';
 import '../../core/auth/webview_oauth_bridge.dart';
 import '../../core/diagnostics/app_logger.dart';
-
-import 'package:dakit_web/dakit_web.dart';
 
 import '../../core/diagnostics/error_text.dart';
 import '../../core/l10n/app_strings.dart';
@@ -51,6 +51,8 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
   bool _serverConfirmedWebSession = false;
   bool _challengeBlocked = false;
   int _reportSeq = 0;
+  int _navSeq = 0;
+  String _navSource = 'initial';
   double _progress = 0;
   late final AuthController _authController;
 
@@ -100,6 +102,7 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
       _pendingAuthUri = uri;
       return;
     }
+    _navSource = 'oauth_bridge';
     controller.loadUrl(urlRequest: URLRequest(url: WebUri(uri.toString())));
   }
 
@@ -270,6 +273,7 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
             tooltip: s.refresh,
             onPressed: () {
               AppLogger.instance.info('webview', 'manual refresh requested');
+              _navSource = 'manual_refresh';
               _controller?.reload();
             },
             icon: const Icon(Icons.refresh),
@@ -335,10 +339,13 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                     ),
                     initialSettings: InAppWebViewSettings(
                       javaScriptEnabled: true,
-                      // A desktop Chrome UA makes deviantart.com serve its desktop login
-                      // page, which includes the Google/Apple one-click sign-in buttons
-                      // that the mobile layout omits.
-                      userAgent: webUserAgent,
+                      // Android must present its real WebView UA: forcing a
+                      // desktop Chrome UA on Android makes PerimeterX treat the
+                      // WebView as an emulated browser and loop the login page
+                      // into a challenge lock. Desktop keeps the desktop UA.
+                      userAgent: webLoginUserAgent(
+                        isAndroid: Platform.isAndroid,
+                      ),
                       // Keep the WebView opaque: transparentBackground forces software
                       // compositing on Android, which causes severe jank when the soft
                       // keyboard resizes the surface.
@@ -363,6 +370,7 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                               uri.scheme == 'dakit' &&
                               uri.host == 'oauth') {
                             _bridge?.addCallback(uri);
+                            _navSource = 'oauth_callback';
                             // Navigate back to the deviantart home page; its onLoadStop then
                             // reports the real web session (CSRF + login state). Do NOT read
                             // the session here — the callback page has no __INITIAL_STATE__.
@@ -378,10 +386,15 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                           return NavigationActionPolicy.ALLOW;
                         },
                     onLoadStart: (controller, url) {
+                      _navSeq += 1;
                       AppLogger.instance.info(
                         'webview',
-                        'load start: ${url ?? '<null>'}',
+                        'nav seq=$_navSeq event=load_start '
+                            'source=$_navSource url=${url ?? '<null>'}',
                       );
+                      // Any later load with no app action is a server redirect
+                      // (for example PerimeterX looping /users/login).
+                      _navSource = 'server_redirect';
                       if (mounted) setState(() => _loading = true);
                     },
                     onLoadStop: (controller, url) {

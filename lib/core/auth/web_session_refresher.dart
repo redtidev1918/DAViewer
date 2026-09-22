@@ -1,16 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:ui' show Size;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:dakit_web/dakit_web.dart';
-
 import '../runtime/runtime_provider.dart';
 import 'session_state.dart';
 import 'web_session_controller.dart';
+import 'web_session_platform.dart';
 
 /// Loads a public page in a hidden browser so website-only metadata adapters
 /// can obtain the anonymous CSRF/cookies expected by DeviantArt. It never asks
@@ -48,7 +48,7 @@ final class WebSessionRefresher {
         initialSize: const Size(480, 800),
         initialSettings: InAppWebViewSettings(
           javaScriptEnabled: true,
-          userAgent: webUserAgent,
+          userAgent: webLoginUserAgent(isAndroid: Platform.isAndroid),
         ),
         initialUrlRequest: URLRequest(
           url: WebUri('https://www.deviantart.com/'),

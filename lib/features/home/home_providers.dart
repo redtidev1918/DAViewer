@@ -52,17 +52,16 @@ final personalizedFeedProvider =
             message: 'The network layer is not available.',
           );
         }
-        // Server verification runs before every personalized request. It is not
-        // a cached FutureProvider: a stale cookie must not keep returning the
-        // same false after the user re-logins or explicitly retries.
-        final statusController = ref.read(webSessionStatusProvider.notifier);
-        await statusController.check();
-        if (!ref.read(webSessionStatusProvider).isHealthy) {
+        // Gate on the WebView-confirmed session, not a WAF-sensitive Dio home
+        // probe on every request. A bare probe that reports anonymous is not
+        // proof the WebView signed out; a confirmed session proceeds to the
+        // actual rfy fetch. Explicit Retry still re-runs the server check.
+        final webSessionState = ref.read(webSessionControllerProvider);
+        if (webSessionState.isLoggedIn != true ||
+            webSessionState.username.trim().isEmpty) {
           AppLogger.instance.warning(
             'home',
-            'web session status: '
-                '${ref.read(webSessionStatusProvider).state.name}; '
-                'showing web-session notice',
+            'web session not confirmed; showing web-session notice',
           );
           throw const DAKitException(
             kind: DAKitFailureKind.authentication,
@@ -72,8 +71,7 @@ final personalizedFeedProvider =
         }
         AppLogger.instance.info(
           'home',
-          'web cookie healthy: '
-              '${ref.read(webSessionStatusProvider).serverUsername}',
+          'web session confirmed: ${webSessionState.username}',
         );
         var csrf = ref.read(webSessionControllerProvider).csrf;
         var cookieHeader = await webSession.cookieHeader();
