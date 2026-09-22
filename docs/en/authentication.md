@@ -92,6 +92,35 @@ secure-storage token must not revive the signed-in UI on the next cold start.
 Web-session usability is also confirmed by the DeviantArt home page
 (`@publicSession.user.username`); a local Cookie alone is not proof.
 
+## Authentication transaction lifecycle
+
+Every login entry point (Home, Settings, Daily, Watched, Favourites,
+Notifications) enters the same `AuthController` transaction:
+
+1. Opening the login screen first cancels the previous OAuth transaction and
+   starts a fresh PKCE flow, so stale `isLoggingIn` state or callbacks cannot
+   block a new login.
+2. After the OAuth callback/token write, the global state converges to
+   `signedIn` only once the account profile has loaded.
+3. The web Cookie is server-verified against the DeviantArt home page; the
+   login screen closes only when OAuth and the web session both satisfy the
+   contract.
+4. Logout, cancellation, and every new login increment an authentication epoch;
+   stale in-flight account loads cannot set the state back to `signedIn`.
+5. OAuth-backed providers (Daily, Watched, Favourites, Notifications) all watch
+   the `AuthController` identity; a fresh `signedIn` automatically invalidates
+   and refetches them without page-local refresh hacks.
+
+State semantics:
+
+- `signedOut`: OAuth is missing, definitively revoked, or the user logged out;
+- `signedIn`: OAuth token and account profile have converged and the API is usable;
+- `anonymous`: DeviantArt confirmed the web Cookie is anonymous/expired; this
+  only degrades web recommendations and never kills a valid OAuth session;
+- `unavailable`: WAF, unexpected HTTP response, or network failure; back off
+  instead of treating it as signed out or prompting repeatedly;
+- `signingIn / signingOut`: a login/logout transaction is in progress.
+
 macOS previews use one private, stable CI signing identity. The identity is
 self-signed, not Apple trusted or notarized, but it prevents a changing ad-hoc
 cdhash from requesting the Mac password after each update. Token and recovery

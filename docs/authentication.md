@@ -48,6 +48,32 @@ DAViewer 只有一个用户身份：官方 DeviantArt OAuth 会话。应用既�
 网页 Cookie 的可用性也由 DeviantArt 首页服务端验证
 （`@publicSession.user.username`），本地存在 Cookie 不等于会话有效。
 
+## 认证事务生命周期
+
+所有登录入口（首页、设置、每日精选、关注动态、收藏、通知）最终都进入同一个
+`AuthController` 登录事务：
+
+1. 打开登录页先终结上一次遗留的 OAuth 事务（`cancelLogin`），再新建 PKCE 事务，
+   防止旧的 `isLoggingIn`、Pending transaction 或回调阻塞新登录。
+2. OAuth 回调/token 写入成功后，账号资料加载完成才把全局状态收敛为 `signedIn`。
+3. 网页 Cookie 由 `WebSessionVerifier` 读取 DeviantArt 首页进行服务端验证；
+   只有 OAuth 与 Web Session 都满足契约，登录页才自动关闭。
+4. 每次登出、取消或新建登录都会递增认证代际；旧的在途账号加载/回调不能把状态
+   改回 `signedIn`。
+5. 依赖 OAuth 的 Provider（每日精选、关注动态、收藏、通知）统一 watch
+   `AuthController` 的账号身份；身份变为 `signedIn` 后自动 invalidate 并重新拉取，
+   不依赖任何页面手动刷新或空状态残留。
+
+状态语义：
+
+- `signedOut`：OAuth 不存在/被明确吊销，或者用户显式登出；
+- `signedIn`：OAuth token 与账号资料已收敛，服务端 API 可用；
+- `anonymous`：网页 Cookie 被 DeviantArt 明确判定为匿名/过期，只影响网页推荐，
+  不把有效 OAuth 误杀；
+- `unavailable`：WAF 拦截、HTTP 非预期响应或网络错误，走退避，
+  不等同于未登录，不触发重复登录提示；
+- `signingIn / signingOut`：登录/登出进行中。
+
 macOS 预览版使用同一个私有稳定的 CI 签名身份。该身份是自签名的，不被 Apple 信任也未公证，但它能避免每次更新后变化的 ad-hoc cdhash 索要 Mac 密码。token 与恢复存储使用 `DAViewer Account` Keychain 服务；更早的 ad-hoc 项永不查询，因此无法访问的历史记录不会阻塞授权。
 
 项目**不购买 Apple Developer Program**，也不要求付费开发者签名。本地

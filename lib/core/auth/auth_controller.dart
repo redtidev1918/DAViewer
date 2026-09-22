@@ -73,11 +73,14 @@ final class AuthController extends StateNotifier<AuthState> {
   StreamSubscription<DAKitException>? _sessionInvalidationSubscription;
   bool _initializing = false;
   bool _loggingIn = false;
+  int _authEpoch = 0;
   Future<void>? _loginOperation;
   Future<void>? _accountLoad;
 
   AppRuntime get _runtime => _ref.read(runtimeProvider);
   AppLogger get _log => AppLogger.instance;
+
+  bool _isCurrentEpoch(int epoch) => epoch == _authEpoch;
 
   Future<void> initialize() async {
     if (_initializing || state.status != AuthStatus.unknown) return;
@@ -199,6 +202,7 @@ final class AuthController extends StateNotifier<AuthState> {
       error,
     );
     await AppPreferences.saveOAuthSessionKnown(false);
+    _authEpoch += 1;
     state = const AuthState(status: AuthStatus.signedOut);
   }
 
@@ -241,6 +245,7 @@ final class AuthController extends StateNotifier<AuthState> {
     } on DAKitException catch (error) {
       if (isDefinitiveCredentialFailure(error)) {
         await AppPreferences.saveOAuthSessionKnown(false);
+        _authEpoch += 1;
         state = const AuthState(status: AuthStatus.signedOut);
         return false;
       }
@@ -273,6 +278,7 @@ final class AuthController extends StateNotifier<AuthState> {
     }
     if (state.status == AuthStatus.signedIn || _loggingIn) return;
 
+    final epoch = ++_authEpoch;
     _loggingIn = true;
     state = AuthState(
       status: state.status,
@@ -284,8 +290,9 @@ final class AuthController extends StateNotifier<AuthState> {
       await runtime.oauth!.authorize();
       await AppPreferences.saveOAuthSessionKnown(true);
       _log.info('auth', 'login: authorize returned, loading account');
-      await _loadAccount(runtime);
+      await _loadAccount(runtime, epoch: epoch);
     } on DAKitException catch (error) {
+      if (!_isCurrentEpoch(epoch)) return;
       if (error.kind == DAKitFailureKind.cancelled ||
           error.code == 'oauth.transaction.cancelled') {
         _log.info('auth', 'OAuth login cancelled cleanly');
@@ -295,6 +302,7 @@ final class AuthController extends StateNotifier<AuthState> {
       _log.error('auth', 'OAuth login failed: ${error.code}', error);
       state = AuthState(status: AuthStatus.signedOut, error: error);
     } catch (error, stack) {
+      if (!_isCurrentEpoch(epoch)) return;
       _log.error('auth', 'OAuth login failed (unexpected)', error, stack);
       state = AuthState(status: AuthStatus.signedOut, error: error);
     } finally {
@@ -306,6 +314,7 @@ final class AuthController extends StateNotifier<AuthState> {
   /// clear, so the next login creates a new authorize URL immediately.
   Future<void> cancelLogin() async {
     if (state.status == AuthStatus.signedIn) return;
+    _authEpoch += 1;
     final runtime = _runtime;
     final active = _loginOperation;
     if (runtime.oauth != null) {
@@ -340,6 +349,7 @@ final class AuthController extends StateNotifier<AuthState> {
     // Persist the user's intent and leave authenticated UI before best-effort
     // network revocation or secure-storage cleanup. Neither failure may sign
     // the user back in on the next launch.
+    _authEpoch += 1;
     state = const AuthState(status: AuthStatus.signedOut);
     await AppPreferences.saveOAuthSessionKnown(false);
     if (runtime.isConfigured && runtime.oauth != null) {
@@ -369,23 +379,27 @@ final class AuthController extends StateNotifier<AuthState> {
   /// so identity-dependent cold-start steps can await it instead of racing a
   /// still-loading account.
   Future<void> _startAccountLoad(AppRuntime runtime) =>
-      _accountLoad ??= _loadAccount(runtime);
+      _accountLoad ??= _loadAccount(runtime, epoch: _authEpoch);
 
   /// Completes when the initial account profile load settles (account loaded,
   /// or the load failed and signed-in state has no account).
   Future<void> get accountLoad => _accountLoad ?? Future<void>.value();
 
-  Future<void> _loadAccount(AppRuntime runtime) async {
+  Future<void> _loadAccount(AppRuntime runtime, {int? epoch}) async {
+    final activeEpoch = epoch ?? _authEpoch;
     _log.info('auth', 'loading account');
     try {
       final account = await OfficialAccountRepository(runtime.transport!)
           .currentUser()
           .timeout(const Duration(seconds: 15));
+      if (!_isCurrentEpoch(activeEpoch)) return;
       _log.info('auth', 'account loaded: ${account.username}');
       state = AuthState(status: AuthStatus.signedIn, account: account);
     } on DAKitException catch (error, stack) {
+      if (!_isCurrentEpoch(activeEpoch)) return;
       if (isDefinitiveCredentialFailure(error)) {
         await AppPreferences.saveOAuthSessionKnown(false);
+        _authEpoch += 1;
         state = const AuthState(status: AuthStatus.signedOut);
         return;
       }
@@ -394,6 +408,7 @@ final class AuthController extends StateNotifier<AuthState> {
       // in with an unknown profile instead of forcing a logout.
       state = const AuthState(status: AuthStatus.signedIn);
     } on Object catch (error, stack) {
+      if (!_isCurrentEpoch(activeEpoch)) return;
       _log.error('auth', 'account load failed', error, stack);
       state = const AuthState(status: AuthStatus.signedIn);
     }

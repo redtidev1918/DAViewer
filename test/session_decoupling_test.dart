@@ -282,4 +282,80 @@ void main() {
       expect(dioAdapter.requests.length, requestsBeforeWebChanges);
     },
   );
+
+  test('fresh OAuth sign-in invalidates daily and watched providers', () async {
+    final dioAdapter = _RecordingDioAdapter(<String, Map<String, Object?>>{
+      'browse/dailydeviations': <String, Object?>{
+        'results': <Object?>[],
+        'has_more': false,
+        'next_offset': 0,
+      },
+      'browse/deviantsyouwatch': <String, Object?>{
+        'results': <Object?>[],
+        'has_more': false,
+        'next_offset': 0,
+      },
+    });
+    final dio = Dio()..httpClientAdapter = dioAdapter;
+    final tokenStore = _MemoryTokenStore()
+      ..tokens = AuthTokens(
+        accessToken: 'access-token',
+        tokenType: 'Bearer',
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        refreshToken: 'refresh-token',
+        scopes: const <String>{OAuthScope.basic},
+      );
+    final oauth = DAKitOAuthClient(
+      config: OAuthConfig(
+        clientId: 'test-client',
+        redirectUri: Uri.parse('dakit://oauth/callback'),
+        scopes: const <String>{OAuthScope.basic},
+      ),
+      tokenStore: tokenStore,
+      pendingStore: _MemoryPendingAuthorizationStore(),
+      callbacks: _EmptyCallbackSource(),
+    );
+    final transport = OfficialApiClient(
+      session: oauth.session,
+      dio: dio,
+      config: ApiConfig(userAgent: 'daviewer-test'),
+    );
+    final runtime = AppRuntime(
+      clientId: 'test-client',
+      oauth: oauth,
+      transport: transport,
+      transfers: transfers,
+    );
+    final container = ProviderContainer(
+      overrides: <Override>[runtimeProvider.overrideWithValue(runtime)],
+    );
+    addTearDown(container.dispose);
+
+    final auth = container.read(authControllerProvider.notifier);
+    auth.state = const AuthState(status: AuthStatus.signedOut);
+    auth.state = const AuthState(
+      status: AuthStatus.signedIn,
+      account: UserProfile(id: 'user-1', username: 'sample-user'),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    final daily = container.read(dailyDeviationsProvider.future);
+    final watched = container.listen(
+      followingFeedProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(watched.close);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await daily;
+
+    final dailyRequests = dioAdapter.requests.where(
+      (path) => path == 'browse/dailydeviations',
+    );
+    final watchedRequests = dioAdapter.requests.where(
+      (path) => path == 'browse/deviantsyouwatch',
+    );
+    expect(dailyRequests, isNotEmpty);
+    expect(watchedRequests, isNotEmpty);
+  });
 }
