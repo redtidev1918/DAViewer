@@ -226,4 +226,38 @@ void main() {
     expect(controller.state.error, isNull);
     expect(controller.state.items.single.id, 'art-1');
   });
+
+  test('refresh transitions through refreshing and back to idle', () async {
+    final controller = ArtworkFeedController((request) async {
+      return Page<Artwork>(items: <Artwork>[artwork(1)], hasMore: false);
+    }, autoLoad: false);
+
+    await controller.refresh();
+    expect(controller.state.phase, FeedRequestPhase.idle);
+
+    final refreshing = controller.refresh();
+    expect(controller.state.isLoading, isTrue);
+    expect(controller.state.phase, FeedRequestPhase.refreshing);
+    await refreshing;
+    expect(controller.state.phase, FeedRequestPhase.idle);
+  });
+
+  test('silent refresh failure becomes an observable stopped state', () async {
+    var calls = 0;
+    final controller = ArtworkFeedController((request) async {
+      calls += 1;
+      if (calls == 1) {
+        return Page<Artwork>(items: <Artwork>[artwork(1)], hasMore: false);
+      }
+      throw StateError('silent boom');
+    }, autoLoad: false);
+
+    await controller.refresh();
+    await controller.refreshSilently();
+
+    expect(calls, 2);
+    expect(controller.state.items, hasLength(1));
+    expect(controller.state.phase, FeedRequestPhase.stopped);
+    expect(controller.state.lastRefreshError, isA<StateError>());
+  });
 }
