@@ -3,6 +3,14 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.4.18](https://github.com/redtidev1918/DAViewer/compare/v0.4.17...v0.4.18) (2026-09-22)
+
+
+### Bug Fixes
+
+* **feed:** bound stalled pagination and persist only confirmed cookies ([adef13e](https://github.com/redtidev1918/DAViewer/commit/adef13e41a7c5bbb2341ee7aff805d08672c15db))
+* **feed:** bound stalled pagination and persist only confirmed cookies ([f23a0a4](https://github.com/redtidev1918/DAViewer/commit/f23a0a49eb982facfb312832bb7d7cf13ad88e30))
+
 ## [0.4.17](https://github.com/redtidev1918/DAViewer/compare/v0.4.16...v0.4.17) (2026-09-22)
 
 
