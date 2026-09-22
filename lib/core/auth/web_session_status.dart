@@ -47,6 +47,7 @@ final class WebSessionStatus {
 
   bool get needsLogin =>
       state == WebSessionStatusState.anonymous ||
+      state == WebSessionStatusState.unverified ||
       state == WebSessionStatusState.stale ||
       state == WebSessionStatusState.locked;
 

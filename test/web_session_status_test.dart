@@ -206,9 +206,11 @@ void main() {
       expect(locked.isLocked, isTrue);
       expect(locked.needsLogin, isTrue);
       // A confirmed WebView session that a bare HTTP probe could not confirm
-      // is not a logged-out signal; neither is a WAF/network answer.
+      // is not a logged-out signal, but it is surfaced to the user with a
+      // login reminder instead of staying silent. A WAF/network answer is
+      // never treated as logged out.
       expect(unverified.isHealthy, isFalse);
-      expect(unverified.needsLogin, isFalse);
+      expect(unverified.needsLogin, isTrue);
       expect(unavailable.needsLogin, isFalse);
     });
 
@@ -246,7 +248,9 @@ void main() {
 
         final status = container.read(webSessionStatusProvider);
         expect(status.state, WebSessionStatusState.unverified);
-        expect(status.needsLogin, isFalse);
+        // The confirmed WebView session survives, but the unverified state is
+        // surfaced so the user can choose to re-verify via login.
+        expect(status.needsLogin, isTrue);
         // The confirmed WebView session itself must survive the false-negative
         // probe; only explicit logout clears it.
         final controllerState = container.read(webSessionControllerProvider);

@@ -67,6 +67,8 @@ final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
     final id = 'web-session-${status.state.name}';
     final message = status.isLocked
         ? s.webLoginChallengeExceeded
+        : status.state == WebSessionStatusState.unverified
+        ? s.webSessionUnverifiedBanner
         : s.webSessionBanner;
     return AppNotice(
       id: id,
