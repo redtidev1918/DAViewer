@@ -3,6 +3,21 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.5.0](https://github.com/redtidev1918/DAViewer/compare/v0.4.19...v0.5.0) (2026-09-22)
+
+
+### Features
+
+* surface unverified web session as a login reminder ([79665e1](https://github.com/redtidev1918/DAViewer/commit/79665e1303758b0f7a44b2e764c9298158c1647d))
+
+
+### Bug Fixes
+
+* do not nag for a probe-only unverified session ([79d50b4](https://github.com/redtidev1918/DAViewer/commit/79d50b45672dc780dddd1eb10a059509eb1257a5))
+* skip WAF probe on feed refresh, preserve subscription gates ([c57f6b1](https://github.com/redtidev1918/DAViewer/commit/c57f6b167e026ee09196341b9467a34a05c219f0))
+* stop web login challenge loop ([387e19f](https://github.com/redtidev1918/DAViewer/commit/387e19fe2df3ac3d69dfa0e6b817ee3d04606301))
+* stop web login challenge loop ([c9b2913](https://github.com/redtidev1918/DAViewer/commit/c9b291320ef250ade049e6a8d4ce2f3f01d5170c))
+
 ## [0.4.19](https://github.com/redtidev1918/DAViewer/compare/v0.4.18...v0.4.19) (2026-09-22)
 
 
