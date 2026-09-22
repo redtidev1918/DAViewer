@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:daviewer/core/auth/web_session_controller.dart';
@@ -43,6 +44,79 @@ final class _HomeHtmlAdapter implements HttpClientAdapter {
       Headers.contentTypeHeader: <String>['text/html'],
     },
   );
+}
+
+/// Counts how many times the home page was actually fetched.
+final class _CountingHtmlAdapter implements HttpClientAdapter {
+  _CountingHtmlAdapter(this.html);
+
+  final String html;
+  int calls = 0;
+
+  @override
+  void close({bool force = false}) {}
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    calls += 1;
+    return ResponseBody.fromString(
+      html,
+      200,
+      headers: <String, List<String>>{
+        Headers.contentTypeHeader: <String>['text/html'],
+      },
+    );
+  }
+}
+
+/// Completes the home page response only when the test decides.
+final class _GatedHtmlAdapter implements HttpClientAdapter {
+  _GatedHtmlAdapter(this.completer);
+
+  final Completer<ResponseBody> completer;
+
+  @override
+  void close({bool force = false}) {}
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) => completer.future;
+}
+
+ProviderContainer _containerWith(HttpClientAdapter adapter) {
+  final container = ProviderContainer(
+    overrides: <Override>[
+      webSessionProvider.overrideWithValue(
+        WebSession(
+          () => _FakeCookieManager(<Cookie>[
+            Cookie(name: 'userinfo', value: 'saved-user'),
+            Cookie(name: 'csrf', value: 'token'),
+          ]),
+        ),
+      ),
+      webSessionControllerProvider.overrideWith(
+        (ref) => WebSessionController(ref),
+      ),
+      webSessionVerifierProvider.overrideWithValue(
+        WebSessionVerifier(Dio()..httpClientAdapter = adapter),
+      ),
+    ],
+  );
+  container
+      .read(webSessionControllerProvider.notifier)
+      .state = const WebSessionState(
+    csrf: 'token',
+    isLoggedIn: true,
+    username: 'artist',
+  );
+  return container;
 }
 
 const _signedInHomeHtml =
@@ -159,6 +233,44 @@ void main() {
       final status = container.read(webSessionStatusProvider);
       expect(status.state, WebSessionStatusState.anonymous);
       expect(status.needsLogin, isTrue);
+    });
+
+    test('concurrent checks share one in-flight verification', () async {
+      final adapter = _CountingHtmlAdapter(_signedInHomeHtml);
+      final container = _containerWith(adapter);
+      addTearDown(container.dispose);
+      final controller = container.read(webSessionStatusProvider.notifier);
+
+      await Future.wait(<Future<void>>[controller.check(), controller.check()]);
+
+      expect(adapter.calls, 1);
+      expect(container.read(webSessionStatusProvider).isHealthy, isTrue);
+    });
+
+    test('a stale anonymous check never overrides a newer login', () async {
+      final gate = Completer<ResponseBody>();
+      final container = _containerWith(_GatedHtmlAdapter(gate));
+      addTearDown(container.dispose);
+      final controller = container.read(webSessionStatusProvider.notifier);
+
+      final checkFuture = controller.check();
+      // Let the check reach the server await before login confirms the session.
+      await Future<void>.delayed(Duration.zero);
+      controller.markHealthy(serverUsername: 'artist');
+      gate.complete(
+        ResponseBody.fromString(
+          _anonymousHomeHtml,
+          200,
+          headers: <String, List<String>>{
+            Headers.contentTypeHeader: <String>['text/html'],
+          },
+        ),
+      );
+      await checkFuture;
+
+      final status = container.read(webSessionStatusProvider);
+      expect(status.isHealthy, isTrue);
+      expect(status.serverUsername, 'artist');
     });
   });
 }

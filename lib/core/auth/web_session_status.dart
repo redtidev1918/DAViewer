@@ -90,13 +90,15 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
 
   DateTime? _lastSuccess;
   int _failures = 0;
-  bool _checking = false;
+  int _generation = 0;
+  Future<void>? _activeCheck;
 
   /// Restores a persisted server-confirmed session snapshot, never during a
   /// backoff period. The next feed request is the acceptance gate: expired
   /// cookies surface as a feed error instead of forcing a WAF probe.
   Future<void> check({bool force = false}) async {
-    if (_checking) return;
+    final active = _activeCheck;
+    if (active != null) return active;
     final last = _lastSuccess;
     if (!force &&
         last != null &&
@@ -106,13 +108,30 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     }
     if (!force && state.inCooldown) return;
 
-    _checking = true;
+    final generation = _generation;
+    late final Future<void> tracked;
+    tracked = _performCheck(force: force, generation: generation).whenComplete(
+      () {
+        if (identical(_activeCheck, tracked)) _activeCheck = null;
+      },
+    );
+    _activeCheck = tracked;
+    return tracked;
+  }
+
+  bool _isCurrent(int generation) => generation == _generation;
+
+  Future<void> _performCheck({
+    required bool force,
+    required int generation,
+  }) async {
     try {
       // Restore the persisted snapshot if the live WebView store lost it
       // (for example after an app update), before asking the server.
       await _ref
           .read(webSessionControllerProvider.notifier)
           .restorePersistedCookies();
+      if (!_isCurrent(generation)) return;
       final webSession = _ref.read(webSessionProvider);
       final cookies = await webSession.cookies();
       if (cookies.isEmpty) {
@@ -123,12 +142,14 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         final persisted = await _ref
             .read(webSessionControllerProvider.notifier)
             .persistedCookies();
+        if (!_isCurrent(generation)) return;
         _setEmptyLiveCookieState(persistedCount: persisted.length);
         return;
       }
       final controllerState = _ref.read(webSessionControllerProvider);
       final claimedUsername = controllerState.username.trim();
       if (controllerState.isLoggedIn != true || claimedUsername.isEmpty) {
+        if (!_isCurrent(generation)) return;
         _setAnonymous();
         return;
       }
@@ -136,6 +157,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       if (cookieHeader.isEmpty) {
         final empty = await webSession.snapshot(source: 'check-empty-cookie');
         AppLogger.instance.warning('auth', empty.logLine());
+        if (!_isCurrent(generation)) return;
         _setAnonymous();
         return;
       }
@@ -147,6 +169,9 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       final serverUsername = await _ref
           .read(webSessionVerifierProvider)
           .username(cookieHeader: cookieHeader);
+      // A newer login/lockout superseded this check; never let a stale answer
+      // overwrite the newer session state.
+      if (!_isCurrent(generation)) return;
       if (serverUsername.isEmpty ||
           serverUsername.trim().toLowerCase() !=
               claimedUsername.toLowerCase()) {
@@ -163,6 +188,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         _setAnonymous();
         return;
       }
+      if (!_isCurrent(generation)) return;
       _lastSuccess = DateTime.now();
       _failures = 0;
       state = WebSessionStatus(
@@ -179,20 +205,20 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
           .read(webSessionControllerProvider.notifier)
           .ensurePersistentSnapshot(capturedCookies: cookies);
     } on Object {
-      _setUnavailable();
-    } finally {
-      _checking = false;
+      if (_isCurrent(generation)) _setUnavailable();
     }
   }
 
   /// Called by the login WebView when DeviantArt reports its WAF lockout.
   /// All automatic retries must stop while this state is active.
   void markLocked() {
+    _generation++;
     _failures = 0;
     state = const WebSessionStatus(state: WebSessionStatusState.locked);
   }
 
   void markHealthy({required String serverUsername}) {
+    _generation++;
     _lastSuccess = DateTime.now();
     _failures = 0;
     state = WebSessionStatus(

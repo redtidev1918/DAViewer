@@ -32,18 +32,34 @@ String _userInfo(String username) => Uri.encodeComponent(
 
 void main() {
   group('WebSession.cookies', () {
-    test('returns name -> value map of the deviantart cookies', () async {
+    test('returns the deviantart cookies with their metadata', () async {
+      final expires = DateTime.fromMillisecondsSinceEpoch(2000000000000);
       final session = WebSession(
         () => _FakeCookieManager(<Cookie>[
-          Cookie(name: 'userinfo', value: 'abc'),
+          Cookie(
+            name: 'userinfo',
+            value: 'abc',
+            domain: '.deviantart.com',
+            path: '/',
+            expiresDate: 2000000000000,
+            isSecure: true,
+            isHttpOnly: true,
+          ),
           Cookie(name: 'csrf', value: 'tok'),
         ]),
       );
 
-      expect(await session.cookies(), <String, String>{
-        'userinfo': 'abc',
-        'csrf': 'tok',
-      });
+      final cookies = await session.cookies();
+      expect(cookies, hasLength(2));
+      final userinfo = cookies.firstWhere(
+        (cookie) => cookie.name == 'userinfo',
+      );
+      expect(userinfo.value, 'abc');
+      expect(userinfo.domain, '.deviantart.com');
+      expect(userinfo.path, '/');
+      expect(userinfo.expiresDate, expires);
+      expect(userinfo.isSecure, isTrue);
+      expect(userinfo.isHttpOnly, isTrue);
     });
 
     test('serializes into a Cookie header value', () async {
@@ -57,11 +73,50 @@ void main() {
       expect(await session.cookieHeader(), 'a=1; b=2');
     });
 
-    test('returns empty map/header when the cookie manager throws', () async {
+    test('returns empty list/header when the cookie manager throws', () async {
       final session = WebSession(() => _FakeCookieManager(null));
 
       expect(await session.cookies(), isEmpty);
       expect(await session.cookieHeader(), '');
+    });
+  });
+
+  group('PersistedWebCookie round trip', () {
+    test('keeps duplicate names from different domains/paths distinct', () {
+      final cookie = PersistedWebCookie(
+        name: 'auth',
+        value: 'www-value',
+        domain: '.www.deviantart.com',
+        path: '/',
+        expiresDate: DateTime.utc(2030, 1, 1),
+        isSecure: true,
+        isHttpOnly: true,
+      );
+      final restored = parsePersistedCookies(<Object?>[cookie.toJson()]);
+      expect(restored, hasLength(1));
+      expect(restored.single.name, 'auth');
+      expect(restored.single.value, 'www-value');
+      expect(restored.single.domain, '.www.deviantart.com');
+      expect(restored.single.path, '/');
+      expect(restored.single.expiresDate, DateTime.utc(2030, 1, 1));
+      expect(restored.single.isSecure, isTrue);
+      expect(restored.single.isHttpOnly, isTrue);
+    });
+
+    test('migrates a legacy name-value map snapshot', () {
+      final migrated = parsePersistedCookies(<String, String>{
+        'userinfo': 'abc',
+        'csrf': 'tok',
+      });
+      expect(migrated, hasLength(2));
+      expect(
+        migrated.firstWhere((cookie) => cookie.name == 'userinfo').value,
+        'abc',
+      );
+      expect(
+        migrated.firstWhere((cookie) => cookie.name == 'csrf').domain,
+        null,
+      );
     });
   });
 
@@ -218,22 +273,36 @@ void main() {
   group('isValidCookieSnapshot', () {
     test('requires userinfo for the claimed account', () {
       final valid = <String, String>{'userinfo': _userInfo('Artist')};
-      expect(isValidCookieSnapshot(cookies: valid, username: 'artist'), isTrue);
       expect(
         isValidCookieSnapshot(
-          cookies: <String, String>{'userinfo': _userInfo('Other')},
+          cookies: parsePersistedCookies(valid),
+          username: 'artist',
+        ),
+        isTrue,
+      );
+      expect(
+        isValidCookieSnapshot(
+          cookies: parsePersistedCookies(<String, String>{
+            'userinfo': _userInfo('Other'),
+          }),
           username: 'artist',
         ),
         isFalse,
       );
       expect(
         isValidCookieSnapshot(
-          cookies: <String, String>{'csrf': 'token'},
+          cookies: parsePersistedCookies(<String, String>{'csrf': 'token'}),
           username: 'artist',
         ),
         isFalse,
       );
-      expect(isValidCookieSnapshot(cookies: valid, username: ''), isFalse);
+      expect(
+        isValidCookieSnapshot(
+          cookies: parsePersistedCookies(valid),
+          username: '',
+        ),
+        isFalse,
+      );
     });
   });
 
@@ -244,7 +313,10 @@ void main() {
         'csrf': 'tok',
       };
       expect(
-        isUnchangedSessionReimport(previous: cookies, imported: cookies),
+        isUnchangedSessionReimport(
+          previous: parsePersistedCookies(cookies),
+          imported: cookies,
+        ),
         isTrue,
       );
     });
@@ -252,21 +324,23 @@ void main() {
     test('different userinfo or no previous userinfo is not unchanged', () {
       expect(
         isUnchangedSessionReimport(
-          previous: <String, String>{'userinfo': _userInfo('A')},
+          previous: parsePersistedCookies(<String, String>{
+            'userinfo': _userInfo('A'),
+          }),
           imported: <String, String>{'userinfo': _userInfo('B')},
         ),
         isFalse,
       );
       expect(
         isUnchangedSessionReimport(
-          previous: <String, String>{'csrf': 'tok'},
+          previous: parsePersistedCookies(<String, String>{'csrf': 'tok'}),
           imported: <String, String>{'userinfo': _userInfo('A'), 'csrf': 'x'},
         ),
         isFalse,
       );
       expect(
         isUnchangedSessionReimport(
-          previous: <String, String>{'userinfo': ''},
+          previous: parsePersistedCookies(<String, String>{'userinfo': ''}),
           imported: <String, String>{'userinfo': _userInfo('A')},
         ),
         isFalse,

@@ -165,6 +165,11 @@ final class _ArtistScreenState extends ConsumerState<ArtistScreen> {
                             artistFavouritesProvider(widget.username).notifier,
                           )
                           .loadMore(),
+                      onRetryLoadMore: () => ref
+                          .read(
+                            artistFavouritesProvider(widget.username).notifier,
+                          )
+                          .retryLoadMore(),
                     ),
                     JournalsView(username: widget.username),
                     FoldersOverviewView(username: widget.username),
@@ -267,6 +272,18 @@ final class ArtistWorksTab extends ConsumerWidget {
                       : artistGalleryProvider(username).notifier,
                 )
                 .loadMore(),
+            onRetryLoadMore: () => ref
+                .read(
+                  searching
+                      ? artistGallerySearchProvider(
+                          ArtistGallerySearchKey(
+                            username: username,
+                            query: query!,
+                          ),
+                        ).notifier
+                      : artistGalleryProvider(username).notifier,
+                )
+                .retryLoadMore(),
           ),
         ),
       ],

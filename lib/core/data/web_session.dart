@@ -4,12 +4,117 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import '../auth/web_session_diagnostics.dart';
 
+/// A deviantart.com cookie preserved with the metadata the WebView store needs
+/// to restore it faithfully (domain/path/expiry/security flags). Persisting a
+/// plain name→value map drops that metadata and collapses same-name cookies
+/// from different domains or paths, which is why a restored session could lose
+/// auth cookies and force a re-login after an update.
+final class PersistedWebCookie {
+  const PersistedWebCookie({
+    required this.name,
+    required this.value,
+    this.domain,
+    this.path = '/',
+    this.expiresDate,
+    this.isSecure = false,
+    this.isHttpOnly = false,
+    this.isSessionOnly = false,
+  });
+
+  factory PersistedWebCookie.fromBrowserCookie(Cookie cookie) =>
+      PersistedWebCookie(
+        name: cookie.name,
+        value: cookie.value,
+        domain: cookie.domain,
+        path: (cookie.path?.isNotEmpty ?? false) ? cookie.path! : '/',
+        expiresDate: cookie.expiresDate == null
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(cookie.expiresDate!),
+        isSecure: cookie.isSecure == true,
+        isHttpOnly: cookie.isHttpOnly == true,
+        isSessionOnly: cookie.isSessionOnly == true,
+      );
+
+  final String name;
+  final String value;
+  final String? domain;
+  final String path;
+  final DateTime? expiresDate;
+  final bool isSecure;
+  final bool isHttpOnly;
+  final bool isSessionOnly;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'name': name,
+    'value': value,
+    if (domain != null && domain!.isNotEmpty) 'domain': domain,
+    if (path.isNotEmpty && path != '/') 'path': path,
+    if (expiresDate != null)
+      'expiresDate': expiresDate!.toUtc().toIso8601String(),
+    if (isSecure) 'secure': true,
+    if (isHttpOnly) 'httpOnly': true,
+    if (isSessionOnly) 'sessionOnly': true,
+  };
+
+  static PersistedWebCookie? fromJson(Object? value) {
+    if (value is! Map) return null;
+    final name = value['name'];
+    final cookieValue = value['value'];
+    if (name is! String || name.isEmpty || cookieValue is! String) return null;
+    DateTime? expiresDate;
+    final rawExpiry = value['expiresDate'];
+    if (rawExpiry is String && rawExpiry.isNotEmpty) {
+      // [toJson] stores UTC; keep the instant as-is so the serialized value
+      // round-trips exactly regardless of the local timezone.
+      expiresDate = DateTime.tryParse(rawExpiry);
+    }
+    final rawPath = value['path'];
+    return PersistedWebCookie(
+      name: name,
+      value: cookieValue,
+      domain: value['domain'] is String ? value['domain'] as String : null,
+      path: rawPath is String && rawPath.isNotEmpty ? rawPath : '/',
+      expiresDate: expiresDate,
+      isSecure: value['secure'] == true,
+      isHttpOnly: value['httpOnly'] == true,
+      isSessionOnly: value['sessionOnly'] == true,
+    );
+  }
+}
+
+/// Decodes a persisted `cookies` value into the structured list. The legacy
+/// name→value map format (which dropped metadata) is migrated into host-only
+/// cookies so an existing snapshot still restores after the upgrade.
+List<PersistedWebCookie> parsePersistedCookies(Object? value) {
+  if (value is List) {
+    final cookies = <PersistedWebCookie>[];
+    for (final item in value) {
+      final cookie = PersistedWebCookie.fromJson(item);
+      if (cookie != null) cookies.add(cookie);
+    }
+    return cookies;
+  }
+  if (value is Map) {
+    return <PersistedWebCookie>[
+      for (final entry in value.entries)
+        if (entry.key is String &&
+            entry.value is String &&
+            (entry.key as String).isNotEmpty)
+          PersistedWebCookie(
+            name: entry.key as String,
+            value: entry.value as String,
+          ),
+    ];
+  }
+  return const <PersistedWebCookie>[];
+}
+
 /// Reads deviantart.com cookies owned by the hidden public browser so
 /// website-only metadata adapters can reuse its anonymous session.
 ///
 /// The CSRF token is read from the browser page because some undocumented
 /// endpoints reject a plain HTTP client even when the page is public.
-/// One atomic WebView Cookie read. The username, Cookie map and fingerprint
+/// One atomic WebView Cookie read. The username, Cookie list and fingerprint
 /// always come from the same instant, so a successful identity can never be
 /// paired with an empty Cookie snapshot from a later read.
 final class WebSessionData {
@@ -19,7 +124,7 @@ final class WebSessionData {
     required this.fingerprint,
   });
 
-  final Map<String, String> cookies;
+  final List<PersistedWebCookie> cookies;
   final String username;
   final String fingerprint;
 }
@@ -39,12 +144,13 @@ final class WebSession {
       final cookies = await _cookieManager().getCookies(
         url: WebUri(_home.toString()),
       );
-      final map = <String, String>{
-        for (final cookie in cookies) cookie.name: cookie.value,
-      };
+      final persisted = <PersistedWebCookie>[
+        for (final cookie in cookies)
+          PersistedWebCookie.fromBrowserCookie(cookie),
+      ];
       return WebSessionData(
-        cookies: map,
-        username: WebSession.usernameFromUserInfo(map['userinfo']),
+        cookies: persisted,
+        username: WebSession.usernameFromCookies(persisted),
         fingerprint: webSessionFingerprint(cookies),
       );
     } on Object {
@@ -52,19 +158,20 @@ final class WebSession {
     }
   }
 
-  /// Reads the deviantart.com cookies as a name → value map. Returns an empty
-  /// map when the cookie manager is unavailable.
-  Future<Map<String, String>> cookies() async {
+  /// Reads the deviantart.com cookies with their storage metadata. Returns an
+  /// empty list when the cookie manager is unavailable.
+  Future<List<PersistedWebCookie>> cookies() async {
     try {
       final cookies = await _cookieManager().getCookies(
         url: WebUri(_home.toString()),
       );
-      return <String, String>{
-        for (final cookie in cookies) cookie.name: cookie.value,
-      };
+      return <PersistedWebCookie>[
+        for (final cookie in cookies)
+          PersistedWebCookie.fromBrowserCookie(cookie),
+      ];
     } on Object {
       // Same as [cookieHeader]: an early-startup failure is treated as empty.
-      return const <String, String>{};
+      return const <PersistedWebCookie>[];
     }
   }
 
@@ -96,13 +203,23 @@ final class WebSession {
     // The cookie manager can be unavailable very early in startup; an empty
     // header simply makes the feed report an auth error, which the UI maps
     // to a sign-in prompt rather than a crash.
-    final values = await cookies();
-    return values.entries.map((e) => '${e.key}=${e.value}').join('; ');
+    return cookieHeaderFrom(await cookies());
   }
 
-  /// Serializes an already-read Cookie map without a second CookieStore read.
-  static String cookieHeaderFrom(Map<String, String> cookies) =>
-      cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
+  /// Serializes an already-read Cookie list without a second CookieStore read.
+  static String cookieHeaderFrom(List<PersistedWebCookie> cookies) =>
+      cookies.map((cookie) => '${cookie.name}=${cookie.value}').join('; ');
+
+  /// The signed-in username carried by the `userinfo` cookie, or `''`.
+  static String usernameFromCookies(List<PersistedWebCookie> cookies) {
+    for (final cookie in cookies) {
+      if (cookie.name == 'userinfo') {
+        final username = usernameFromUserInfo(cookie.value);
+        if (username.isNotEmpty) return username;
+      }
+    }
+    return '';
+  }
 
   /// Extracts the signed-in username from a DeviantArt `userinfo` cookie
   /// value, or `''` when the cookie is absent, anonymous, or unparseable.

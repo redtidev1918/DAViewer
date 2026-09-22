@@ -60,6 +60,8 @@ final class _WatchedBody extends ConsumerWidget {
             onRefresh: () => ref.read(followingFeedProvider.notifier).refresh(),
             onLoadMore: () =>
                 ref.read(followingFeedProvider.notifier).loadMore(),
+            onRetryLoadMore: () =>
+                ref.read(followingFeedProvider.notifier).retryLoadMore(),
           ),
         ),
       ],

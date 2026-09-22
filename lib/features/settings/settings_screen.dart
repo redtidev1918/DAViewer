@@ -474,10 +474,13 @@ Future<void> _showAccountCookies(
         .read(webSessionControllerProvider.notifier)
         .persistedCookies();
   }
+  final cookieMap = <String, String>{
+    for (final cookie in cookies) cookie.name: cookie.value,
+  };
   if (!context.mounted) return;
   final importedUser = await showDialog<String>(
     context: context,
-    builder: (context) => _AccountCookiesDialog(cookies: cookies, s: s),
+    builder: (context) => _AccountCookiesDialog(cookies: cookieMap, s: s),
   );
   if (importedUser == null || importedUser.isEmpty) return;
   if (!context.mounted) return;

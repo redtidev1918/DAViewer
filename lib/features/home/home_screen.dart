@@ -224,6 +224,8 @@ final class _PersonalizedFeedState extends ConsumerState<_PersonalizedFeed>
         await ref.read(personalizedFeedProvider.notifier).refresh();
       },
       onLoadMore: () => ref.read(personalizedFeedProvider.notifier).loadMore(),
+      onRetryLoadMore: () =>
+          ref.read(personalizedFeedProvider.notifier).retryLoadMore(),
       errorActionLabel: needsWebLogin ? s.login : null,
       errorOnAction: needsWebLogin ? () => context.push('/web-login') : null,
     );
