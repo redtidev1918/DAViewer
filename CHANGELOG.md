@@ -3,6 +3,14 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.4.17](https://github.com/redtidev1918/DAViewer/compare/v0.4.16...v0.4.17) (2026-09-22)
+
+
+### Bug Fixes
+
+* **auth:** persist validated web cookie snapshots ([3833797](https://github.com/redtidev1918/DAViewer/commit/3833797471cca60b61466a961dec76c90c659cb9))
+* **feed:** serialize scroll pagination and preserve unverified cookies ([cb48f4d](https://github.com/redtidev1918/DAViewer/commit/cb48f4d313729542983cc24802488872a21644c1))
+
 ## [0.4.9](https://github.com/redtidev1918/DAViewer/compare/v0.4.8...v0.4.9) (2026-09-22)
 
 ### 修复
