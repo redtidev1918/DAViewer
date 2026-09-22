@@ -3,6 +3,14 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.4.19](https://github.com/redtidev1918/DAViewer/compare/v0.4.18...v0.4.19) (2026-09-22)
+
+
+### Bug Fixes
+
+* root-cause cookie persistence and pagination stalls ([3f3c61a](https://github.com/redtidev1918/DAViewer/commit/3f3c61a7cd534be8823e6eca421fa6600eb04c87))
+* root-cause cookie persistence and pagination stalls ([058edd0](https://github.com/redtidev1918/DAViewer/commit/058edd0b1888b05c0f9687e71d3347b96f9ef530))
+
 ## [0.4.18](https://github.com/redtidev1918/DAViewer/compare/v0.4.17...v0.4.18) (2026-09-22)
 
 
