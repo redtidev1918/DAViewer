@@ -215,6 +215,28 @@ void main() {
     });
   });
 
+  group('isValidCookieSnapshot', () {
+    test('requires userinfo for the claimed account', () {
+      final valid = <String, String>{'userinfo': _userInfo('Artist')};
+      expect(isValidCookieSnapshot(cookies: valid, username: 'artist'), isTrue);
+      expect(
+        isValidCookieSnapshot(
+          cookies: <String, String>{'userinfo': _userInfo('Other')},
+          username: 'artist',
+        ),
+        isFalse,
+      );
+      expect(
+        isValidCookieSnapshot(
+          cookies: <String, String>{'csrf': 'token'},
+          username: 'artist',
+        ),
+        isFalse,
+      );
+      expect(isValidCookieSnapshot(cookies: valid, username: ''), isFalse);
+    });
+  });
+
   group('isUnchangedSessionReimport', () {
     test('an app-exported session is an unchanged re-import', () {
       final cookies = <String, String>{

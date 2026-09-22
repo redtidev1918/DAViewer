@@ -90,7 +90,8 @@ final class WebSessionRefresher {
       // metadata fallbacks. It is intentionally not treated as another user
       // login; the official OAuth session remains the only app identity.
       if (csrf.isEmpty) return;
-      final username = await _ref.read(webSessionProvider).webUsername();
+      final username =
+          (await _ref.read(webSessionProvider).readData())?.username ?? '';
       debugPrint(
         '[web-session] cold-start csrf=${csrf.length} username=$username',
       );

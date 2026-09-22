@@ -1,4 +1,3 @@
-import 'package:daviewer/core/auth/web_session_controller.dart';
 import 'package:daviewer/core/auth/web_session_diagnostics.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -41,17 +40,5 @@ void main() {
       cookieHeaderFingerprint(header),
       isNot(cookieHeaderFingerprint('userinfo=other; csrf=token')),
     );
-  });
-
-  test('empty captured read preserves the saved snapshot', () {
-    const saved = <String, String>{'userinfo': 'valid'};
-
-    final chosen = selectCookiesForSnapshot(
-      loggedIn: true,
-      captured: const <String, String>{},
-      saved: saved,
-    );
-
-    expect(chosen, saved);
   });
 }

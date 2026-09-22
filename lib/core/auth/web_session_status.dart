@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../diagnostics/app_logger.dart';
+import '../data/web_session.dart';
 import '../runtime/runtime_provider.dart';
 import 'session_state.dart';
 import 'web_session_controller.dart';
@@ -131,7 +132,13 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         _setAnonymous();
         return;
       }
-      final cookieHeader = await webSession.cookieHeader();
+      // This is the bounded retry for a login report whose first Cookie read
+      // was unavailable: now that the live store is readable, persist it before
+      // the app can be backgrounded or updated.
+      await _ref
+          .read(webSessionControllerProvider.notifier)
+          .ensurePersistentSnapshot(capturedCookies: cookies);
+      final cookieHeader = WebSession.cookieHeaderFrom(cookies);
       if (cookieHeader.isEmpty) {
         final empty = await webSession.snapshot(source: 'check-empty-cookie');
         AppLogger.instance.warning('auth', empty.logLine());

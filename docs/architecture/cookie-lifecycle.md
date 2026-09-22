@@ -17,12 +17,18 @@ Only these paths may write cookies or the persisted snapshot:
 3. Startup restore injects the persisted snapshot back into the live store.
 4. Explicit logout clears both stores.
 
+Every persisted mutation is serialized as a read-modify-write patch. CSRF and
+background refreshes update metadata only; a Cookie map is written only from a
+single validated snapshot where `userinfo` names the confirmed account. A
+failed or empty read is logged and never replaces the existing snapshot.
+
 ## Empty-read guard
 
-A transient empty WebView read must never empty the persisted snapshot.
-`selectCookiesForSnapshot` keeps the saved map when a signed-in capture returns
-empty, and anonymous background probes preserve the signed-in snapshot through
-`reportRefresh`.
+A transient empty WebView read must never empty the persisted snapshot. A
+visible login reports its Cookie snapshot from the same read that produced its
+username; if that snapshot is missing or invalid, the old persisted snapshot is
+kept and a later health check retries with `ensurePersistentSnapshot`. Background
+refreshes never rewrite Cookies.
 
 A server-health check that reads zero live Cookies while a claimed signed-in
 session still has a persisted snapshot is `unavailable`, not `anonymous`: the

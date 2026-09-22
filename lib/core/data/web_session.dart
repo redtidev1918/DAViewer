@@ -9,12 +9,48 @@ import '../auth/web_session_diagnostics.dart';
 ///
 /// The CSRF token is read from the browser page because some undocumented
 /// endpoints reject a plain HTTP client even when the page is public.
+/// One atomic WebView Cookie read. The username, Cookie map and fingerprint
+/// always come from the same instant, so a successful identity can never be
+/// paired with an empty Cookie snapshot from a later read.
+final class WebSessionData {
+  const WebSessionData({
+    required this.cookies,
+    required this.username,
+    required this.fingerprint,
+  });
+
+  final Map<String, String> cookies;
+  final String username;
+  final String fingerprint;
+}
+
 final class WebSession {
   const WebSession(this._cookieManager);
 
   final CookieManager Function() _cookieManager;
 
   static final Uri _home = Uri.parse('https://www.deviantart.com/');
+
+  /// Makes one CookieManager read and derives the signed-in identity from it.
+  /// Returns null only when the Cookie store itself is unavailable; an empty
+  /// result is a valid anonymous read, not an unknown state.
+  Future<WebSessionData?> readData() async {
+    try {
+      final cookies = await _cookieManager().getCookies(
+        url: WebUri(_home.toString()),
+      );
+      final map = <String, String>{
+        for (final cookie in cookies) cookie.name: cookie.value,
+      };
+      return WebSessionData(
+        cookies: map,
+        username: WebSession.usernameFromUserInfo(map['userinfo']),
+        fingerprint: webSessionFingerprint(cookies),
+      );
+    } on Object {
+      return null;
+    }
+  }
 
   /// Reads the deviantart.com cookies as a name → value map. Returns an empty
   /// map when the cookie manager is unavailable.
@@ -64,25 +100,9 @@ final class WebSession {
     return values.entries.map((e) => '${e.key}=${e.value}').join('; ');
   }
 
-  /// The username signed in on deviantart.com, read from the long-lived
-  /// `userinfo` cookie. Returns `''` when anonymous. This is far more reliable
-  /// than scraping `__INITIAL_STATE__` from a page that may not be the home
-  /// page (login/authorize pages lack the full session state).
-  Future<String> webUsername() async {
-    try {
-      final cookies = await _cookieManager().getCookies(
-        url: WebUri(_home.toString()),
-      );
-      for (final cookie in cookies) {
-        if (cookie.name != 'userinfo') continue;
-        final username = usernameFromUserInfo(cookie.value);
-        if (username.isNotEmpty) return username;
-      }
-    } on Object {
-      // Best effort; treat as anonymous on failure.
-    }
-    return '';
-  }
+  /// Serializes an already-read Cookie map without a second CookieStore read.
+  static String cookieHeaderFrom(Map<String, String> cookies) =>
+      cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
 
   /// Extracts the signed-in username from a DeviantArt `userinfo` cookie
   /// value, or `''` when the cookie is absent, anonymous, or unparseable.

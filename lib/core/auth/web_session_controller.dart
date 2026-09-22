@@ -78,6 +78,17 @@ CookieImportOutcome? evaluateCookieImportIdentity({
   return null;
 }
 
+/// A Cookie snapshot can persist a session only when it contains `userinfo`
+/// and that cookie names the same account as the confirmed web identity.
+bool isValidCookieSnapshot({
+  required Map<String, String> cookies,
+  required String username,
+}) {
+  if (cookies.isEmpty || username.trim().isEmpty) return false;
+  final claimed = WebSession.usernameFromUserInfo(cookies['userinfo']);
+  return claimed.trim().toLowerCase() == username.trim().toLowerCase();
+}
+
 final webSessionControllerProvider =
     StateNotifierProvider<WebSessionController, WebSessionState>(
       (ref) => WebSessionController(ref),
@@ -148,8 +159,10 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
       return;
     }
     try {
-      final currentUser = await _ref.read(webSessionProvider).webUsername();
-      if (currentUser.isNotEmpty) return; // Web session already present.
+      final current = await _ref.read(webSessionProvider).readData();
+      if (current?.username.isNotEmpty == true) {
+        return; // Web session already present.
+      }
       final cookieManager = _ref
           .read(runtimeProvider)
           .webViewProxyManager
@@ -163,34 +176,38 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
           value: entry.value as String,
         );
       }
-      final restoredUser = await _ref.read(webSessionProvider).webUsername();
-      if (restoredUser.isNotEmpty) {
-        final after = await _ref
-            .read(webSessionProvider)
-            .snapshot(source: 'restore-after-inject');
-        AppLogger.instance.info('web-session', after.logLine());
+      final restored = await _ref.read(webSessionProvider).readData();
+      if (restored?.username.isNotEmpty == true) {
+        AppLogger.instance.info(
+          'web-session',
+          'restore verified username=${restored!.username} '
+              'count=${restored.cookies.length} '
+              'fingerprint=${restored.fingerprint}',
+        );
         state = WebSessionState(
           csrf: state.csrf,
           isLoggedIn: true,
-          username: restoredUser,
+          username: restored.username,
         );
-        await _store.write(
-          csrf: state.csrf,
-          isLoggedIn: true,
-          username: restoredUser,
-          cookies: _stringMap(rawCookies),
-        );
+        await _store.update(isLoggedIn: true, username: restored.username);
       }
     } on Object {
       // Best effort; a failed restore only means the user signs in again.
     }
   }
 
-  /// Records browser state. A legacy mismatched identity is cleared instead of
-  /// being treated as an additional login. A signed-in report also snapshots
-  /// the current deviantart.com cookies for later re-injection; an anonymous
-  /// refresh keeps the previously saved cookies untouched.
-  Future<void> report({required String csrf, required String username}) async {
+  /// Records the user-visible login result. The Cookie map must come from the
+  /// same read as [username]; the controller never takes a second Cookie
+  /// snapshot because that race was the cause of empty first-login snapshots.
+  ///
+  /// A signed-in report without a valid snapshot still updates runtime state,
+  /// but leaves the last good persisted snapshot untouched. It will be replaced
+  /// later by [ensurePersistentSnapshot] once the WebView read is usable.
+  Future<void> report({
+    required String csrf,
+    required String username,
+    Map<String, String>? capturedCookies,
+  }) async {
     final loggedIn = username.isNotEmpty;
     final oauthUsername = _ref.read(authControllerProvider).account?.username;
     if (loggedIn &&
@@ -207,38 +224,69 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
         // Best effort.
       }
       state = const WebSessionState(isLoggedIn: false);
-      await _store.clear();
+      await _store.clear(reason: 'identity_mismatch');
       return;
     }
-    final savedCookies = _stringMap((await _store.read())['cookies']);
-    final capturedCookies = loggedIn
-        ? await _captureCookies()
-        : const <String, String>{};
-    // CookieManager can be temporarily unavailable while the platform WebView
-    // is starting. Never let that transient empty read destroy the last known
-    // good snapshot, or a later app update would have nothing to restore.
-    final cookies = selectCookiesForSnapshot(
-      loggedIn: loggedIn,
-      captured: capturedCookies,
-      saved: savedCookies,
-    );
-    AppLogger.instance.info(
-      'web-session',
-      'persist decision loggedIn=$loggedIn captured=${capturedCookies.length} '
-          'saved=${savedCookies.length} selected=${cookies.length} '
-          'fingerprint=${webSessionMapFingerprint(cookies)}',
-    );
+
+    if (loggedIn &&
+        !isValidCookieSnapshot(
+          cookies: capturedCookies ?? const <String, String>{},
+          username: username,
+        )) {
+      state = WebSessionState(csrf: csrf, isLoggedIn: true, username: username);
+      AppLogger.instance.warning(
+        'web-session',
+        'persist skipped reason='
+            '${capturedCookies == null || capturedCookies.isEmpty ? 'empty_capture' : 'missing_userinfo'} '
+            'claimedUsername=$username captured=${capturedCookies?.length ?? 0}',
+      );
+      return;
+    }
+
     state = WebSessionState(
       csrf: csrf,
       isLoggedIn: loggedIn,
       username: username,
     );
-    await _store.write(
+    await _store.update(
       csrf: csrf,
       isLoggedIn: loggedIn,
       username: username,
+      cookies: loggedIn ? capturedCookies : null,
+    );
+  }
+
+  /// Captures and persists a valid live Cookie snapshot. This is the bounded
+  /// retry path for a login whose first WebView read was unavailable/empty; it
+  /// runs from health checks only while the runtime still reports signed in.
+  Future<bool> ensurePersistentSnapshot({
+    Map<String, String>? capturedCookies,
+  }) async {
+    if (state.isLoggedIn != true) return false;
+    final cookies =
+        capturedCookies ??
+        (await _ref.read(webSessionProvider).readData())?.cookies ??
+        const <String, String>{};
+    if (!isValidCookieSnapshot(cookies: cookies, username: state.username)) {
+      AppLogger.instance.warning(
+        'web-session',
+        'persist skipped reason=invalid_snapshot '
+            'claimedUsername=${state.username} count=${cookies.length}',
+      );
+      return false;
+    }
+    final persisted = _stringMap((await _store.read())['cookies']);
+    if (webSessionMapFingerprint(persisted) ==
+        webSessionMapFingerprint(cookies)) {
+      return true;
+    }
+    await _store.update(
+      csrf: state.csrf,
+      isLoggedIn: true,
+      username: state.username,
       cookies: cookies,
     );
+    return true;
   }
 
   /// Stores a fresh public browser CSRF even without a `userinfo` cookie.
@@ -263,21 +311,18 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
       currentlySignedIn: state.isLoggedIn == true,
       probeUsername: username,
     )) {
-      final saved = await _store.read();
-      final cookies = _stringMap(saved['cookies']);
       state = WebSessionState(
         csrf: csrf,
         isLoggedIn: true,
         username: state.username,
       );
-      if (cookies.isNotEmpty) {
-        await _store.write(
-          csrf: csrf,
-          isLoggedIn: true,
-          username: state.username,
-          cookies: cookies,
-        );
-      }
+      // Deliberately does not read or rewrite Cookies: a stale snapshot must
+      // never overwrite fresher credentials captured by login/import.
+      await _store.update(
+        csrf: csrf,
+        isLoggedIn: true,
+        username: state.username,
+      );
       return;
     }
     await report(csrf: csrf, username: username);
@@ -323,7 +368,8 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
     final oauthUsername = _ref.read(authControllerProvider).account?.username;
     String currentWebUsername = '';
     try {
-      currentWebUsername = await _ref.read(webSessionProvider).webUsername();
+      currentWebUsername =
+          (await _ref.read(webSessionProvider).readData())?.username ?? '';
     } on Object {
       // The cookie store may be unavailable; that is handled below.
     }
@@ -354,7 +400,8 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
           value: entry.value,
         );
       }
-      final verifiedUser = await _ref.read(webSessionProvider).webUsername();
+      final verified = await _ref.read(webSessionProvider).readData();
+      final verifiedUser = verified?.username ?? '';
       final sameAccount =
           verifiedUser.isNotEmpty &&
           verifiedUser.trim().toLowerCase() ==
@@ -376,7 +423,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
             isLoggedIn: true,
             username: importedUsername,
           );
-          await _store.write(
+          await _store.update(
             csrf: state.csrf,
             isLoggedIn: true,
             username: importedUsername,
@@ -395,7 +442,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
         isLoggedIn: true,
         username: verifiedUser,
       );
-      await _store.write(
+      await _store.update(
         csrf: state.csrf,
         isLoggedIn: true,
         username: verifiedUser,
@@ -432,7 +479,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
 
   Future<void> clear() async {
     state = const WebSessionState(isLoggedIn: false);
-    await _store.clear();
+    await _store.clear(reason: 'explicit_logout');
   }
 
   /// The persisted deviantart.com cookie snapshot (name → value), used as a
@@ -485,14 +532,6 @@ bool isUnchangedSessionReimport({
       previousUser.isNotEmpty &&
       previousUser == imported['userinfo'];
 }
-
-/// Keeps the last valid cookie snapshot when a signed-in platform read fails.
-/// Anonymous refreshes also preserve it; explicit logout still calls [clear].
-Map<String, String> selectCookiesForSnapshot({
-  required bool loggedIn,
-  required Map<String, String> captured,
-  required Map<String, String> saved,
-}) => loggedIn && captured.isNotEmpty ? captured : saved;
 
 /// Safely converts a decoded JSON value to a string map, dropping anything
 /// that is not a string pair.

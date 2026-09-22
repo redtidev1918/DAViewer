@@ -132,7 +132,8 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
       // Read the login identity from the long-lived `userinfo` cookie instead
       // of the page's __INITIAL_STATE__, which the login/authorize pages do
       // not populate reliably.
-      final username = await ref.read(webSessionProvider).webUsername();
+      final sessionData = await ref.read(webSessionProvider).readData();
+      final username = sessionData?.username ?? '';
       final isLoggedIn = username.isNotEmpty;
       AppLogger.instance.info(
         'webview',
@@ -141,7 +142,11 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
       );
       await ref
           .read(webSessionControllerProvider.notifier)
-          .report(csrf: csrf, username: username);
+          .report(
+            csrf: csrf,
+            username: username,
+            capturedCookies: sessionData?.cookies,
+          );
       AppLogger.instance.info('webview', 'web session reported to controller');
       // A redirect from /users/login to the signed-in home page is the
       // server's own verification that the cookie is valid. An extra HTTP
