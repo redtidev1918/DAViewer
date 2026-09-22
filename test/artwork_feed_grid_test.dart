@@ -210,6 +210,38 @@ void main() {
     expect(calls, greaterThan(0));
   });
 
+  testWidgets('remaining near the bottom fires only one edge event', (
+    tester,
+  ) async {
+    var calls = 0;
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: ArtworkFeedGrid(
+              feed: longFeed(),
+              emptyMessage: 'Empty',
+              scrollController: controller,
+              onLoadMore: () => calls += 1,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    controller.jumpTo(controller.position.maxScrollExtent - 200);
+    await tester.pump();
+    await tester.drag(find.byType(ArtworkFeedGrid), const Offset(0, -40));
+    await tester.pump();
+    await tester.drag(find.byType(ArtworkFeedGrid), const Offset(0, -40));
+    await tester.pump();
+
+    expect(calls, 1);
+  });
+
   testWidgets('a real drag near the bottom loads next page', (tester) async {
     var calls = 0;
     final controller = ScrollController();

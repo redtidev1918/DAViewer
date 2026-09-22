@@ -136,6 +136,20 @@ void main() {
       expect(status.needsLogin, isTrue);
     });
 
+    test('empty live cookies with a saved snapshot are unavailable, not signed out', () {
+      expect(
+        emptyLiveCookieStatus(persistedCookieCount: 1),
+        WebSessionStatusState.unavailable,
+      );
+    });
+
+    test('empty live and saved cookies are anonymous', () {
+      expect(
+        emptyLiveCookieStatus(persistedCookieCount: 0),
+        WebSessionStatusState.anonymous,
+      );
+    });
+
     test('marks anonymous when the server identity differs', () async {
       final container = await _statusContainer(_otherUserHomeHtml);
       addTearDown(container.dispose);

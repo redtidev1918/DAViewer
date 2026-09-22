@@ -24,6 +24,11 @@ A transient empty WebView read must never empty the persisted snapshot.
 empty, and anonymous background probes preserve the signed-in snapshot through
 `reportRefresh`.
 
+A server-health check that reads zero live Cookies while a claimed signed-in
+session still has a persisted snapshot is `unavailable`, not `anonymous`: the
+restore/read may simply not be ready. `anonymous` is reserved for no usable
+snapshot or a DeviantArt page that explicitly reports anonymous.
+
 ## Diagnostics
 
 Every sensitive point logs only structural metadata and a SHA-256 fingerprint,

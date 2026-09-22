@@ -53,6 +53,7 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
   static const Duration _pointerScrollGrace = Duration(milliseconds: 400);
 
   DateTime? _lastPointerScrollAt;
+  bool _loadMoreArmed = true;
 
   void _handlePointerSignal(PointerSignalEvent event) {
     if (event is PointerScrollEvent) {
@@ -163,12 +164,14 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
           if (notification is! ScrollUpdateNotification) return false;
           if (!_isManualScroll(notification)) return false;
           if (notification.metrics.extentAfter < 400) {
-            AppLogger.instance.info(
-              'feed',
-              'loadMore trigger drag=${notification.dragDetails != null} '
-                  'extentAfter=${notification.metrics.extentAfter.toStringAsFixed(1)}',
-            );
+            // Keep this an edge event: while the viewport stays inside the
+            // prefetch zone, repeated scroll frames must not call loadMore.
+            if (!_loadMoreArmed) return false;
+            _loadMoreArmed = false;
+            AppLogger.instance.info('feed', 'pagination trigger');
             widget.onLoadMore?.call();
+          } else {
+            _loadMoreArmed = true;
           }
           return false;
         },

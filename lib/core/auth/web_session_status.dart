@@ -69,6 +69,12 @@ final webSessionVerifierProvider = Provider<WebSessionVerifier>((ref) {
   return WebSessionVerifier(dio);
 });
 
+WebSessionStatusState emptyLiveCookieStatus({
+  required int persistedCookieCount,
+}) => persistedCookieCount == 0
+    ? WebSessionStatusState.anonymous
+    : WebSessionStatusState.unavailable;
+
 final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   WebSessionStatusController(this._ref) : super(const WebSessionStatus());
 
@@ -109,7 +115,14 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       final webSession = _ref.read(webSessionProvider);
       final cookies = await webSession.cookies();
       if (cookies.isEmpty) {
-        _setAnonymous();
+        // A claimed signed-in session with a persisted snapshot means the live
+        // read/restore failed or is not ready. That is unavailable, not proof
+        // that the user is signed out. A genuinely logged-out account has no
+        // persisted cookie snapshot at all.
+        final persisted = await _ref
+            .read(webSessionControllerProvider.notifier)
+            .persistedCookies();
+        _setEmptyLiveCookieState(persistedCount: persisted.length);
         return;
       }
       final controllerState = _ref.read(webSessionControllerProvider);
@@ -178,6 +191,14 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       serverUsername: serverUsername,
       lastCheckedAt: DateTime.now(),
     );
+  }
+
+  void _setEmptyLiveCookieState({required int persistedCount}) {
+    if (persistedCount == 0) {
+      _setAnonymous();
+    } else {
+      _setUnavailable();
+    }
   }
 
   void _setAnonymous() {
