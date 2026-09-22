@@ -9,6 +9,7 @@ import '../../app/theme/app_theme.dart';
 import '../../core/diagnostics/error_text.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/sharing/app_share.dart';
+import '../../features/artwork/artwork_access.dart';
 import '../../features/artwork/artwork_store.dart';
 import '../../features/artwork/favourite_actions.dart';
 
@@ -71,6 +72,7 @@ final class ArtworkCard extends ConsumerWidget {
           m.mimeType == 'image/gif' ||
           (m.uri?.path.toLowerCase().endsWith('.gif') ?? false),
     );
+    final viewLock = artworkViewLock(artwork);
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -129,6 +131,14 @@ final class ArtworkCard extends ConsumerWidget {
                       child: _CornerBadge(
                         label: s.multiImageBadge,
                         icon: Icons.filter_none,
+                      ),
+                    ),
+                  if (viewLock != null)
+                    Positioned(
+                      left: 6,
+                      bottom: 6,
+                      child: _LockBadge(
+                        tooltip: artworkViewLockLabel(s, viewLock),
                       ),
                     ),
                 ],
@@ -255,6 +265,27 @@ final class ArtworkCard extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+final class _LockBadge extends StatelessWidget {
+  const _LockBadge({required this.tooltip});
+
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        padding: const EdgeInsets.all(5),
+        decoration: const BoxDecoration(
+          color: Colors.black54,
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Icons.lock_outline, size: 13, color: Colors.white),
       ),
     );
   }

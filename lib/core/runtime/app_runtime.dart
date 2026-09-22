@@ -53,7 +53,14 @@ final class AppRuntime {
   static Future<AppRuntime> create() async {
     final logger = AppLogger.instance;
     final proxyController = ProxyController();
-    await proxyController.start();
+    try {
+      await proxyController.start().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {},
+      );
+    } on Object catch (error, stack) {
+      logger.warning('runtime', 'proxy startup timed out', error, stack);
+    }
     logger.info(
       'runtime',
       'proxy: ${proxyController.config?.host}:${proxyController.config?.port ?? '-'}',
@@ -66,8 +73,32 @@ final class AppRuntime {
       ),
     );
     final runtime = _build(null, dio: dio, proxyController: proxyController);
-    await runtime.webViewProxyManager?.prepare();
-    await runtime.transfers.initialize();
+    try {
+      await runtime.webViewProxyManager?.prepare().timeout(
+        const Duration(seconds: 12),
+        onTimeout: () => null,
+      );
+    } on Object catch (error, stack) {
+      logger.warning(
+        'runtime',
+        'webview proxy prepare timed out',
+        error,
+        stack,
+      );
+    }
+    try {
+      await runtime.transfers.initialize().timeout(
+        const Duration(seconds: 12),
+        onTimeout: () {},
+      );
+    } on Object catch (error, stack) {
+      logger.warning(
+        'runtime',
+        'transfer manager init timed out',
+        error,
+        stack,
+      );
+    }
     runtime._listenForProxyChanges();
     return runtime;
   }

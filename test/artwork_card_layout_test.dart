@@ -38,6 +38,23 @@ Artwork _portraitArtwork() => Artwork(
   ],
 );
 
+Artwork _lockedArtwork() => Artwork(
+  id: 'locked',
+  title: 'Members only',
+  author: const UserProfile(id: 'artist-id', username: 'artist'),
+  pageUri: Uri.parse('https://example.test/art/locked'),
+  media: const <MediaAsset>[
+    MediaAsset(
+      id: 'preview',
+      kind: MediaKind.image,
+      role: MediaRole.preview,
+      availability: MediaAvailability.purchaseRequired,
+      width: 600,
+      height: 400,
+    ),
+  ],
+);
+
 void main() {
   testWidgets('mobile banner previews keep more visual height', (tester) async {
     late double ratio;
@@ -98,6 +115,24 @@ void main() {
       ),
     );
 
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('locked preview shows a lock badge', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 180,
+              child: ArtworkCard(artwork: _lockedArtwork()),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byIcon(Icons.lock_outline), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

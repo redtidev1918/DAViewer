@@ -3,6 +3,14 @@
 这里只写下载者需要知道的变化，一行一条。内部实现、协议与调试细节请见
 `CHANGELOG.md`。
 
+## 0.4.14
+
+- 锁定/需要订阅的作品在预览卡显示锁图标，详情页标题下方明确提示查看受限原因，不再与 NSFW 打码混淆。
+- 修复更新 APK 后偶发黑屏：代理、WebView、OAuth/网页会话恢复超时后仍会进入主界面。
+
+- Locked or subscription-gated artwork now shows a lock badge and an explicit detail-page reason, separate from NSFW blur.
+- Fixes occasional black screen after an APK update with bounded startup budgets.
+
 ## 0.4.13
 
 - 修复“有更新但暂无更新说明”：GitHub API 正常时读取 Release 正文；API 限流时改用 HTML 重定向确认版本，并从仓库 `RELEASE_NOTES.md` 读取对应版本说明。

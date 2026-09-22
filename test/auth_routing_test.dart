@@ -7,6 +7,14 @@ void main() {
     expect(authRedirect(AuthStatus.signedOut, '/splash'), '/web-login');
   });
 
+  test('unknown auth stays on splash until the startup budget is ready', () {
+    expect(authRedirect(AuthStatus.unknown, '/splash'), '/splash');
+    expect(
+      authRedirect(AuthStatus.unknown, '/splash', startupReady: true),
+      '/',
+    );
+  });
+
   test('restored session leaves splash for Home', () {
     expect(authRedirect(AuthStatus.signedIn, '/splash'), '/');
   });

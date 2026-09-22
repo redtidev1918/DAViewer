@@ -156,7 +156,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         return null;
       }
       final auth = ref.read(authControllerProvider);
-      return authRedirect(auth.status, state.matchedLocation);
+      return authRedirect(
+        auth.status,
+        state.matchedLocation,
+        startupReady: ref.read(webSessionReadyProvider),
+      );
     },
   );
 
@@ -204,8 +208,18 @@ Page<void> artworkDetailPage(BuildContext context, GoRouterState state) {
 /// Keeps first-run authentication separate from authenticated feed loading.
 /// Exposed as a pure function so this critical route policy is regression
 /// tested without constructing a platform WebView.
-String? authRedirect(AuthStatus status, String location) {
-  if (status == AuthStatus.unknown) return '/splash';
+String? authRedirect(
+  AuthStatus status,
+  String location, {
+  bool startupReady = false,
+}) {
+  if (status == AuthStatus.unknown) {
+    // After the startup budget expires the session may still be restoring
+    // (e.g. Keychain/webview restore after an update). Move to Home instead
+    // of leaving a permanent black splash; a later signed-in transition
+    // refreshes the router again.
+    return startupReady && location == '/splash' ? '/' : '/splash';
+  }
   if (status == AuthStatus.signedIn && location == '/splash') {
     return '/';
   }

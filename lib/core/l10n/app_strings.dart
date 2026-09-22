@@ -291,6 +291,9 @@ final class AppStrings {
       _lang == AppLanguage.zh ? '需要登录' : 'Login required';
   String get availabilityPurchaseRequired =>
       _lang == AppLanguage.zh ? '需要购买' : 'Purchase required';
+  String get viewLockedSubscription => _lang == AppLanguage.zh
+      ? '需要订阅或购买后才能查看'
+      : 'Subscription or purchase required to view';
   String get availabilityRestricted =>
       _lang == AppLanguage.zh ? '受限' : 'Restricted';
   String get availabilityUnavailable =>

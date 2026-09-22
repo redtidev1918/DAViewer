@@ -7,6 +7,7 @@ import '../../shared/widgets/compact_tag_strip.dart';
 import '../../shared/widgets/relative_time_text.dart';
 
 import '../../core/l10n/app_strings.dart';
+import 'artwork_access.dart';
 import 'rich_html.dart';
 
 /// The artwork title and author link, with the author's avatar for a more
@@ -21,10 +22,30 @@ final class ArtworkHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final author = artwork.author;
+    final viewLock = artworkViewLock(artwork);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(artwork.title, style: theme.textTheme.headlineSmall),
+        if (viewLock != null) ...<Widget>[
+          const SizedBox(height: 6),
+          Row(
+            children: <Widget>[
+              Icon(
+                Icons.lock_outline,
+                size: 16,
+                color: theme.colorScheme.error,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                artworkViewLockLabel(s, viewLock),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 8),
         InkWell(
           borderRadius: BorderRadius.circular(20),
