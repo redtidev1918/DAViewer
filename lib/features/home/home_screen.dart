@@ -98,7 +98,7 @@ final class HomeScreen extends ConsumerWidget {
             const UpdateBanner(),
             const Expanded(
               child: TabBarView(
-                children: <Widget>[_PersonalizedFeed(), DailyFeed()],
+                children: <Widget>[PersonalizedFeed(), DailyFeed()],
               ),
             ),
           ],
@@ -142,14 +142,16 @@ Future<void> _showOpenLinkDialog(BuildContext context, AppStrings s) async {
   }
 }
 
-final class _PersonalizedFeed extends ConsumerStatefulWidget {
-  const _PersonalizedFeed();
+/// The website-personalized `rfy/deviations` recommendation tab. Kept public
+/// so the pull-to-refresh contract can be widget-tested in isolation.
+final class PersonalizedFeed extends ConsumerStatefulWidget {
+  const PersonalizedFeed({super.key});
 
   @override
-  ConsumerState<_PersonalizedFeed> createState() => _PersonalizedFeedState();
+  ConsumerState<PersonalizedFeed> createState() => PersonalizedFeedState();
 }
 
-final class _PersonalizedFeedState extends ConsumerState<_PersonalizedFeed>
+final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
     with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
   final ScrollController _scrollController = ScrollController();
   DateTime? _backgroundedAt;
@@ -217,12 +219,11 @@ final class _PersonalizedFeedState extends ConsumerState<_PersonalizedFeed>
       errorMessage: needsWebLogin
           ? s.recommendedSignInHint
           : s.recommendedFeedLoadFailure,
-      onRefresh: () async {
-        // User-initiated retry must bypass any verification cooldown, otherwise
-        // the button appears to do nothing after a failed session check.
-        await ref.read(webSessionStatusProvider.notifier).check(force: true);
-        await ref.read(personalizedFeedProvider.notifier).refresh();
-      },
+      // Pull-to-refresh goes straight to the real rfy request. A WAF-sensitive
+      // home-page probe before every pull would add ~1.5s and is not an
+      // authoritative logout signal; the feed request itself is the session
+      // acceptance gate and carries its own CSRF refresh/retry path.
+      onRefresh: () => ref.read(personalizedFeedProvider.notifier).refresh(),
       onLoadMore: () => ref.read(personalizedFeedProvider.notifier).loadMore(),
       onRetryLoadMore: () =>
           ref.read(personalizedFeedProvider.notifier).retryLoadMore(),

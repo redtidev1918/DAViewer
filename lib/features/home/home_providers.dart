@@ -12,6 +12,7 @@ import 'package:dakit_web/dakit_web.dart';
 import '../../core/diagnostics/app_logger.dart';
 import '../../core/feed/artwork_feed_controller.dart';
 import '../../core/runtime/runtime_provider.dart';
+import '../artwork/artwork_access.dart';
 import '../artwork/artwork_store.dart';
 
 int _personalizedProviderSeq = 0;
@@ -138,14 +139,29 @@ Future<Page<Artwork>?> _tryFetchRfy(
     );
     return null;
   }
+  final stopwatch = Stopwatch()..start();
   try {
-    return await RfyFeedFetcher(dio).fetch(
+    final page = await RfyFeedFetcher(dio).fetch(
       cookieHeader: cookieHeader,
       csrfToken: csrf,
       cursor: request.cursor,
     );
+    logger.info(
+      'home',
+      'personalized feed success elapsedMs=${stopwatch.elapsedMilliseconds} '
+          'cursor=${request.cursor ?? 'initial'} '
+          'items=${page.items.length} '
+          'gated=${page.items.where((a) => artworkViewLock(a) != null).length}',
+    );
+    return page;
   } on Object catch (error, stack) {
-    logger.warning('home', 'rfy fetch failed', error, stack);
+    logger.warning(
+      'home',
+      'personalized feed failure elapsedMs=${stopwatch.elapsedMilliseconds} '
+          'cursor=${request.cursor ?? 'initial'}',
+      error,
+      stack,
+    );
     return null;
   }
 }

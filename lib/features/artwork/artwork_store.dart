@@ -1,6 +1,8 @@
 import 'package:dakit_core/dakit_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'artwork_access.dart';
+
 /// Whether the canonical source has already told us a list-like field's
 /// real value, as opposed to the field being missing from a sparse payload.
 enum HydrationStatus { unknown, resolved, confirmedEmpty }
@@ -88,13 +90,61 @@ final class ArtworkStore extends Notifier<Map<String, Artwork>> {
 }
 
 /// The single merge rule for sparse list payloads vs a hydrated detail/web
-/// result: a later empty-tags payload never erases already-known tags.
+/// result:
+/// - a later empty-tags payload never erases already-known tags;
+/// - a later payload that carried no access metadata never erases a confirmed
+///   view/download gate (e.g. subscription-only art seen in the feed). Missing
+///   gate info means "unknown", never "known available".
 Artwork mergeArtwork({Artwork? cached, required Artwork incoming}) {
   if (cached == null) return incoming;
-  if (incoming.tags.isEmpty && cached.tags.isNotEmpty) {
-    return incoming.copyWith(tags: cached.tags);
+  var merged = incoming;
+  if (merged.tags.isEmpty && cached.tags.isNotEmpty) {
+    merged = merged.copyWith(tags: cached.tags);
   }
-  return incoming;
+  final cachedLock = artworkViewLock(cached);
+  if (cachedLock != null && artworkViewLock(merged) == null) {
+    merged = applyViewLock(merged, cachedLock);
+  }
+  return merged;
+}
+
+/// Re-applies a confirmed gate to an artwork whose later payload dropped the
+/// access metadata. Gates the first available preview asset (so the card and
+/// detail header keep their lock) and the download availability.
+Artwork applyViewLock(Artwork artwork, MediaAvailability gate) {
+  var applied = false;
+  final media = <MediaAsset>[];
+  for (final asset in artwork.media) {
+    if (!applied &&
+        asset.role == MediaRole.preview &&
+        asset.availability == MediaAvailability.available) {
+      media.add(_withAvailability(asset, gate));
+      applied = true;
+    } else {
+      media.add(asset);
+    }
+  }
+  return artwork.copyWith(
+    media: List<MediaAsset>.unmodifiable(media),
+    downloadAvailability: gate,
+  );
+}
+
+MediaAsset _withAvailability(MediaAsset asset, MediaAvailability availability) {
+  return MediaAsset(
+    id: asset.id,
+    kind: asset.kind,
+    role: asset.role,
+    availability: availability,
+    uri: asset.uri,
+    mimeType: asset.mimeType,
+    filename: asset.filename,
+    byteLength: asset.byteLength,
+    width: asset.width,
+    height: asset.height,
+    duration: asset.duration,
+    availabilityReason: asset.availabilityReason,
+  );
 }
 
 bool _sameStrings(List<String> left, List<String> right) {
