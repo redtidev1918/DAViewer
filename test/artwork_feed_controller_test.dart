@@ -192,47 +192,50 @@ void main() {
     expect(controller.state.items, hasLength(2));
   });
 
-  test('a stalled page fetch times out and later retries start fresh', () async {
-    var calls = 0;
-    var now = DateTime(2026, 1, 1);
-    final stalled = Completer<Page<Artwork>>();
-    final controller = ArtworkFeedController(
-      (request) {
-        calls += 1;
-        if (request.cursor == null) {
+  test(
+    'a stalled page fetch times out and later retries start fresh',
+    () async {
+      var calls = 0;
+      var now = DateTime(2026, 1, 1);
+      final stalled = Completer<Page<Artwork>>();
+      final controller = ArtworkFeedController(
+        (request) {
+          calls += 1;
+          if (request.cursor == null) {
+            return Future<Page<Artwork>>.value(
+              Page<Artwork>(
+                items: <Artwork>[artwork(1)],
+                hasMore: true,
+                nextCursor: 'next',
+              ),
+            );
+          }
+          // The second call never completes: a stalled response body would
+          // otherwise leave the feed permanently in-flight.
+          if (calls == 2) return stalled.future;
           return Future<Page<Artwork>>.value(
-            Page<Artwork>(
-              items: <Artwork>[artwork(1)],
-              hasMore: true,
-              nextCursor: 'next',
-            ),
+            Page<Artwork>(items: <Artwork>[artwork(2)], hasMore: false),
           );
-        }
-        // The second call never completes: a stalled response body would
-        // otherwise leave the feed permanently in-flight.
-        if (calls == 2) return stalled.future;
-        return Future<Page<Artwork>>.value(
-          Page<Artwork>(items: <Artwork>[artwork(2)], hasMore: false),
-        );
-      },
-      autoLoad: false,
-      now: () => now,
-      requestTimeout: const Duration(milliseconds: 50),
-      paginationBackoff: const <Duration>[Duration(minutes: 1)],
-    );
+        },
+        autoLoad: false,
+        now: () => now,
+        requestTimeout: const Duration(milliseconds: 50),
+        paginationBackoff: const <Duration>[Duration(minutes: 1)],
+      );
 
-    await controller.refresh();
-    await controller.loadMore();
-    expect(calls, 2);
-    expect(controller.state.phase, FeedRequestPhase.stopped);
-    expect(controller.state.error, isA<DAKitException>());
+      await controller.refresh();
+      await controller.loadMore();
+      expect(calls, 2);
+      expect(controller.state.phase, FeedRequestPhase.stopped);
+      expect(controller.state.error, isA<DAKitException>());
 
-    now = now.add(const Duration(minutes: 1, seconds: 1));
-    await controller.loadMore();
-    expect(calls, 3, reason: 'retry must not await the abandoned request');
-    expect(controller.state.items, hasLength(2));
-    expect(controller.state.phase, FeedRequestPhase.idle);
-  });
+      now = now.add(const Duration(minutes: 1, seconds: 1));
+      await controller.loadMore();
+      expect(calls, 3, reason: 'retry must not await the abandoned request');
+      expect(controller.state.items, hasLength(2));
+      expect(controller.state.phase, FeedRequestPhase.idle);
+    },
+  );
 
   test('dispose stops new pagination requests', () async {
     var calls = 0;
