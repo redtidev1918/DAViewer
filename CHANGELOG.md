@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.7](https://github.com/redtidev1918/DAViewer/compare/v0.5.6...v0.5.7) (2026-09-23)
+
+
+### Bug Fixes
+
+* **artwork:** label text work previews instead of placeholder styling ([d2cb642](https://github.com/redtidev1918/DAViewer/commit/d2cb642f2d2390ab348059fb4a03100b6ef41c87))
+* **artwork:** render literature deviations instead of blank detail and broken previews ([34b625f](https://github.com/redtidev1918/DAViewer/commit/34b625f75c32d47228603b1108398f384267a30f))
+
 ## [0.5.6](https://github.com/redtidev1918/DAViewer/compare/v0.5.5...v0.5.6) (2026-09-23)
 
 
