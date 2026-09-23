@@ -60,6 +60,12 @@ Cookie 也能拿到 HTTP 200 的通用内容。匿名探测结果由真实 headl
 anonymous 并提示重新登录；真实浏览器无法作答（挑战/网络）→ 保持 unverified，
 绝不静默降级。
 
+职责边界（见 `regressions/011`）：只有验证层能产生 verdict；Cookie 存储、
+后台探测（只轮转 CSRF）、feed 成功/失败、UI 都没有写权限。所有 verdict
+变更经由 `WebSessionStatusController.applyVerification` 单一入口，带代际
+保护与 source 日志；`webSessionReadyProvider` 只表示启动 readiness，不等于
+会话健康。
+
 ## 认证事务生命周期
 
 所有登录入口（首页、设置、每日精选、关注动态、收藏、通知）最终都进入同一个

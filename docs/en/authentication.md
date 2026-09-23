@@ -98,6 +98,13 @@ the real headless WebView (the same Cookie stack as login): same account →
 healthy; the real browser also anonymous → anonymous and a re-login prompt;
 real-browser probe failure → stays unverified, never a silent downgrade.
 
+Ownership boundary (see `regressions/011`): only the verification layer may
+produce a verdict; cookie storage, background probes (CSRF rotation only),
+feed success/failure, and UI have no write access. Every verdict change goes
+through the single `WebSessionStatusController.applyVerification` entry point
+with generation protection and source logging; `webSessionReadyProvider` means
+startup readiness only, never session health.
+
 ## Authentication transaction lifecycle
 
 Every login entry point (Home, Settings, Daily, Watched, Favourites,
