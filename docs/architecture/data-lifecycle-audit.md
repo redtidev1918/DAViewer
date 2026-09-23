@@ -92,6 +92,9 @@ ref.watch(webSessionControllerProvider.select(personalizedFeedSessionIdentity))
   连续翻页（`artwork_feed_grid_test.dart`）
 - 推荐流诊断区分锁定信号：`gated` 之外新增 `blurred` 计数，付费/锁定作品以模糊
   Wix transform 出现时可直接观测
+- 下拉刷新从任意位置可触发：`AppRefreshIndicator` 使用
+  `RefreshIndicatorTriggerMode.anywhere`，单次下拉即可刷新，不再要求先回到顶部
+  （`artwork_feed_grid_test.dart`）
 
 ## 6. 下一步审计目标
 

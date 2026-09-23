@@ -53,12 +53,10 @@ because the project does not purchase Apple Developer Program signing.
 
 ## 当前状态
 
-`v0.5.1` 已按项目决策发布（2026-09-23），下载页与 Pages 已自动同步。本轮已闭环：
+`v0.5.2` 已按项目决策发布（2026-09-23），下载页与 Pages 已自动同步。本轮已闭环：
 
-- 推荐页分页边界卡住已修复：翻页完成后停留在底部，再次下滑即可继续翻页，无需
-  先上滑再滑到底，并有 widget 回归测试（`artwork_feed_grid_test.dart`）。
-- 推荐流成功日志新增 `blurred` 计数，用于区分「本页没有付费/锁定作品」与
-  「解析器漏掉锁定信号」。
+- 推荐页下拉刷新已修复：列表不在顶部时单次下拉即刷新，不再需要先上滑到顶再
+  下拉一次，并有 widget 回归测试（`artwork_feed_grid_test.dart`）。
 
 剩余 runtime caveats（Mac 交互 smoke、真实付费 rfy 样本的 `blurred` 验证）记录在
 `docs/architecture/data-lifecycle-audit.md`；Keychain 付费签名不作为阻塞项。
