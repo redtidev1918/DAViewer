@@ -358,6 +358,46 @@ void main() {
     expect(calls, greaterThan(0));
   });
 
+  testWidgets('pull-to-refresh from a scrolled position works in one gesture', (
+    tester,
+  ) async {
+    var refreshes = 0;
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: ArtworkFeedGrid(
+              feed: ArtworkFeedState(
+                items: <Artwork>[for (var i = 0; i < 60; i += 1) artwork(i)],
+                nextCursor: 'next',
+              ),
+              emptyMessage: 'Empty',
+              scrollController: controller,
+              onRefresh: () async {
+                refreshes += 1;
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // Scrolled away from the top, a single pull-down must still refresh
+    // (RefreshIndicatorTriggerMode.anywhere) instead of only scrolling to the
+    // top and demanding a second gesture.
+    controller.jumpTo(200);
+    await tester.pump();
+
+    await tester.drag(find.byType(ArtworkFeedGrid), const Offset(0, 600));
+    await tester.pumpAndSettle();
+
+    expect(refreshes, greaterThan(0));
+  });
+
   testWidgets('tall portrait cards never overflow', (tester) async {
     await tester.pumpWidget(
       ProviderScope(

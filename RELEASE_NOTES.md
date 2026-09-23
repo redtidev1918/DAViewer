@@ -3,6 +3,12 @@
 这里只写下载者需要知道的变化，一行一条。内部实现、协议与调试细节请见
 `CHANGELOG.md`。
 
+## 0.5.2
+
+- 修复推荐页下拉刷新：列表不在顶部时，单次下拉即可触发刷新，不再需要先上滑到顶再下拉一次。
+
+- Fixes pull-to-refresh on the recommendation feed: a single pull-down now refreshes even when the list is scrolled away from the top.
+
 ## 0.5.1
 
 - 修复推荐页持续下滑到分页边界后卡住：翻页完成后仍停留在底部附近时，再次下滑即可继续加载下一页，不再需要先上滑再滑到底。

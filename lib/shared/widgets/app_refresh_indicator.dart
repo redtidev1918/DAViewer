@@ -21,6 +21,7 @@ final class AppRefreshIndicator extends StatelessWidget {
       backgroundColor: scheme.surface,
       strokeWidth: 2.5,
       displacement: 48,
+      triggerMode: RefreshIndicatorTriggerMode.anywhere,
       child: child,
     );
   }
