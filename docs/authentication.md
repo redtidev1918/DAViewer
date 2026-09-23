@@ -53,9 +53,12 @@ Secure/HttpOnly），而不是折叠成 `name→value` 表：同名的 `.deviant
 `oauthSessionKnown=false` 是显式登出的权威证据：即使清理 token 时安全存储失败，
 下次冷启动也不会因为遗留 token 重新进入 `signedIn`。
 网页 Cookie 的可用性也由 DeviantArt 首页服务端验证
-（`@publicSession.user.username`），本地存在 Cookie 不等于会话有效。但裸 HTTP
-首页探测可能被 WAF 干扰；如果 `rfy/deviations` 用同一 Cookie + CSRF 成功返回，
-它就是更强的健康证据，应用会确认网页会话健康并丢弃迟到的匿名探测。
+（`@publicSession.user.username`），本地存在 Cookie 不等于会话有效。裸 HTTP
+首页探测可能被 WAF 干扰，但 `rfy/deviations` 成功**同样不是**健康证据：匿名
+Cookie 也能拿到 HTTP 200 的通用内容。匿名探测结果由真实 headless WebView
+（与登录相同的 Cookie 栈）仲裁：确认同一账号 → healthy；真实浏览器也匿名 →
+anonymous 并提示重新登录；真实浏览器无法作答（挑战/网络）→ 保持 unverified，
+绝不静默降级。
 
 ## 认证事务生命周期
 
@@ -89,7 +92,7 @@ macOS 预览版使用同一个私有稳定的 CI 签名身份。该身份是自�
 `ad-hoc / 无 TeamIdentifier` 是接受的环境限制；稳定签名与公证明确不在本项目的
 发布范围内，不作为 Keychain 验收或 Release Gate 的阻塞项。
 
-首页 **推荐 / For you** 标签是网站的个性化 `rfy/deviations` 信息流，使用 WebView 的 Cookie 与 CSRF token 拉取。它需要已登录的网页会话；网页会话缺失时该标签展示登录提示。**每日精选 / Daily** 标签使用官方 OAuth API，不依赖网页会话。产品上不得把这两个数据源表述为等价。
+首页 **推荐 / For you** 标签是网站的个性化 `rfy/deviations` 信息流，使用 WebView 的 Cookie 与 CSRF token 拉取。它需要已登录的网页会话；网页会话缺失、正在恢复或被权威判定匿名时，该标签展示登录/恢复提示，**绝不静默渲染匿名 Cookie 拿到的通用内容**，也绝不自动切到 **每日精选 / Daily** 标签（该标签使用官方 OAuth API，不依赖网页会话，只在用户主动切换时显示）。产品上不得把这两个数据源表述为等价。
 
 ## 公开网页适配器
 

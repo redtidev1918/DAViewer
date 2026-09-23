@@ -16,22 +16,24 @@
 ## 正确架构
 
 - 启动页必须区分“未检测到代理/直连失败”与“代理地址不可达”，并说明这是应用侧路由探测；
-- 真实业务请求的成功证据强于独立首页探测：`rfy/deviations` 用同一 Cookie + CSRF 成功返回
-  即确认 web session healthy；
-- 探测结果只允许在代际仍然最新时覆盖状态；业务请求确认健康后，迟到的匿名/不可用结果必须
-  被丢弃。
+- **（2026-09 修订）** 裸 HTTP 首页探测与 `rfy/deviations` 成功都不是健康证据：
+  匿名 Cookie 同样能拿到 rfy HTTP 200 + 通用内容。匿名探测必须由真实 headless
+  WebView（与登录相同的 Cookie 栈）仲裁，见 `009`；
+- 探测结果只允许在代际仍然最新时覆盖状态；迟到的匿名/不可用结果必须被丢弃。
 
 ## 修复
 
 - Splash 显示恢复状态并异步执行 `ProxyController.testConnection`；代理变化时重新检测；
 - 中文/英文文案区分 no proxy、direct blocked、proxy unreachable 与 proxy ready；
-- 个性化 rfy 请求成功后，把 web session 标记为 healthy，并避免同账号重复刷新状态；
-- 测试确认 rfy 成功即 healthy，且不引入首页探测。
+- ~~个性化 rfy 请求成功后，把 web session 标记为 healthy~~（v0.5.4 引入、v0.5.5
+  撤销：rfy 200 无法证明登录态，见 `009`）；
+- 测试确认拉取刷新不引入首页探测。
 
 ## Regression
 
-- `test/home_refresh_no_probe_test.dart`：rfy 成功后 `webSessionStatusProvider.isHealthy`
-  为 true，且首页探测次数为 0；
+- `test/home_refresh_no_probe_test.dart`：rfy 拉取刷新路径无首页探测；
+- ~~rfy 成功后 `webSessionStatusProvider.isHealthy` 为 true~~（已被 `009` 的
+  新契约取代：rfy 成功不改变状态）；
 - `test/app_strings_test.dart`：锁定启动文案的中文/英文关键语义；
 - Real-device cold-start without proxy and with proxy should be captured before calling
   the runtime path fully closed.

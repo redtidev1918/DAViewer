@@ -24,7 +24,8 @@ machine cannot produce the required evidence.
 | R14  | page completion re-arms load-more (controller state) | Verified   | `artwork_feed_grid_test.dart`: `page completing at the bottom loads again even if content barely grows` (re-arm on paginating → idle; next bottom drag pages even with no scroll-extent growth). |
 | R15  | pull-to-refresh from any scroll position        | Verified       | `artwork_feed_grid_test.dart`: `pull-to-refresh from a scrolled position works in one gesture` (single pull-down from mid-scroll triggers onRefresh). See `007`. |
 | R16  | drag at the exact bottom still pages            | Verified       | `artwork_feed_grid_test.dart`: `a drag at the exact bottom asks for the next page` (bottom-edge overscroll triggers loadMore) and `page completing at the bottom loads again even if content barely grows`. See `006`. |
-| R17  | startup tells proxy vs network; rfy success confirms web session | Partial | `home_refresh_no_probe_test.dart` and `app_strings_test.dart` cover rfy-success health and localized startup copy. See `008`; a real-device no-proxy/proxy cold-start trace is still required. |
+| R17  | startup tells proxy vs network; web-session verdict is authoritative | Partial | `home_refresh_no_probe_test.dart` and `app_strings_test.dart` cover localized startup copy and the no-probe rfy path. See `008`; a real-device no-proxy/proxy cold-start trace is still required. |
+| R18  | rfy 200 is not web-session proof; anonymous verdict surfaces recovery | Verified | `test/web_session_status_test.dart` (real-browser arbitration: confirmed→healthy, anonymous→needsLogin, failure→unverified) and `test/home_refresh_no_probe_test.dart` (rfy success no longer marks healthy; anonymous verdict shows recovery UI and sends no rfy request). See `009`. |
 
 ## Evidence still required before calling the architecture closed
 

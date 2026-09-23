@@ -91,9 +91,12 @@ DeviantArt's browsing preferences.
 secure-storage token must not revive the signed-in UI on the next cold start.
 Web-session usability is also confirmed by the DeviantArt home page
 (`@publicSession.user.username`); a local Cookie alone is not proof. However,
-the bare HTTP home probe can be distorted by WAF responses. A successful
-`rfy/deviations` request using the same Cookie plus CSRF is stronger evidence:
-the app marks that web session healthy and discards a later anonymous probe.
+neither a bare HTTP home probe (WAF-distorted) nor a successful
+`rfy/deviations` request is health evidence: an anonymous Cookie also gets an
+HTTP 200 answer with generic content. A bare anonymous verdict is arbitrated by
+the real headless WebView (the same Cookie stack as login): same account →
+healthy; the real browser also anonymous → anonymous and a re-login prompt;
+real-browser probe failure → stays unverified, never a silent downgrade.
 
 ## Authentication transaction lifecycle
 
@@ -137,9 +140,12 @@ of scope and are not a Keychain acceptance or Release Gate blocker.
 
 The Home **推荐 / For you** tab is the website's personalized `rfy/deviations`
 feed, fetched with the WebView's Cookie and CSRF token. It requires a signed-in
-web session; when the web session is absent the tab shows the sign-in prompt.
-The **每日精选 / Daily** tab uses the official OAuth API and does not depend on
-the web session. The product must not label these two sources as equivalent.
+web session; when the web session is absent, still restoring, or authoritatively
+anonymous, the tab shows the sign-in/recovery prompt and must **never silently
+render the generic content an anonymous Cookie receives**, nor auto-switch to
+the **每日精选 / Daily** tab (official OAuth API, web-session independent,
+shown only on explicit user navigation). The product must not label these two
+sources as equivalent.
 
 ## Public website adapters
 
