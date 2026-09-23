@@ -76,6 +76,19 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
   }
 
   @override
+  void didUpdateWidget(covariant ArtworkFeedGrid oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A page that finishes while the user stays inside the prefetch zone leaves
+    // the edge disarmed (the scroll never passes back through extentAfter>=400).
+    // Re-arm as soon as paginating ends so the next bottom drag loads the next
+    // page without requiring the user to scroll up and back down.
+    if (oldWidget.feed.phase == FeedRequestPhase.paginating &&
+        widget.feed.phase != FeedRequestPhase.paginating) {
+      _loadMoreArmed = true;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     Widget body;
 

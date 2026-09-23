@@ -3,6 +3,14 @@
 这里只写下载者需要知道的变化，一行一条。内部实现、协议与调试细节请见
 `CHANGELOG.md`。
 
+## 0.5.1
+
+- 修复推荐页持续下滑到分页边界后卡住：翻页完成后仍停留在底部附近时，再次下滑即可继续加载下一页，不再需要先上滑再滑到底。
+- 增强推荐流诊断：成功日志新增 `blurred` 计数，区分“本页没有付费/锁定作品”与“解析器漏掉锁定信号”。
+
+- Fixes the recommendation feed freezing at the pagination edge: once a page finishes loading, the next downward drag near the bottom loads the next page without scrolling back up first.
+- Adds a blurred-preview count to recommendation diagnostics so a locked preview hidden by DeviantArt's blur can be told apart from an empty page.
+
 ## 0.5.0
 
 - 修复首页推荐下拉刷新过慢：下拉直接刷新推荐流，不再先做一次 WAF 敏感的首页探测（每次省约 1.5 秒）；失效会话仍会明确提示重新登录。
