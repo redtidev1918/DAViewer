@@ -146,12 +146,26 @@ Future<Page<Artwork>?> _tryFetchRfy(
       csrfToken: csrf,
       cursor: request.cursor,
     );
+    // DeviantArt gates paid/blocked works by serving blurred Wix transforms
+    // (e.g. `blur_30`) rather than an explicit feed field, so `gated` alone
+    // can read 0 on a stream that still contains locked previews. Log both so
+    // a real run can tell "no locked works in this page" from "parser misses
+    // the signal".
+    final blurred = page.items.where((artwork) {
+      return artwork.media.any(
+        (asset) =>
+            asset.role == MediaRole.preview &&
+            asset.uri != null &&
+            asset.uri.toString().contains('blur_'),
+      );
+    }).length;
     logger.info(
       'home',
       'personalized feed success elapsedMs=${stopwatch.elapsedMilliseconds} '
           'cursor=${request.cursor ?? 'initial'} '
           'items=${page.items.length} '
-          'gated=${page.items.where((a) => artworkViewLock(a) != null).length}',
+          'gated=${page.items.where((a) => artworkViewLock(a) != null).length} '
+          'blurred=$blurred',
     );
     return page;
   } on Object catch (error, stack) {
