@@ -90,7 +90,10 @@ DeviantArt's browsing preferences.
 `oauthSessionKnown=false` is authoritative after an explicit logout: a leftover
 secure-storage token must not revive the signed-in UI on the next cold start.
 Web-session usability is also confirmed by the DeviantArt home page
-(`@publicSession.user.username`); a local Cookie alone is not proof.
+(`@publicSession.user.username`); a local Cookie alone is not proof. However,
+the bare HTTP home probe can be distorted by WAF responses. A successful
+`rfy/deviations` request using the same Cookie plus CSRF is stronger evidence:
+the app marks that web session healthy and discards a later anonymous probe.
 
 ## Authentication transaction lifecycle
 

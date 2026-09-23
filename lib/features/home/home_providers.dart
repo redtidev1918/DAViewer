@@ -102,6 +102,19 @@ final personalizedFeedProvider =
             message: 'The personalized feed requires a signed-in web session.',
           );
         }
+        // The actual rfy request is stronger evidence than the separate bare
+        // home-page probe: DeviantArt has just accepted this Cookie session and
+        // returned personalized data. Mark it healthy so a WAF-served anonymous
+        // verifier answer cannot turn into a misleading web-login prompt.
+        final username = webSessionState.username.trim();
+        final sessionStatus = ref.read(webSessionStatusProvider);
+        if (!(sessionStatus.isHealthy &&
+            sessionStatus.serverUsername.trim().toLowerCase() ==
+                username.toLowerCase())) {
+          ref
+              .read(webSessionStatusProvider.notifier)
+              .markHealthy(serverUsername: username);
+        }
         ref.read(artworkStoreProvider.notifier).putAll(page.items);
         return page;
       });

@@ -58,6 +58,18 @@ void main() {
     expect(en.home, 'For you');
   });
 
+  test('startup copy helps users distinguish proxy from network trouble', () {
+    expect(zh.splashRestoringSession, contains('正在恢复'));
+    expect(en.splashRestoringSession, contains('session'));
+    expect(zh.splashCheckingConnection, contains('连接'));
+    expect(zh.splashDirectBlocked, contains('未检测到代理'));
+    expect(
+      zh.splashProxyUnreachable('127.0.0.1:7892'),
+      contains('127.0.0.1:7892'),
+    );
+    expect(en.splashDirectBlocked, contains('No proxy'));
+  });
+
   test('download deletion warning states that local files are removed', () {
     expect(zh.deleteFinishedDownloadsTitle, '删除已结束的下载？');
     expect(zh.deleteFinishedDownloadsMessage(2), contains('本地文件'));

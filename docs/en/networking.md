@@ -59,6 +59,20 @@ Windows hidden WebViews and cookie reads share one WebView2 environment. This
 keeps public adapter cookies and proxy behavior consistent; it is not a second
 authentication session.
 
+## Startup connectivity status
+
+The splash screen no longer shows only a spinner while restoring the session. It
+reports proxy detection and performs a bounded App-side DeviantArt connectivity
+check:
+
+- with no proxy detected, it says that a direct connection is being tried;
+- when direct access fails, it tells the user to enable a proxy/VPN;
+- with a proxy, it shows the address and distinguishes reachable from
+  unreachable;
+- proxy changes trigger a new check.
+
+This copy describes App traffic only; it never claims an external browser uses
+the same route.
 ## Sign-in recovery flow
 
 The login route starts with native UI. It exposes one official sign-in action,

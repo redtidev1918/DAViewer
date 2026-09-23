@@ -162,6 +162,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      // The successful rfy request proves the Cookie session works. It must
+      // mark the web session healthy, even if a separate home-page probe later
+      // answers anonymously behind a WAF.
+      expect(container.read(webSessionStatusProvider).isHealthy, isTrue);
+
       // The controller's initial auto-load is the only first-page fetch so
       // far, and no WAF-sensitive home-page probe ran.
       expect(rfyAdapter.calls, 1);

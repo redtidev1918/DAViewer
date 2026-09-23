@@ -53,11 +53,16 @@ because the project does not purchase Apple Developer Program signing.
 
 ## 当前状态
 
-`v0.5.3` 已按项目决策发布（2026-09-23），下载页与 Pages 已自动同步。本轮已闭环：
+`v0.5.4` 候选已闭环并准备发布。本轮新增：
 
-- 推荐页滑到底无法继续加载已修复：翻页不再取决于底部两张预览图是否对齐
-  （masonry 两列底端高度），贴底 overscroll 与 controller 状态驱动的 re-arm
-  保证持续下滑可连续翻页，并有 widget 回归测试（`artwork_feed_grid_test.dart`）。
+- 启动页显示网络/代理状态：无代理、直连失败、代理可达与不可达分别有明确文案，
+  用户可以区分网络问题和代理问题。
+- 个性化 `rfy` 请求成功即确认网页会话健康，避免裸首页探测被 WAF 判成 anonymous
+  后误导用户重新登录 Cookie。
+- 回归目录新增 REG-008 / R17；真实设备“无代理冷启动 → 开代理 → 进入首页”的完整
+  日志仍需发版后收集。
 
-剩余 runtime caveats（Mac 交互 smoke、真实付费 rfy 样本的 `blurred` 验证）记录在
+上一轮 `v0.5.3`（2026-09-23）已修复推荐页贴底翻页，详情见
+`docs/regressions/006-feed-pagination-edge.md`。剩余 runtime caveats
+（Mac 交互 smoke、真实付费 rfy 样本的 `blurred` 验证）记录在
 `docs/architecture/data-lifecycle-audit.md`；Keychain 付费签名不作为阻塞项。

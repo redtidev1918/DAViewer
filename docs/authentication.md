@@ -53,7 +53,9 @@ Secure/HttpOnly），而不是折叠成 `name→value` 表：同名的 `.deviant
 `oauthSessionKnown=false` 是显式登出的权威证据：即使清理 token 时安全存储失败，
 下次冷启动也不会因为遗留 token 重新进入 `signedIn`。
 网页 Cookie 的可用性也由 DeviantArt 首页服务端验证
-（`@publicSession.user.username`），本地存在 Cookie 不等于会话有效。
+（`@publicSession.user.username`），本地存在 Cookie 不等于会话有效。但裸 HTTP
+首页探测可能被 WAF 干扰；如果 `rfy/deviations` 用同一 Cookie + CSRF 成功返回，
+它就是更强的健康证据，应用会确认网页会话健康并丢弃迟到的匿名探测。
 
 ## 认证事务生命周期
 

@@ -39,6 +39,23 @@ final class AppStrings {
   static const AppStrings en = AppStrings._(AppLanguage.en);
 
   String get appTitle => _lang == AppLanguage.zh ? 'DA 查看器' : 'DA Viewer';
+
+  // Startup status: keep the spinner informative when DeviantArt is slow or
+  // unreachable, and help users tell a proxy problem from a network problem.
+  String get splashRestoringSession =>
+      _lang == AppLanguage.zh ? '正在恢复登录状态…' : 'Restoring your session…';
+  String get splashCheckingConnection => _lang == AppLanguage.zh
+      ? '正在检测 DeviantArt 连接…'
+      : 'Checking DeviantArt connectivity…';
+  String get splashNoProxyDetected => _lang == AppLanguage.zh
+      ? '未检测到代理；正在尝试直连…'
+      : 'No proxy detected; trying a direct connection…';
+  String get splashDirectBlocked => _lang == AppLanguage.zh
+      ? '无法直连 DeviantArt。当前未检测到代理；请开启代理/VPN 后等待或重启应用。'
+      : 'DeviantArt is not reachable directly. No proxy was detected; enable your proxy/VPN and wait or restart the app.';
+  String splashProxyUnreachable(String address) => _lang == AppLanguage.zh
+      ? '无法通过代理 $address 访问 DeviantArt。请确认代理软件已启动、端口正确，或更换节点。'
+      : 'DeviantArt is not reachable through $address. Check that the proxy app is running, the port is correct, or switch nodes.';
   String get home => _lang == AppLanguage.zh ? '推荐' : 'For you';
   String get daily => _lang == AppLanguage.zh ? '每日精选' : 'Daily';
   String get following => _lang == AppLanguage.zh ? '关注动态' : 'Watched';
