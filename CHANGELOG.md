@@ -3,6 +3,13 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.5.3](https://github.com/redtidev1918/DAViewer/compare/v0.5.2...v0.5.3) (2026-09-23)
+
+
+### Bug Fixes
+
+* **feed:** page reliably from the exact bottom regardless of card alignment ([f35b622](https://github.com/redtidev1918/DAViewer/commit/f35b62296197f16704954566a28806d4a273e385))
+
 ## [0.5.2](https://github.com/redtidev1918/DAViewer/compare/v0.5.1...v0.5.2) (2026-09-23)
 
 
