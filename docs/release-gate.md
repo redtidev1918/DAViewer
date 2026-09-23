@@ -53,10 +53,11 @@ because the project does not purchase Apple Developer Program signing.
 
 ## 当前状态
 
-`v0.5.2` 已按项目决策发布（2026-09-23），下载页与 Pages 已自动同步。本轮已闭环：
+`v0.5.3` 已按项目决策发布（2026-09-23），下载页与 Pages 已自动同步。本轮已闭环：
 
-- 推荐页下拉刷新已修复：列表不在顶部时单次下拉即刷新，不再需要先上滑到顶再
-  下拉一次，并有 widget 回归测试（`artwork_feed_grid_test.dart`）。
+- 推荐页滑到底无法继续加载已修复：翻页不再取决于底部两张预览图是否对齐
+  （masonry 两列底端高度），贴底 overscroll 与 controller 状态驱动的 re-arm
+  保证持续下滑可连续翻页，并有 widget 回归测试（`artwork_feed_grid_test.dart`）。
 
 剩余 runtime caveats（Mac 交互 smoke、真实付费 rfy 样本的 `blurred` 验证）记录在
 `docs/architecture/data-lifecycle-audit.md`；Keychain 付费签名不作为阻塞项。

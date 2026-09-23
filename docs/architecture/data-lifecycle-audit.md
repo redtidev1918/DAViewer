@@ -95,6 +95,10 @@ ref.watch(webSessionControllerProvider.select(personalizedFeedSessionIdentity))
 - 下拉刷新从任意位置可触发：`AppRefreshIndicator` 使用
   `RefreshIndicatorTriggerMode.anywhere`，单次下拉即可刷新，不再要求先回到顶部
   （`artwork_feed_grid_test.dart`）
+- 翻页布防与几何解耦：`ArtworkFeedGrid` 的 `_loadMoreArmed` 由 controller 状态
+  （`paginating` 结束）re-arm，贴底 overscroll（`extentBefore>0 &&
+  extentAfter==0`）也触发下一页，翻页不再取决于 masonry 两列底端是否对齐
+  （`artwork_feed_grid_test.dart`）
 
 ## 6. 下一步审计目标
 

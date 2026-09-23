@@ -3,6 +3,12 @@
 这里只写下载者需要知道的变化，一行一条。内部实现、协议与调试细节请见
 `CHANGELOG.md`。
 
+## 0.5.3
+
+- 修复推荐页滑到底后无法继续加载：翻页不再取决于底部两张预览图是否对齐，贴底即加载下一页。
+
+- Fixes the recommendation feed stalling at the bottom: loading no longer depends on the bottom cards' heights being aligned.
+
 ## 0.5.2
 
 - 修复推荐页下拉刷新：列表不在顶部时，单次下拉即可触发刷新，不再需要先上滑到顶再下拉一次。

@@ -239,7 +239,45 @@ void main() {
     expect(retries, 1);
   });
 
-  testWidgets('remaining near the bottom fires only one edge event', (
+  testWidgets('in-flight pagination suppresses repeated bottom asks', (
+    tester,
+  ) async {
+    var calls = 0;
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: ArtworkFeedGrid(
+              feed: ArtworkFeedState(
+                items: <Artwork>[for (var i = 0; i < 40; i += 1) artwork(i)],
+                nextCursor: 'next',
+                isLoading: true,
+                phase: FeedRequestPhase.paginating,
+              ),
+              emptyMessage: 'Empty',
+              scrollController: controller,
+              onLoadMore: () => calls += 1,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    controller.jumpTo(controller.position.maxScrollExtent - 200);
+    await tester.pump();
+    await tester.drag(find.byType(ArtworkFeedGrid), const Offset(0, -40));
+    await tester.pump();
+    await tester.drag(find.byType(ArtworkFeedGrid), const Offset(0, -40));
+    await tester.pump();
+
+    expect(calls, 0);
+  });
+
+  testWidgets('a drag at the exact bottom asks for the next page', (
     tester,
   ) async {
     var calls = 0;
@@ -260,24 +298,29 @@ void main() {
         ),
       ),
     );
-
-    controller.jumpTo(controller.position.maxScrollExtent - 200);
-    await tester.pump();
-    await tester.drag(find.byType(ArtworkFeedGrid), const Offset(0, -40));
-    await tester.pump();
-    await tester.drag(find.byType(ArtworkFeedGrid), const Offset(0, -40));
     await tester.pump();
 
-    expect(calls, 1);
+    // Land exactly on the bottom edge; a further downward drag can only
+    // overscroll, and must still request the next page. This is the
+    // masonry-aligned-bottom case that used to stall.
+    controller.jumpTo(controller.position.maxScrollExtent);
+    await tester.pump();
+    await tester.drag(find.byType(ArtworkFeedGrid), const Offset(0, -60));
+    await tester.pump();
+
+    expect(calls, greaterThan(0));
   });
 
-  testWidgets('page completing near the bottom re-arms the next edge drag', (
+  testWidgets('page completing at the bottom loads again even if content barely grows', (
     tester,
   ) async {
     var calls = 0;
     final controller = ScrollController();
     addTearDown(controller.dispose);
-    var feed = longFeed();
+    var feed = ArtworkFeedState(
+      items: <Artwork>[for (var i = 0; i < 60; i += 1) artwork(i)],
+      nextCursor: 'next',
+    );
 
     Future<void> pumpFeed() => tester.pumpWidget(
       ProviderScope(
@@ -297,26 +340,24 @@ void main() {
     await pumpFeed();
     controller.jumpTo(controller.position.maxScrollExtent - 200);
     await tester.pump();
-
-    // First bottom drag fires loadMore and disarms the edge.
     await tester.drag(find.byType(ArtworkFeedGrid), const Offset(0, -40));
     await tester.pump();
     expect(calls, 1);
 
-    // The controller enters paginating while the fetch is in flight...
     feed = ArtworkFeedState(
-      items: <Artwork>[for (var i = 0; i < 40; i += 1) artwork(i)],
+      items: <Artwork>[for (var i = 0; i < 60; i += 1) artwork(i)],
       nextCursor: 'next',
-      phase: FeedRequestPhase.paginating,
       isLoading: true,
+      phase: FeedRequestPhase.paginating,
     );
     await pumpFeed();
     await tester.pump();
 
-    // ...then the page completes (paginating -> idle) while the user is still
-    // near the bottom; the next drag must page again without scrolling back up.
+    // The page completes while the user stays near the bottom but the scroll
+    // extent barely grows (aligned columns). The next bottom drag must still
+    // page again without scrolling back up.
     feed = ArtworkFeedState(
-      items: <Artwork>[for (var i = 0; i < 64; i += 1) artwork(i)],
+      items: <Artwork>[for (var i = 0; i < 62; i += 1) artwork(i)],
       nextCursor: 'next-2',
     );
     await pumpFeed();

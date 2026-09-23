@@ -57,6 +57,13 @@ final class ArtworkFeedGrid extends ConsumerStatefulWidget {
 }
 
 final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
+  /// How close to the bottom (in logical pixels) a manual scroll counts as
+  /// "near the bottom" and asks the controller for the next page. This is a
+  /// prefetch zone, not the pagination gate: whether a page loads never depends
+  /// on crossing it, because the latch is re-armed by the controller finishing
+  /// a page (see [didUpdateWidget]) and by an overscroll at the exact bottom,
+  /// not by re-crossing this threshold.
+  static const double _prefetchPixels = 400;
   static const Duration _pointerScrollGrace = Duration(milliseconds: 400);
 
   DateTime? _lastPointerScrollAt;
@@ -68,24 +75,55 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
     }
   }
 
-  bool _isManualScroll(ScrollUpdateNotification notification) {
-    if (notification.dragDetails != null) return true;
+  bool _isManualScroll(ScrollNotification notification) {
+    final dragDetails = switch (notification) {
+      ScrollUpdateNotification(:final dragDetails) => dragDetails,
+      OverscrollNotification(:final dragDetails) => dragDetails,
+      _ => null,
+    };
+    if (dragDetails != null) return true;
     final lastPointerScroll = _lastPointerScrollAt;
     return lastPointerScroll != null &&
         DateTime.now().difference(lastPointerScroll) <= _pointerScrollGrace;
   }
 
+  // Re-arm from the controller's state, not from scroll geometry. A page that
+  // completes while the user stays at the bottom must let the next bottom drag
+  // load the following page; previously the latch only re-armed when the scroll
+  // re-crossed extentAfter>=400, so whether the masonry columns grew the taller
+  // one (i.e. whether the two bottom cards were aligned) decided if the feed
+  // kept loading.
   @override
   void didUpdateWidget(covariant ArtworkFeedGrid oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // A page that finishes while the user stays inside the prefetch zone leaves
-    // the edge disarmed (the scroll never passes back through extentAfter>=400).
-    // Re-arm as soon as paginating ends so the next bottom drag loads the next
-    // page without requiring the user to scroll up and back down.
     if (oldWidget.feed.phase == FeedRequestPhase.paginating &&
         widget.feed.phase != FeedRequestPhase.paginating) {
       _loadMoreArmed = true;
     }
+  }
+
+  bool _maybeLoadMore(ScrollNotification notification) {
+    if (widget.onLoadMore == null) return false;
+    if (!_isManualScroll(notification)) return false;
+    if (widget.feed.isLoading ||
+        widget.feed.phase == FeedRequestPhase.paginating) {
+      return false;
+    }
+    final metrics = notification.metrics;
+    // A drag that starts with the viewport already at the bottom produces only
+    // OverscrollNotifications (the position cannot move), so the in-zone
+    // ScrollUpdate check below would never run. Treat an overscroll at the
+    // bottom edge (and only there) as a request for the next page.
+    final draggedPastBottom = notification is OverscrollNotification &&
+        metrics.extentBefore > 0 &&
+        metrics.extentAfter == 0;
+    if (metrics.extentAfter <= _prefetchPixels || draggedPastBottom) {
+      if (!_loadMoreArmed) return false;
+      _loadMoreArmed = false;
+      AppLogger.instance.info('feed', 'pagination trigger');
+      widget.onLoadMore?.call();
+    }
+    return false;
   }
 
   @override
@@ -192,28 +230,7 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
     return Listener(
       onPointerSignal: _handlePointerSignal,
       child: NotificationListener<ScrollNotification>(
-        onNotification: (notification) {
-          // Only real user scroll may page the feed. Programmatic layout,
-          // rebuilds, or state updates must never call loadMore: without this
-          // guard a masonry grid whose content does not fill the viewport
-          // would repeatedly page through the whole collection on its own.
-          // Trackpad and mouse-wheel scrolling emit PointerScrollEvent with no
-          // dragDetails, so those are tracked separately instead of being
-          // filtered out as if they were programmatic.
-          if (notification is! ScrollUpdateNotification) return false;
-          if (!_isManualScroll(notification)) return false;
-          if (notification.metrics.extentAfter < 400) {
-            // Keep this an edge event: while the viewport stays inside the
-            // prefetch zone, repeated scroll frames must not call loadMore.
-            if (!_loadMoreArmed) return false;
-            _loadMoreArmed = false;
-            AppLogger.instance.info('feed', 'pagination trigger');
-            widget.onLoadMore?.call();
-          } else {
-            _loadMoreArmed = true;
-          }
-          return false;
-        },
+        onNotification: _maybeLoadMore,
         child: refreshable,
       ),
     );

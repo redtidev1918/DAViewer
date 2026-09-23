@@ -23,6 +23,7 @@ machine cannot produce the required evidence.
 | R13  | dispose stops request                           | Verified       | `artwork_feed_controller_test.dart`: post-dispose loadMore makes no request. |
 | R14  | page completion near bottom re-arms load-more   | Verified       | `artwork_feed_grid_test.dart`: `page completing near the bottom re-arms the next edge drag` (paginating → idle while staying near bottom; next drag pages again). |
 | R15  | pull-to-refresh from any scroll position        | Verified       | `artwork_feed_grid_test.dart`: `pull-to-refresh from a scrolled position works in one gesture` (single pull-down from mid-scroll triggers onRefresh). See `007`. |
+| R16  | drag at the exact bottom still pages            | Verified       | `artwork_feed_grid_test.dart`: `a drag at the exact bottom asks for the next page` (bottom-edge overscroll triggers loadMore) and `page completing at the bottom loads again even if content barely grows`. See `006`. |
 
 ## Evidence still required before calling the architecture closed
 
