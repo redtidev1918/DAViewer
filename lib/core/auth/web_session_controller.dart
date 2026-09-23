@@ -320,48 +320,17 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
   /// an incomplete page never means signed out). Anonymous probe results
   /// therefore rotate the CSRF only and leave the session identity and cookie
   /// snapshot intact.
-  Future<void> reportRefresh({
-    required String csrf,
-    required String username,
-  }) async {
+  /// Rotates the CSRF token from a background browser context. This is the
+  /// ONLY thing a background probe may write: it never touches identity,
+  /// cookies, or any session verdict (REG-010).
+  Future<void> updateCsrf(String csrf) async {
     if (!shouldStoreBackgroundBrowserSession(csrf)) return;
-    // A background probe that observed the same signed-in account is a CSRF
-    // rotation, not a login capture: rotate the token and never rewrite the
-    // identity or emit a persist-failure-style warning (see REG-010).
-    if (state.isLoggedIn == true &&
-        state.username.trim().isNotEmpty &&
-        username.trim().toLowerCase() == state.username.trim().toLowerCase()) {
-      state = WebSessionState(
-        csrf: csrf,
-        isLoggedIn: true,
-        username: state.username,
-      );
-      await _store.update(
-        csrf: csrf,
-        isLoggedIn: true,
-        username: state.username,
-      );
-      return;
-    }
-    if (shouldPreserveSignedInSessionOnAnonymousProbe(
-      currentlySignedIn: state.isLoggedIn == true,
-      probeUsername: username,
-    )) {
-      state = WebSessionState(
-        csrf: csrf,
-        isLoggedIn: true,
-        username: state.username,
-      );
-      // Deliberately does not read or rewrite Cookies: a stale snapshot must
-      // never overwrite fresher credentials captured by login/import.
-      await _store.update(
-        csrf: csrf,
-        isLoggedIn: true,
-        username: state.username,
-      );
-      return;
-    }
-    await report(csrf: csrf, username: username);
+    state = WebSessionState(
+      csrf: csrf,
+      isLoggedIn: state.isLoggedIn,
+      username: state.username,
+    );
+    await _store.update(csrf: csrf);
   }
 
   /// Snapshots the current deviantart.com cookies with their metadata.

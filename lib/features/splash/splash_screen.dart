@@ -72,6 +72,9 @@ final class _SplashScreenState extends ConsumerState<SplashScreen> {
     }
     if (mounted) {
       ref.read(webSessionReadyProvider.notifier).state = true;
+      // Startup owns the first verification trigger. UI hosts only render the
+      // resulting verdict (REG-010): no widget mounts its own probe.
+      unawaited(ref.read(webSessionStatusProvider.notifier).check());
     }
   }
 

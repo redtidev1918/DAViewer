@@ -180,19 +180,11 @@ final class WebSessionRefresher {
         'localUsername=${localUsername.isEmpty ? '-' : localUsername}',
       );
       // A public browser session is sufficient for numeric-id and website
-      // metadata fallbacks. It is intentionally not treated as another user
-      // login; the official OAuth session remains the only app identity.
-      await _ref
-          .read(webSessionControllerProvider.notifier)
-          .reportRefresh(
-            csrf: csrf,
-            // Only a page-confirmed username may be reported. An unresolved or
-            // anonymous page reports nothing, so the preserve-signed-in policy
-            // applies instead of downgrading the identity.
-            username: result.outcome == WebSessionProbeOutcome.confirmed
-                ? result.username
-                : '',
-          );
+      // metadata fallbacks. This probe is a pure observer: it rotates the CSRF
+      // for website adapters and returns its observation. It never writes an
+      // identity or a session verdict (REG-010) — the verification layer
+      // consumes the returned evidence instead.
+      await _ref.read(webSessionControllerProvider.notifier).updateCsrf(csrf);
       return result;
     } on Object catch (error) {
       debugPrint('[web-session] headless report failed: $error');

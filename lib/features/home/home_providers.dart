@@ -71,7 +71,7 @@ final personalizedFeedProvider =
         }
         AppLogger.instance.info(
           'home',
-          'web session confirmed: ${webSessionState.username}',
+          'web session candidate: ${webSessionState.username}',
         );
         // rfy answers HTTP 200 with generic content even for a dead Cookie,
         // so the authoritative session verdict — not the rfy status code —

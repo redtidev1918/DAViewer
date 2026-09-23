@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -26,9 +24,6 @@ final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
   @override
   void initState() {
     super.initState();
-    Future<void>.microtask(
-      () => ref.read(webSessionStatusProvider.notifier).check(),
-    );
     AppLogger.instance.info('notice', 'notice host created');
   }
 
