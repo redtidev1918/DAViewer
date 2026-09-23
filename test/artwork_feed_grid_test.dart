@@ -271,6 +271,63 @@ void main() {
     expect(calls, 1);
   });
 
+  testWidgets('page completing near the bottom re-arms the next edge drag', (
+    tester,
+  ) async {
+    var calls = 0;
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    var feed = longFeed();
+
+    Future<void> pumpFeed() => tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: ArtworkFeedGrid(
+              feed: feed,
+              emptyMessage: 'Empty',
+              scrollController: controller,
+              onLoadMore: () => calls += 1,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await pumpFeed();
+    controller.jumpTo(controller.position.maxScrollExtent - 200);
+    await tester.pump();
+
+    // First bottom drag fires loadMore and disarms the edge.
+    await tester.drag(find.byType(ArtworkFeedGrid), const Offset(0, -40));
+    await tester.pump();
+    expect(calls, 1);
+
+    // The controller enters paginating while the fetch is in flight...
+    feed = ArtworkFeedState(
+      items: <Artwork>[for (var i = 0; i < 40; i += 1) artwork(i)],
+      nextCursor: 'next',
+      phase: FeedRequestPhase.paginating,
+      isLoading: true,
+    );
+    await pumpFeed();
+    await tester.pump();
+
+    // ...then the page completes (paginating -> idle) while the user is still
+    // near the bottom; the next drag must page again without scrolling back up.
+    feed = ArtworkFeedState(
+      items: <Artwork>[for (var i = 0; i < 64; i += 1) artwork(i)],
+      nextCursor: 'next-2',
+    );
+    await pumpFeed();
+    controller.jumpTo(controller.position.maxScrollExtent - 200);
+    await tester.pump();
+
+    await tester.drag(find.byType(ArtworkFeedGrid), const Offset(0, -40));
+    await tester.pump();
+    expect(calls, 2);
+  });
+
   testWidgets('a real drag near the bottom loads next page', (tester) async {
     var calls = 0;
     final controller = ScrollController();
