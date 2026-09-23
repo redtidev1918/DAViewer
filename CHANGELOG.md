@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.4](https://github.com/redtidev1918/DAViewer/compare/v0.5.3...v0.5.4) (2026-09-24)
+
+
+### Bug Fixes
+
+* **auth:** report startup connectivity and trust confirmed rfy session ([7228387](https://github.com/redtidev1918/DAViewer/commit/7228387aa4d07eb707d7bbafbb84a9a717c0a314))
+
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
