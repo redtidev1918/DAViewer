@@ -47,8 +47,9 @@
 - `artwork_feed_grid_test.dart`：rebuild/programmatic scroll 不产生 `loadMore`；
 - `artwork_feed_grid_test.dart`：trackpad scroll 与真实 drag 到底部都会触发
   `loadMore`；
-- `artwork_feed_grid_test.dart`：`page completing near the bottom re-arms the
-  next edge drag` 覆盖翻页完成后停留在底部仍能继续翻页；
+- `artwork_feed_grid_test.dart`：`page completing at the bottom loads again even
+  if content barely grows` 与 `a drag at the exact bottom asks for the next
+  page` 覆盖翻页完成后停留在底部（含贴底 overscroll）仍能继续翻页；
 - `artwork_feed_controller_test.dart`：pagination 失败进入有界 backoff，期间不
   产生 HTTP，成功后重置；
 - 未来加入 Network Budget Test：同一页面生命周期 `collections/all <= 1`。
