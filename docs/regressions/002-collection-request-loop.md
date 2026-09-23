@@ -32,6 +32,8 @@
 
 - 只有真实用户滚动才允许触发 `loadMore`：触摸/鼠标拖拽与触控板/滚轮都要放行，
   程序化滚动（`jumpTo`/布局重排）不触发；
+- 翻页请求结束（`paginating` → `idle/stopped`）时重新布防边缘，用户停留在底部
+  持续下滑可连续翻页（见 REG-006）；
 - Provider/Controller 只持有状态，不因 rebuild 隐式发请求。
 
 ## 修复
@@ -45,6 +47,8 @@
 - `artwork_feed_grid_test.dart`：rebuild/programmatic scroll 不产生 `loadMore`；
 - `artwork_feed_grid_test.dart`：trackpad scroll 与真实 drag 到底部都会触发
   `loadMore`；
+- `artwork_feed_grid_test.dart`：`page completing near the bottom re-arms the
+  next edge drag` 覆盖翻页完成后停留在底部仍能继续翻页；
 - `artwork_feed_controller_test.dart`：pagination 失败进入有界 backoff，期间不
   产生 HTTP，成功后重置；
 - 未来加入 Network Budget Test：同一页面生命周期 `collections/all <= 1`。

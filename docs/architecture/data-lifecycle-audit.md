@@ -22,7 +22,7 @@ UI build/scroll
 |---|---|---|
 | initial load | Provider/Controller 隐式 | provider 重建也会触发首次请求 |
 | manual refresh | `ArtworkFeedController.refresh()` | 已可用，但 health/cache 曾拦截 |
-| pagination | `ArtworkFeedGrid + Controller` | 已收敛，仍需 runtime 验证 |
+| pagination | `ArtworkFeedGrid + Controller` | 已收敛 + widget 回归，仍需 runtime 验证 |
 | retry | UI 回调 | 已改为 force check + refresh |
 | identity change → reload | WebLoginScreen invalidate + provider identity watch | 两处都负责，易重 |
 | cache | Provider memory / FutureProvider | 失败结果缓存导致 Retry 拿到旧值，已移除部分 |
@@ -88,6 +88,10 @@ ref.watch(webSessionControllerProvider.select(personalizedFeedSessionIdentity))
 - 登录成功以 WebView 跳转首页作为服务端确认，并显式 invalidate 推荐一次
 - retry 使用 force check + 真实 refresh
 - `MoreFromArtistCard` 使用专用固定视口布局
+- 推荐分页边缘重新布防：`paginating` 阶段结束时重新 armed，停留在底部持续下滑可
+  连续翻页（`artwork_feed_grid_test.dart`）
+- 推荐流诊断区分锁定信号：`gated` 之外新增 `blurred` 计数，付费/锁定作品以模糊
+  Wix transform 出现时可直接观测
 
 ## 6. 下一步审计目标
 

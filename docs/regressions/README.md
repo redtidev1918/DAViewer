@@ -21,6 +21,7 @@ machine cannot produce the required evidence.
 | R11  | bounded failure retry                           | Verified       | Backoff blocks repeat HTTP and resets after success. |
 | R12  | mature_content contract                         | Verified       | `official_repositories_test.dart` locks `seed + mature_content=true`. |
 | R13  | dispose stops request                           | Verified       | `artwork_feed_controller_test.dart`: post-dispose loadMore makes no request. |
+| R14  | page completion near bottom re-arms load-more   | Verified       | `artwork_feed_grid_test.dart`: `page completing near the bottom re-arms the next edge drag` (paginating → idle while staying near bottom; next drag pages again). |
 
 ## Evidence still required before calling the architecture closed
 
@@ -31,6 +32,9 @@ machine cannot produce the required evidence.
   `load start` must remain stable across rebuilds and challenge state changes.
 - Mac run: physically scroll the personalized feed through at least two pages
   and pull-to-refresh once.
+- Real run: rfy success log shows `blurred=N` on a page containing a known
+  paid/locked work, distinguishing "no locked works in this page" from "parser
+  misses the signal" (see REG-006).
 - Mac run: notice anonymous → dismiss → healthy → anonymous flow, plus visual
   check that the banner never covers the last row, nav bar, or refresh gesture.
 
