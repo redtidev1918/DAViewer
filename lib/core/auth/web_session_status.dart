@@ -6,6 +6,7 @@ import '../runtime/runtime_provider.dart';
 import 'session_state.dart';
 import 'web_session_controller.dart';
 import 'web_session_diagnostics.dart';
+import 'web_session_refresher.dart';
 import 'web_session_verifier.dart';
 
 export 'session_state.dart' show webSessionProvider;
@@ -73,6 +74,13 @@ final webSessionVerifierProvider = Provider<WebSessionVerifier>((ref) {
   return WebSessionVerifier(dio);
 });
 
+/// The authoritative real-browser probe used to arbitrate a bare HTTP
+/// verifier answer that contradicts a confirmed WebView session. Injectable
+/// so tests can stub the headless WebView without platform channels.
+final webSessionProbeProvider =
+    Provider<Future<WebSessionProbeResult> Function()>(
+      (ref) => ref.watch(webSessionRefresherProvider).refresh,
+    );
 WebSessionStatusState emptyLiveCookieStatus({
   required int persistedCookieCount,
 }) => persistedCookieCount == 0
@@ -214,8 +222,9 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         case WebSessionVerificationState.anonymous:
           // A bare HTTP probe reporting anonymous is not proof the WebView is
           // signed out (PerimeterX can serve an anonymous page for a valid
-          // session). Keep the confirmed WebView session as unverified; only
-          // an explicitly confirmed anonymous/logout state is authoritative.
+          // session). Arbitrate with the real headless browser before deciding:
+          // it carries the same cookie store and request stack as the login
+          // WebView, so only its answer is authoritative about logged-out.
           if (controllerState.isLoggedIn == true &&
               claimedUsername.isNotEmpty) {
             final after = await webSession.snapshot(
@@ -229,7 +238,37 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
                   'cookieFingerprint=${cookieHeaderFingerprint(cookieHeader)} '
                   '${after.logLine()}',
             );
-            _setUnverified();
+            final probe = await _ref.read(webSessionProbeProvider)();
+            if (!_isCurrent(generation)) return;
+            switch (probe.outcome) {
+              case WebSessionProbeOutcome.confirmed:
+                if (probe.username.trim().toLowerCase() !=
+                    claimedUsername.toLowerCase()) {
+                  _setAnonymous();
+                  return;
+                }
+                // The real browser confirms the same account: the bare probe
+                // was a WAF false negative after all.
+                _lastSuccess = DateTime.now();
+                _failures = 0;
+                state = WebSessionStatus(
+                  state: WebSessionStatusState.healthy,
+                  serverUsername: probe.username,
+                  lastCheckedAt: DateTime.now(),
+                );
+                await _ref
+                    .read(webSessionControllerProvider.notifier)
+                    .ensurePersistentSnapshot(capturedCookies: cookies);
+              case WebSessionProbeOutcome.anonymous:
+                // The real browser also reports logged out: the web Cookie
+                // really is dead. Surface the login reminder instead of
+                // silently serving generic content.
+                _setAnonymous();
+              case WebSessionProbeOutcome.unavailable:
+                // The real browser could not answer either (challenge,
+                // network). Stay non-committal; never a logged-out signal.
+                _setUnverified();
+            }
           } else {
             _setAnonymous();
           }

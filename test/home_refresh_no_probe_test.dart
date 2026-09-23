@@ -109,6 +109,12 @@ final class _HomeProbeAdapter implements HttpClientAdapter {
   }
 }
 
+/// FileDownloaderBackend exposes a single-listener stream, so every test in
+/// this file must share one transfer manager.
+final _sharedTransfers = BackgroundTransferManager(
+  diagnostics: AppLogger.instance,
+);
+
 ResponseBody _json(Map<String, Object?> body) => ResponseBody.fromString(
   jsonEncode(body),
   200,
@@ -127,7 +133,7 @@ void main() {
         clientId: 'test-client',
         oauth: null,
         transport: null,
-        transfers: BackgroundTransferManager(diagnostics: AppLogger.instance),
+        transfers: _sharedTransfers,
         dio: Dio()..httpClientAdapter = rfyAdapter,
       );
       final container = ProviderContainer(
@@ -162,10 +168,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // The successful rfy request proves the Cookie session works. It must
-      // mark the web session healthy, even if a separate home-page probe later
-      // answers anonymously behind a WAF.
-      expect(container.read(webSessionStatusProvider).isHealthy, isTrue);
+      // rfy returning 200 no longer proves the web session is signed in: an
+      // anonymous Cookie also gets a generic rfy answer. Only the verifier /
+      // real-browser probe chain may mark the session healthy, so the status
+      // stays unknown here and a later anonymous verdict can surface the
+      // login reminder instead of silently serving generic content.
+      expect(container.read(webSessionStatusProvider).isHealthy, isFalse);
 
       // The controller's initial auto-load is the only first-page fetch so
       // far, and no WAF-sensitive home-page probe ran.
@@ -186,6 +194,61 @@ void main() {
       expect(rfyAdapter.calls, 2);
       expect(rfyAdapter.cursors, <String>['initial', 'initial']);
       expect(probeAdapter.calls, 0);
+    },
+  );
+
+  testWidgets(
+    'an anonymous web-session verdict shows recovery, not generic content',
+    (tester) async {
+      final rfyAdapter = _RfyAdapter();
+      final runtime = AppRuntime(
+        clientId: 'test-client',
+        oauth: null,
+        transport: null,
+        transfers: _sharedTransfers,
+        dio: Dio()..httpClientAdapter = rfyAdapter,
+      );
+      final container = ProviderContainer(
+        overrides: <Override>[
+          runtimeProvider.overrideWithValue(runtime),
+          webSessionReadyProvider.overrideWith((ref) => true),
+          webSessionProvider.overrideWithValue(
+            WebSession(_FakeCookieManager.new),
+          ),
+          webSessionControllerProvider.overrideWith(
+            (ref) => WebSessionController(ref),
+          ),
+          webSessionVerifierProvider.overrideWithValue(
+            WebSessionVerifier(Dio()),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      container
+          .read(webSessionControllerProvider.notifier)
+          .state = const WebSessionState(
+        csrf: 'token',
+        isLoggedIn: true,
+        username: 'artist',
+      );
+      // The authoritative verdict chain (bare probe anonymous + real browser
+      // anonymous) decided the web Cookie is dead.
+      container.read(webSessionStatusProvider.notifier).state =
+          const WebSessionStatus(state: WebSessionStatusState.anonymous);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: Scaffold(body: PersonalizedFeed())),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The recommendations tab must never render the generic rfy content an
+      // anonymous session gets, and it must not even send the request.
+      expect(rfyAdapter.calls, 0);
+      expect(find.byType(FilledButton), findsOneWidget);
+      expect(find.textContaining('Cookie'), findsOneWidget);
     },
   );
 }

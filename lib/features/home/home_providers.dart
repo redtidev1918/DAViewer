@@ -74,6 +74,24 @@ final personalizedFeedProvider =
           'home',
           'web session confirmed: ${webSessionState.username}',
         );
+        // rfy answers HTTP 200 with generic content even for a dead Cookie,
+        // so the authoritative session verdict — not the rfy status code —
+        // decides whether the fetch may run at all. Otherwise the user sees
+        // "每日精选"-style generic items silently masquerade as personalized
+        // recommendations.
+        final verdict = ref.read(webSessionStatusProvider).state;
+        if (verdict == WebSessionStatusState.anonymous) {
+          AppLogger.instance.warning(
+            'home',
+            'rfy skipped: web session verdict anonymous '
+                'claimed=${webSessionState.username}',
+          );
+          throw const DAKitException(
+            kind: DAKitFailureKind.authentication,
+            code: 'web.session.unavailable',
+            message: 'The personalized feed requires a signed-in web session.',
+          );
+        }
         var csrf = ref.read(webSessionControllerProvider).csrf;
         var cookieHeader = await webSession.cookieHeader();
         var page = await _tryFetchRfy(dio, csrf, cookieHeader, request);
@@ -102,19 +120,7 @@ final personalizedFeedProvider =
             message: 'The personalized feed requires a signed-in web session.',
           );
         }
-        // The actual rfy request is stronger evidence than the separate bare
-        // home-page probe: DeviantArt has just accepted this Cookie session and
-        // returned personalized data. Mark it healthy so a WAF-served anonymous
-        // verifier answer cannot turn into a misleading web-login prompt.
-        final username = webSessionState.username.trim();
-        final sessionStatus = ref.read(webSessionStatusProvider);
-        if (!(sessionStatus.isHealthy &&
-            sessionStatus.serverUsername.trim().toLowerCase() ==
-                username.toLowerCase())) {
-          ref
-              .read(webSessionStatusProvider.notifier)
-              .markHealthy(serverUsername: username);
-        }
+
         ref.read(artworkStoreProvider.notifier).putAll(page.items);
         return page;
       });

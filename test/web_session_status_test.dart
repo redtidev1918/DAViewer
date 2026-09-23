@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:daviewer/core/auth/web_session_controller.dart';
+import 'package:daviewer/core/auth/web_session_refresher.dart'
+    hide webSessionProbeProvider;
 import 'package:daviewer/core/auth/web_session_status.dart';
 import 'package:daviewer/core/auth/web_session_verifier.dart';
 import 'package:daviewer/core/data/web_session.dart';
@@ -90,7 +92,10 @@ final class _GatedHtmlAdapter implements HttpClientAdapter {
   ) => completer.future;
 }
 
-ProviderContainer _containerWith(HttpClientAdapter adapter) {
+ProviderContainer _containerWith(
+  HttpClientAdapter adapter, {
+  Future<WebSessionProbeResult> Function()? probe,
+}) {
   final container = ProviderContainer(
     overrides: <Override>[
       webSessionProvider.overrideWithValue(
@@ -106,6 +111,9 @@ ProviderContainer _containerWith(HttpClientAdapter adapter) {
       ),
       webSessionVerifierProvider.overrideWithValue(
         WebSessionVerifier(Dio()..httpClientAdapter = adapter),
+      ),
+      webSessionProbeProvider.overrideWithValue(
+        probe ?? () async => const WebSessionProbeResult.unavailable(),
       ),
     ],
   );
@@ -126,7 +134,10 @@ const _anonymousHomeHtml =
 const _otherUserHomeHtml =
     '<script>window.__INITIAL_STATE__ = JSON.parse("{\\"@publicSession\\":{\\"user\\":{\\"username\\":\\"someone-else\\"}}}");</script>';
 
-Future<ProviderContainer> _statusContainer(String homeHtml) async {
+Future<ProviderContainer> _statusContainer(
+  String homeHtml, {
+  Future<WebSessionProbeResult> Function()? probe,
+}) async {
   final container = ProviderContainer(
     overrides: <Override>[
       webSessionProvider.overrideWithValue(
@@ -144,6 +155,9 @@ Future<ProviderContainer> _statusContainer(String homeHtml) async {
         WebSessionVerifier(
           Dio()..httpClientAdapter = _HomeHtmlAdapter(homeHtml),
         ),
+      ),
+      webSessionProbeProvider.overrideWithValue(
+        probe ?? () async => const WebSessionProbeResult.unavailable(),
       ),
     ],
   );
@@ -239,7 +253,56 @@ void main() {
     );
 
     test(
-      'a bare anonymous probe keeps a confirmed session as unverified',
+      'a bare anonymous probe with a confirming real browser is healthy',
+      () async {
+        final container = await _statusContainer(
+          _anonymousHomeHtml,
+          probe: () async => const WebSessionProbeResult.confirmed(
+            csrf: 'token',
+            username: 'artist',
+          ),
+        );
+        addTearDown(container.dispose);
+
+        await container.read(webSessionStatusProvider.notifier).check();
+
+        final status = container.read(webSessionStatusProvider);
+        // The bare probe was a WAF false negative: the real browser, with the
+        // same cookie store and request stack as login, confirms the account.
+        expect(status.isHealthy, isTrue);
+        expect(status.serverUsername, 'artist');
+        expect(status.needsLogin, isFalse);
+      },
+    );
+
+    test(
+      'a real-browser anonymous answer surfaces the login reminder',
+      () async {
+        final container = await _statusContainer(
+          _anonymousHomeHtml,
+          probe: () async =>
+              const WebSessionProbeResult.anonymous(csrf: 'token'),
+        );
+        addTearDown(container.dispose);
+
+        await container.read(webSessionStatusProvider.notifier).check();
+
+        final status = container.read(webSessionStatusProvider);
+        // Both the bare page and the real browser report logged out: the web
+        // Cookie is really dead and the user must be told, instead of the
+        // personalized feed silently degrading to generic content.
+        expect(status.state, WebSessionStatusState.anonymous);
+        expect(status.needsLogin, isTrue);
+        // The web identity itself is preserved for the login screen; the
+        // status verdict is what gates the recommendations tab.
+        final controllerState = container.read(webSessionControllerProvider);
+        expect(controllerState.isLoggedIn, isTrue);
+        expect(controllerState.username, 'artist');
+      },
+    );
+
+    test(
+      'a real-browser probe failure stays unverified, never logged out',
       () async {
         final container = await _statusContainer(_anonymousHomeHtml);
         addTearDown(container.dispose);
@@ -247,13 +310,10 @@ void main() {
         await container.read(webSessionStatusProvider.notifier).check();
 
         final status = container.read(webSessionStatusProvider);
+        // The real browser could not answer either (challenge/network):
+        // stay non-committal so a WAF false negative never nags the user.
         expect(status.state, WebSessionStatusState.unverified);
-        // The confirmed WebView session survives and the probe result stays
-        // internal: it must not drive a login reminder that contradicts a
-        // working personalized feed.
         expect(status.needsLogin, isFalse);
-        // The confirmed WebView session itself must survive the false-negative
-        // probe; only explicit logout clears it.
         final controllerState = container.read(webSessionControllerProvider);
         expect(controllerState.isLoggedIn, isTrue);
         expect(controllerState.username, 'artist');

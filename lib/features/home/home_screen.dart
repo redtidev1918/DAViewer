@@ -207,6 +207,33 @@ final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
     if (!ref.watch(webSessionReadyProvider)) {
       return const SkeletonGrid();
     }
+    // An authoritative anonymous verdict (real browser probe confirmed the
+    // web Cookie is gone) must never be papered over by whatever generic
+    // content an anonymous rfy request happens to return. The user chose the
+    // recommendations tab: show the recovery state, not a different feed.
+    final webSessionDead = ref.watch(
+      webSessionStatusProvider.select(
+        (status) => status.state == WebSessionStatusState.anonymous,
+      ),
+    );
+    if (webSessionDead) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(s.recommendedSignInHint, textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: () => context.push('/web-login'),
+                child: Text(s.login),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     final feed = ref.watch(personalizedFeedProvider);
     final needsWebLogin =
         feed.error is DAKitException &&
