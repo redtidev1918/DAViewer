@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.6](https://github.com/redtidev1918/DAViewer/compare/v0.5.5...v0.5.6) (2026-09-23)
+
+
+### Bug Fixes
+
+* **auth:** background probes can no longer downgrade a confirmed web session ([5e062df](https://github.com/redtidev1918/DAViewer/commit/5e062df0aa1af4f1bd283a7528cb077b4f267630))
+
 ## [0.5.5](https://github.com/redtidev1918/DAViewer/compare/v0.5.4...v0.5.5) (2026-09-23)
 
 
