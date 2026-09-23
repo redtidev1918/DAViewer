@@ -105,10 +105,30 @@ final class ArtworkCard extends ConsumerWidget {
                         ),
                       ),
                     )
-                  else
-                    const ColoredBox(
+                  else if (media.isEmpty)
+                    // Literature/text works carry no media assets at all: show
+                    // a text card with the title instead of a broken-image
+                    // icon (REG-012). Assets that exist but lack a URI (e.g.
+                    // layout probes) keep the plain placeholder.
+                    ColoredBox(
                       color: AppTheme.placeholderColor,
-                      child: Icon(Icons.image_outlined),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            const Icon(Icons.article_outlined, size: 28),
+                            const SizedBox(height: 8),
+                            Text(
+                              artwork.title,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleSmall,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   if (hasVideo)
                     const Center(

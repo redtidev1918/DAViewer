@@ -524,7 +524,11 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
     final media = artwork.media;
     // Journals/literature are rendered as text (with any embedded thumbs shown
     // above), never as an image with a bogus "original deleted" download row.
-    final isJournal = artwork.pageUri.path.contains('/journal/');
+    // Literature deviations use `/art/...` URLs, so the fetched text body —
+    // not the URL shape — is the deciding signal (REG-012).
+    final isTextWork =
+        artwork.pageUri.path.contains('/journal/') ||
+        (journalHtml?.trim().isNotEmpty ?? false);
     // The detail screen is a thin composition of self-contained sections. To
     // add another related-content block (e.g. Suggested Deviants / Collections),
     // drop a new widget below; each section owns its provider, its loading /
@@ -557,7 +561,7 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
           ),
           const Divider(),
           ArtworkDescriptionSection(
-            isJournal: isJournal,
+            isJournal: isTextWork,
             s: s,
             journalHtml: journalHtml,
             descriptionHtml: descriptionHtml,
@@ -565,7 +569,7 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
             onOpenLink: _openLink,
           ),
           if (tags.isNotEmpty) ArtworkTagsSection(tags: tags),
-          if (!isJournal && media.isNotEmpty) ...[
+          if (!isTextWork && media.isNotEmpty) ...[
             const SizedBox(height: 8),
             originalResolution.when(
               loading: () => Row(

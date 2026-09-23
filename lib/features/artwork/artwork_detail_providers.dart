@@ -209,11 +209,21 @@ final journalHtmlProvider = FutureProvider.autoDispose.family<String?, String>((
   artworkId,
 ) async {
   final cached = ref.read(artworkStoreProvider)[artworkId];
-  if (cached == null || !cached.pageUri.path.contains('/journal/')) {
+  // Text works come in two shapes: journal posts (`/journal/` URLs) and
+  // literature deviations (`/art/...` URLs with no image media — REG-012).
+  // Pasted links have no cached artwork yet, so their type is unknown until
+  // the init round-trip; attempt the text fetch there and let the endpoint
+  // answer null for image works.
+  final mightBeText = cached == null
+      ? isNumericDeviationId(artworkId) &&
+            (ref.read(linkUsernameProvider)?.isNotEmpty ?? false)
+      : cached.pageUri.path.contains('/journal/') || cached.media.isEmpty;
+  if (!mightBeText) {
     return null;
   }
-  final match = RegExp(r'-(\d+)/?$').firstMatch(cached.pageUri.path);
-  final numericId = match?.group(1);
+  final match = RegExp(r'-(\d+)/?$').firstMatch(cached?.pageUri.path ?? '');
+  final numericId =
+      match?.group(1) ?? (isNumericDeviationId(artworkId) ? artworkId : null);
   if (numericId == null) return null;
   var csrf = ref.watch(webSessionControllerProvider.select((web) => web.csrf));
   if (csrf.isEmpty) {
@@ -224,9 +234,12 @@ final journalHtmlProvider = FutureProvider.autoDispose.family<String?, String>((
   final webSession = ref.read(webSessionProvider);
   final cookieHeader = await webSession.cookieHeader();
   final runtime = ref.watch(runtimeProvider);
+  final username =
+      cached?.author.username ?? ref.read(linkUsernameProvider) ?? '';
+  if (username.isEmpty) return null;
   return JournalContentFetcher(runtime.dio!).fetchHtml(
     deviationId: numericId,
-    username: cached.author.username,
+    username: username,
     cookieHeader: cookieHeader,
     csrfToken: csrf,
   );

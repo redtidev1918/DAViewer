@@ -26,17 +26,20 @@ machine cannot produce the required evidence.
 | R16  | drag at the exact bottom still pages            | Verified       | `artwork_feed_grid_test.dart`: `a drag at the exact bottom asks for the next page` (bottom-edge overscroll triggers loadMore) and `page completing at the bottom loads again even if content barely grows`. See `006`. |
 | R17  | startup tells proxy vs network; web-session verdict is authoritative | Partial | `home_refresh_no_probe_test.dart` and `app_strings_test.dart` cover localized startup copy and the no-probe rfy path. See `008`; a real-device no-proxy/proxy cold-start trace is still required. |
 | R18  | rfy 200 is not web-session proof; anonymous verdict surfaces recovery | Verified | `test/web_session_status_test.dart` (real-browser arbitration: confirmed→healthy, anonymous→needsLogin, failure→unverified) and `test/home_refresh_no_probe_test.dart` (rfy success no longer marks healthy; anonymous verdict shows recovery UI and sends no rfy request). See `009`. |
+| R19  | background probes never downgrade auth verdict; feed failures are not login prompts | Verified | test/home_pagination_no_auth_damage_test.dart (pagination 403 + unavailable probe keeps healthy identity; persistent 403 yields rfy.feed.unavailable, not web.session.unavailable), test/web_session_refresher_probe_test.dart (unresolved page → unavailable, never anonymous). See 010. |
+| R20  | single verdict write path; background probes are pure observers | Verified | test/web_session_verdict_policy_test.dart (full evidence matrix incl. authoritative real-browser anonymous and unavailable→unverified) plus all 298 existing tests passing after routing every verdict mutation through WebSessionStatusController.applyVerification (generation-guarded). Refresher writes only CSRF (updateCsrf); AppNoticeHost no longer starts session checks. See 011. |
+| R21  | literature deviations render text instead of blank detail/broken previews | Verified | test/literature_deviation_test.dart covers the text card, body fetch for a /art/ literature deviation, and no body request for image works. flutter analyze is clean; the full suite (312 tests) passes. See 012. |
 
 ## Evidence still required before calling the architecture closed
 
-- Mac run: record actual `collections/all` request count and caller around the
+- Mac run: record actual collections/all request count and caller around the
   favourites/home flows.
-- Mac run: capture `[webview] login screen created / controller created / load
-  start / load stop / challenge page detected` counts; `controller created` and
-  `load start` must remain stable across rebuilds and challenge state changes.
+- Mac run: capture webview login screen/controller/load challenge counts;
+  controller created and load start must remain stable across rebuilds and
+  challenge state changes.
 - Mac run: physically scroll the personalized feed through at least two pages
   and pull-to-refresh once.
-- Real run: rfy success log shows `blurred=N` on a page containing a known
+- Real run: rfy success log shows blurred=N on a page containing a known
   paid/locked work, distinguishing "no locked works in this page" from "parser
   misses the signal" (see REG-006).
 - Mac run: notice anonymous → dismiss → healthy → anonymous flow, plus visual
@@ -44,10 +47,9 @@ machine cannot produce the required evidence.
 
 ## Keychain acceptance
 
-Project does **not purchase Apple Developer Program**. Stable signing and
+Project does not purchase Apple Developer Program. Stable signing and
 notarization are intentionally out of scope, so Debug
-`ad-hoc / TeamIdentifier=none` and a locally unsigned Release are accepted
+ad-hoc / TeamIdentifier=none and a locally unsigned Release are accepted
 environment limits rather than release blockers. Application-side behavior
-(independent `DAViewer Account` service, no legacy ad-hoc reads, no startup
+(independent DAViewer Account service, no legacy ad-hoc reads, no startup
 delete/create loop) remains the Keychain acceptance contract.
-| R19  | background probes never downgrade auth verdict; feed failures are not login prompts | Verified | `test/home_pagination_no_auth_damage_test.dart` (pagination 403 + unavailable probe keeps healthy identity; persistent 403 yields `rfy.feed.unavailable`, not `web.session.unavailable`), `test/web_session_refresher_probe_test.dart` (unresolved page → unavailable, never anonymous). See `010`. || R20  | single verdict write path; background probes are pure observers | Verified | `test/web_session_verdict_policy_test.dart` (full evidence matrix incl. authoritative real-browser anonymous and unavailable→unverified) plus all 298 existing tests passing after routing every verdict mutation through `WebSessionStatusController.applyVerification` (generation-guarded). Refresher writes only CSRF (`updateCsrf`); `AppNoticeHost` no longer starts checks. See `011`. |
