@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.5](https://github.com/redtidev1918/DAViewer/compare/v0.5.4...v0.5.5) (2026-09-23)
+
+
+### Bug Fixes
+
+* **auth:** arbitrate web-session verdict with the real browser and stop silent rfy degradation ([37a8155](https://github.com/redtidev1918/DAViewer/commit/37a815504d52cc2e23c75e5e70ee57685bab673c))
+
 ## [0.5.4](https://github.com/redtidev1918/DAViewer/compare/v0.5.3...v0.5.4) (2026-09-24)
 
 
