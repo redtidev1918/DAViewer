@@ -161,7 +161,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       final claimedUsername = controllerState.username.trim();
       if (controllerState.isLoggedIn != true || claimedUsername.isEmpty) {
         if (!_isCurrent(generation)) return;
-        _setAnonymous();
+        _setAnonymous(source: 'empty-cookie-header');
         return;
       }
       final cookieHeader = WebSession.cookieHeaderFrom(cookies);
@@ -169,7 +169,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         final empty = await webSession.snapshot(source: 'check-empty-cookie');
         AppLogger.instance.warning('auth', empty.logLine());
         if (!_isCurrent(generation)) return;
-        _setAnonymous();
+        _setAnonymous(source: 'empty-cookie-header');
         return;
       }
       final before = await webSession.snapshot(source: 'check-before-verify');
@@ -200,16 +200,18 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
                   'cookieFingerprint=${cookieHeaderFingerprint(cookieHeader)} '
                   '${after.logLine()}',
             );
-            _setAnonymous();
+            _setAnonymous(source: 'bare-verifier');
             return;
           }
           _lastSuccess = DateTime.now();
           _failures = 0;
-          state = WebSessionStatus(
+          final next = WebSessionStatus(
             state: WebSessionStatusState.healthy,
             serverUsername: verification.username,
             lastCheckedAt: DateTime.now(),
           );
+          _logTransition(next, 'bare-verifier');
+          state = next;
           // Persist only a server-confirmed live cookie set. An unconfirmed
           // health check must never overwrite the snapshot: a degraded live
           // store during a WAF challenge can still carry a matching
@@ -244,18 +246,20 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
               case WebSessionProbeOutcome.confirmed:
                 if (probe.username.trim().toLowerCase() !=
                     claimedUsername.toLowerCase()) {
-                  _setAnonymous();
+                  _setAnonymous(source: 'real-browser-probe');
                   return;
                 }
                 // The real browser confirms the same account: the bare probe
                 // was a WAF false negative after all.
                 _lastSuccess = DateTime.now();
                 _failures = 0;
-                state = WebSessionStatus(
+                final next = WebSessionStatus(
                   state: WebSessionStatusState.healthy,
                   serverUsername: probe.username,
                   lastCheckedAt: DateTime.now(),
                 );
+                _logTransition(next, 'real-browser-probe');
+                state = next;
                 await _ref
                     .read(webSessionControllerProvider.notifier)
                     .ensurePersistentSnapshot(capturedCookies: cookies);
@@ -263,20 +267,20 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
                 // The real browser also reports logged out: the web Cookie
                 // really is dead. Surface the login reminder instead of
                 // silently serving generic content.
-                _setAnonymous();
+                _setAnonymous(source: 'real-browser-probe');
               case WebSessionProbeOutcome.unavailable:
                 // The real browser could not answer either (challenge,
                 // network). Stay non-committal; never a logged-out signal.
-                _setUnverified();
+                _setUnverified(source: 'real-browser-probe');
             }
           } else {
-            _setAnonymous();
+            _setAnonymous(source: 'bare-verifier');
           }
         case WebSessionVerificationState.unavailable:
-          _setUnavailable();
+          _setUnavailable(source: 'bare-verifier');
       }
     } on Object {
-      if (_isCurrent(generation)) _setUnavailable();
+      if (_isCurrent(generation)) _setUnavailable(source: 'check-error');
     }
   }
 
@@ -285,46 +289,71 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   void markLocked() {
     _generation++;
     _failures = 0;
-    state = const WebSessionStatus(state: WebSessionStatusState.locked);
+    const next = WebSessionStatus(state: WebSessionStatusState.locked);
+    _logTransition(next, 'web-login-challenge');
+    state = next;
   }
 
   void markHealthy({required String serverUsername}) {
     _generation++;
     _lastSuccess = DateTime.now();
     _failures = 0;
-    state = WebSessionStatus(
+    final next = WebSessionStatus(
       state: WebSessionStatusState.healthy,
       serverUsername: serverUsername,
       lastCheckedAt: DateTime.now(),
     );
+    _logTransition(next, 'web-login');
+    state = next;
   }
 
   void _setEmptyLiveCookieState({required int persistedCount}) {
     if (persistedCount == 0) {
-      _setAnonymous();
+      _setAnonymous(source: 'cookie-store');
     } else {
-      _setUnavailable();
+      _setUnavailable(source: 'cookie-store');
     }
   }
 
-  void _setAnonymous() {
+  /// Every mutation logs old → new with its source, so a production log can
+  /// answer "which async path turned healthy into anonymous" (REG-010).
+  void _logTransition(WebSessionStatus next, String source) {
+    final claimed = _ref.read(webSessionControllerProvider).username;
+    final cooldown = next.cooldownUntil;
+    AppLogger.instance.info(
+      'auth',
+      'web session state: ${state.state.name} -> ${next.state.name} '
+          'source=$source generation=$_generation '
+          'claimed=${claimed.isEmpty ? '-' : claimed} '
+          'server=${next.serverUsername.isEmpty ? '-' : next.serverUsername}'
+          '${cooldown == null ? '' : ' cooldown=$cooldown'}',
+    );
+  }
+
+  void _setAnonymous({required String source}) {
     _failures = 0;
-    state = const WebSessionStatus(state: WebSessionStatusState.anonymous);
+    const next = WebSessionStatus(state: WebSessionStatusState.anonymous);
+    _logTransition(next, source);
+    state = next;
   }
 
   /// A confirmed WebView session that a bare HTTP probe could not confirm.
   /// Kept out of [WebSessionStatus.needsLogin] so a WAF false-negative never
   /// sends the user back into the login challenge loop.
-  void _setUnverified() => _setTransient(WebSessionStatusState.unverified);
+  void _setUnverified({required String source}) =>
+      _setTransient(WebSessionStatusState.unverified, source);
 
-  void _setUnavailable() => _setTransient(WebSessionStatusState.unavailable);
+  void _setUnavailable({required String source}) =>
+      _setTransient(WebSessionStatusState.unavailable, source);
 
-  void _setTransient(WebSessionStatusState state) {
+  void _setTransient(WebSessionStatusState state, String source) {
     _failures += 1;
     final index = (_failures - 1).clamp(0, _backoff.length - 1);
-    this.state = WebSessionStatus(
+    final next = WebSessionStatus(
       state: state,
       cooldownUntil: DateTime.now().add(_backoff[index]),
     );
+    _logTransition(next, source);
+    this.state = next;
   }
 }

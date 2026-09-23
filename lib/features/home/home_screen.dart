@@ -7,8 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_controller.dart';
+import '../../core/auth/web_session_controller.dart';
 import '../../core/auth/web_session_status.dart';
 import '../../core/data/da_uri.dart';
+import '../../core/diagnostics/app_logger.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../shared/widgets/artwork_feed_grid.dart';
 import '../../shared/widgets/skeleton.dart';
@@ -155,6 +157,7 @@ final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
     with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
   final ScrollController _scrollController = ScrollController();
   DateTime? _backgroundedAt;
+  bool _recoveryUiLogged = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -162,11 +165,13 @@ final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
   @override
   void initState() {
     super.initState();
+    AppLogger.instance.info('home', 'personalized widget created');
     WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
+    AppLogger.instance.info('home', 'personalized widget disposed');
     WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     super.dispose();
@@ -217,6 +222,14 @@ final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
       ),
     );
     if (webSessionDead) {
+      if (!_recoveryUiLogged) {
+        _recoveryUiLogged = true;
+        AppLogger.instance.warning(
+          'home',
+          'recovery UI shown status=anonymous '
+              'claimed=${ref.read(webSessionControllerProvider).username}',
+        );
+      }
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -234,6 +247,7 @@ final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
         ),
       );
     }
+    _recoveryUiLogged = false;
     final feed = ref.watch(personalizedFeedProvider);
     final needsWebLogin =
         feed.error is DAKitException &&

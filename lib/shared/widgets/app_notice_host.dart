@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/web_session_status.dart';
+import '../../core/diagnostics/app_logger.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/notice/app_notices.dart';
 
@@ -20,6 +21,7 @@ final class AppNoticeHost extends ConsumerStatefulWidget {
 
 final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
   final Set<String> _dismissedNoticeIds = <String>{};
+  bool _loginNoticeLogged = false;
 
   @override
   void initState() {
@@ -27,6 +29,7 @@ final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
     Future<void>.microtask(
       () => ref.read(webSessionStatusProvider.notifier).check(),
     );
+    AppLogger.instance.info('notice', 'notice host created');
   }
 
   @override
@@ -42,6 +45,17 @@ final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
     }
 
     final sessionNotice = _sessionNotice(session, s);
+    if (sessionNotice != null && !_loginNoticeLogged) {
+      _loginNoticeLogged = true;
+      AppLogger.instance.warning(
+        'notice',
+        'web-session login notice shown '
+            'state=${session.state.name} '
+            'source=${session.serverUsername.isEmpty ? 'verdict-chain' : session.serverUsername}',
+      );
+    } else if (sessionNotice == null) {
+      _loginNoticeLogged = false;
+    }
     final visibleSessionNotice =
         sessionNotice != null && _dismissedNoticeIds.contains(sessionNotice.id)
         ? null

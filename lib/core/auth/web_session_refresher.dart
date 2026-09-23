@@ -39,9 +39,8 @@ final class WebSessionProbeResult {
     : outcome = WebSessionProbeOutcome.anonymous,
       username = '';
 
-  const WebSessionProbeResult.unavailable()
+  const WebSessionProbeResult.unavailable({this.csrf = ''})
     : outcome = WebSessionProbeOutcome.unavailable,
-      csrf = '',
       username = '';
 
   final WebSessionProbeOutcome outcome;
@@ -49,6 +48,30 @@ final class WebSessionProbeResult {
   final String username;
 
   bool get succeeded => outcome == WebSessionProbeOutcome.confirmed;
+}
+
+/// Maps one real-browser page observation onto a probe verdict.
+///
+/// Only explicit evidence decides between the three outcomes:
+/// - a rendered username → confirmed;
+/// - the page itself reporting `anonymous` → anonymous;
+/// - anything unresolvable (missing `__INITIAL_STATE__`, missing
+///   `@publicSession`, challenge page, incomplete load) → unavailable.
+/// "Could not parse a username" must never become "the user is logged out".
+WebSessionProbeResult webSessionProbeResultFromPage({
+  required String? pageUsername,
+  required String csrf,
+}) {
+  if (csrf.isEmpty) {
+    return const WebSessionProbeResult.unavailable();
+  }
+  if (pageUsername == null || pageUsername.isEmpty) {
+    return WebSessionProbeResult.unavailable(csrf: csrf);
+  }
+  if (pageUsername == 'anonymous') {
+    return WebSessionProbeResult.anonymous(csrf: csrf);
+  }
+  return WebSessionProbeResult.confirmed(csrf: csrf, username: pageUsername);
 }
 
 /// Loads a public page in a hidden browser so website-only metadata adapters
@@ -134,33 +157,43 @@ final class WebSessionRefresher {
       }
       final data = jsonDecode(raw) as Map<String, dynamic>;
       final csrf = (data['csrf'] as String?) ?? '';
-      final pageUsername = ((data['username'] as String?) ?? '').trim();
+      // `username` is null when the page structure did not expose it (WAF,
+      // challenge, incomplete load) and 'anonymous' only when the page itself
+      // explicitly reported a signed-out session. The two must never merge.
+      final pageUsername = (data['username'] as String?)?.trim();
+      final result = webSessionProbeResultFromPage(
+        pageUsername: pageUsername,
+        csrf: csrf,
+      );
+      // Logging context only: the local identity must never impersonate the
+      // page observation (see REG-010).
+      final localUsername =
+          (await _ref.read(webSessionProvider).readData())?.username ?? '';
+      debugPrint(
+        '[web-session] probe outcome=${result.outcome.name} '
+        'csrf=${csrf.length} '
+        'pageUsername=${pageUsername == null
+            ? 'missing'
+            : pageUsername.isEmpty
+            ? '-'
+            : pageUsername} '
+        'localUsername=${localUsername.isEmpty ? '-' : localUsername}',
+      );
       // A public browser session is sufficient for numeric-id and website
       // metadata fallbacks. It is intentionally not treated as another user
       // login; the official OAuth session remains the only app identity.
-      if (csrf.isEmpty) {
-        return const WebSessionProbeResult.unavailable();
-      }
-      final localUsername =
-          (await _ref.read(webSessionProvider).readData())?.username ?? '';
-      final reportedUsername = pageUsername.isEmpty
-          ? localUsername
-          : pageUsername;
-      debugPrint(
-        '[web-session] cold-start csrf=${csrf.length} '
-        'pageUsername=${pageUsername.isEmpty ? '-' : pageUsername} '
-        'localUsername=${localUsername.isEmpty ? '-' : localUsername}',
-      );
       await _ref
           .read(webSessionControllerProvider.notifier)
-          .reportRefresh(csrf: csrf, username: reportedUsername);
-      final signedInUsername = pageUsername == 'anonymous' ? '' : pageUsername;
-      return signedInUsername.isEmpty
-          ? WebSessionProbeResult.anonymous(csrf: csrf)
-          : WebSessionProbeResult.confirmed(
-              csrf: csrf,
-              username: signedInUsername,
-            );
+          .reportRefresh(
+            csrf: csrf,
+            // Only a page-confirmed username may be reported. An unresolved or
+            // anonymous page reports nothing, so the preserve-signed-in policy
+            // applies instead of downgrading the identity.
+            username: result.outcome == WebSessionProbeOutcome.confirmed
+                ? result.username
+                : '',
+          );
+      return result;
     } on Object catch (error) {
       debugPrint('[web-session] headless report failed: $error');
       return const WebSessionProbeResult.unavailable();
@@ -196,7 +229,7 @@ final class WebSessionRefresher {
   var user = session.user || {};
   return JSON.stringify({
     csrf: window.__CSRF_TOKEN__ || '',
-    username: user.username || ''
+    username: typeof user.username === 'string' ? user.username : null
   });
 })()
 ''';

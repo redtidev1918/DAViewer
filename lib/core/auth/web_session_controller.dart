@@ -325,6 +325,24 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
     required String username,
   }) async {
     if (!shouldStoreBackgroundBrowserSession(csrf)) return;
+    // A background probe that observed the same signed-in account is a CSRF
+    // rotation, not a login capture: rotate the token and never rewrite the
+    // identity or emit a persist-failure-style warning (see REG-010).
+    if (state.isLoggedIn == true &&
+        state.username.trim().isNotEmpty &&
+        username.trim().toLowerCase() == state.username.trim().toLowerCase()) {
+      state = WebSessionState(
+        csrf: csrf,
+        isLoggedIn: true,
+        username: state.username,
+      );
+      await _store.update(
+        csrf: csrf,
+        isLoggedIn: true,
+        username: state.username,
+      );
+      return;
+    }
     if (shouldPreserveSignedInSessionOnAnonymousProbe(
       currentlySignedIn: state.isLoggedIn == true,
       probeUsername: username,

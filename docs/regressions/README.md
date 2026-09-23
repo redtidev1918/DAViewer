@@ -50,3 +50,4 @@ notarization are intentionally out of scope, so Debug
 environment limits rather than release blockers. Application-side behavior
 (independent `DAViewer Account` service, no legacy ad-hoc reads, no startup
 delete/create loop) remains the Keychain acceptance contract.
+| R19  | background probes never downgrade auth verdict; feed failures are not login prompts | Verified | `test/home_pagination_no_auth_damage_test.dart` (pagination 403 + unavailable probe keeps healthy identity; persistent 403 yields `rfy.feed.unavailable`, not `web.session.unavailable`), `test/web_session_refresher_probe_test.dart` (unresolved page → unavailable, never anonymous). See `010`. |

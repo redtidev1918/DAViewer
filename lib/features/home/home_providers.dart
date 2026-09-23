@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/auth_controller.dart';
 import '../../core/auth/web_session_controller.dart';
-import '../../core/auth/web_session_refresher.dart';
 import '../../core/auth/web_session_status.dart';
 
 import 'package:dakit_web/dakit_web.dart';
@@ -107,17 +106,23 @@ final personalizedFeedProvider =
             cookieHeader = await webSession.cookieHeader();
           }
           // Stale session after a restart: re-read the CSRF from the persisted
-          // cookies (headless page load) and retry once.
-          await ref.read(webSessionRefresherProvider).refresh();
+          // cookies (headless page load) and retry once. This only refreshes
+          // the request context; the real-browser probe never writes an auth
+          // verdict from inside a feed retry (REG-010).
+          await ref.read(webSessionProbeProvider)();
           csrf = ref.read(webSessionControllerProvider).csrf;
           cookieHeader = await webSession.cookieHeader();
           page = await _tryFetchRfy(dio, csrf, cookieHeader, request);
         }
         if (page == null) {
+          // The retry already refreshed the request context. A still-failing
+          // rfy request is a feed failure (WAF/proxy/CSRF), not a login
+          // verdict: only the authoritative session chain may produce the
+          // login prompt, so this must not carry web.session.unavailable.
           throw const DAKitException(
-            kind: DAKitFailureKind.authentication,
-            code: 'web.session.unavailable',
-            message: 'The personalized feed requires a signed-in web session.',
+            kind: DAKitFailureKind.network,
+            code: 'rfy.feed.unavailable',
+            message: 'Recommendations are temporarily unavailable.',
           );
         }
 
