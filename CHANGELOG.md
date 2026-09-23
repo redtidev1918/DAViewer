@@ -3,6 +3,13 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.5.2](https://github.com/redtidev1918/DAViewer/compare/v0.5.1...v0.5.2) (2026-09-23)
+
+
+### Bug Fixes
+
+* **feed:** pull-to-refresh works from any scroll position ([c85f58c](https://github.com/redtidev1918/DAViewer/commit/c85f58c410b6b81cb2a6334c442852c994967a17))
+
 ## [0.5.1](https://github.com/redtidev1918/DAViewer/compare/v0.5.0...v0.5.1) (2026-09-23)
 
 
