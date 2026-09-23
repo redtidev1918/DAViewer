@@ -148,8 +148,10 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.byIcon(Icons.article_outlined), findsOneWidget);
-    // The card body and the title row below both render the title.\n    expect(find.text('Through Closed Eyes'), findsNWidgets(2));
+    expect(find.byIcon(Icons.article_outlined), findsNWidgets(2));
+    expect(find.text('文字'), findsOneWidget);
+    // The card body and the title row below both render the title.
+    expect(find.text('Through Closed Eyes'), findsNWidgets(2));
     expect(find.byType(CachedNetworkImage), findsNothing);
   });
 

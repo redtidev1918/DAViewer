@@ -106,28 +106,45 @@ final class ArtworkCard extends ConsumerWidget {
                       ),
                     )
                   else if (media.isEmpty)
-                    // Literature/text works carry no media assets at all: show
-                    // a text card with the title instead of a broken-image
-                    // icon (REG-012). Assets that exist but lack a URI (e.g.
-                    // layout probes) keep the plain placeholder.
-                    ColoredBox(
-                      color: AppTheme.placeholderColor,
+                    // Literature/text works carry no media assets at all: use a
+                    // deliberately styled text cover, not the neutral loading
+                    // placeholder (REG-012). Assets that exist but lack a URI
+                    // (e.g. layout probes) keep the plain placeholder.
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.secondaryContainer,
+                      ),
                       child: Padding(
                         padding: const EdgeInsets.all(12),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            const Icon(Icons.article_outlined, size: 28),
+                            Icon(
+                              Icons.article_outlined,
+                              size: 28,
+                              color: theme.colorScheme.onSecondaryContainer,
+                            ),
                             const SizedBox(height: 8),
                             Text(
                               artwork.title,
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleSmall,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                color: theme.colorScheme.onSecondaryContainer,
+                              ),
                             ),
                           ],
                         ),
+                      ),
+                    ),
+                  if (media.isEmpty)
+                    Positioned(
+                      left: 6,
+                      top: 6,
+                      child: _CornerBadge(
+                        label: s.textWorkBadge,
+                        icon: Icons.article_outlined,
                       ),
                     ),
                   if (hasVideo)
