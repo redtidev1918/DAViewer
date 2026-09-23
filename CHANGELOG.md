@@ -3,6 +3,13 @@
 本文件按主题记录用户可见的变更。逐提交历史与每个 patch 版本对应的具体提交见
 [Releases](https://github.com/redtidev1918/daviewer/releases)。
 
+## [0.5.1](https://github.com/redtidev1918/DAViewer/compare/v0.5.0...v0.5.1) (2026-09-23)
+
+
+### Bug Fixes
+
+* **feed:** re-arm pagination near the bottom; add blurred-preview diagnostic ([#66](https://github.com/redtidev1918/DAViewer/issues/66)) ([db6c2ee](https://github.com/redtidev1918/DAViewer/commit/db6c2eed970cd625c347d775389a2ad1a29c4ecc))
+
 ## [0.5.0](https://github.com/redtidev1918/DAViewer/compare/v0.4.19...v0.5.0) (2026-09-22)
 
 
