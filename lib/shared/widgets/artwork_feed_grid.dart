@@ -114,7 +114,8 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
     // OverscrollNotifications (the position cannot move), so the in-zone
     // ScrollUpdate check below would never run. Treat an overscroll at the
     // bottom edge (and only there) as a request for the next page.
-    final draggedPastBottom = notification is OverscrollNotification &&
+    final draggedPastBottom =
+        notification is OverscrollNotification &&
         metrics.extentBefore > 0 &&
         metrics.extentAfter == 0;
     if (metrics.extentAfter <= _prefetchPixels || draggedPastBottom) {

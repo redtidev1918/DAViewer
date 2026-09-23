@@ -311,63 +311,64 @@ void main() {
     expect(calls, greaterThan(0));
   });
 
-  testWidgets('page completing at the bottom loads again even if content barely grows', (
-    tester,
-  ) async {
-    var calls = 0;
-    final controller = ScrollController();
-    addTearDown(controller.dispose);
-    var feed = ArtworkFeedState(
-      items: <Artwork>[for (var i = 0; i < 60; i += 1) artwork(i)],
-      nextCursor: 'next',
-    );
+  testWidgets(
+    'page completing at the bottom loads again even if content barely grows',
+    (tester) async {
+      var calls = 0;
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      var feed = ArtworkFeedState(
+        items: <Artwork>[for (var i = 0; i < 60; i += 1) artwork(i)],
+        nextCursor: 'next',
+      );
 
-    Future<void> pumpFeed() => tester.pumpWidget(
-      ProviderScope(
-        child: MaterialApp(
-          home: Scaffold(
-            body: ArtworkFeedGrid(
-              feed: feed,
-              emptyMessage: 'Empty',
-              scrollController: controller,
-              onLoadMore: () => calls += 1,
+      Future<void> pumpFeed() => tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: ArtworkFeedGrid(
+                feed: feed,
+                emptyMessage: 'Empty',
+                scrollController: controller,
+                onLoadMore: () => calls += 1,
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
 
-    await pumpFeed();
-    controller.jumpTo(controller.position.maxScrollExtent - 200);
-    await tester.pump();
-    await tester.drag(find.byType(ArtworkFeedGrid), const Offset(0, -40));
-    await tester.pump();
-    expect(calls, 1);
+      await pumpFeed();
+      controller.jumpTo(controller.position.maxScrollExtent - 200);
+      await tester.pump();
+      await tester.drag(find.byType(ArtworkFeedGrid), const Offset(0, -40));
+      await tester.pump();
+      expect(calls, 1);
 
-    feed = ArtworkFeedState(
-      items: <Artwork>[for (var i = 0; i < 60; i += 1) artwork(i)],
-      nextCursor: 'next',
-      isLoading: true,
-      phase: FeedRequestPhase.paginating,
-    );
-    await pumpFeed();
-    await tester.pump();
+      feed = ArtworkFeedState(
+        items: <Artwork>[for (var i = 0; i < 60; i += 1) artwork(i)],
+        nextCursor: 'next',
+        isLoading: true,
+        phase: FeedRequestPhase.paginating,
+      );
+      await pumpFeed();
+      await tester.pump();
 
-    // The page completes while the user stays near the bottom but the scroll
-    // extent barely grows (aligned columns). The next bottom drag must still
-    // page again without scrolling back up.
-    feed = ArtworkFeedState(
-      items: <Artwork>[for (var i = 0; i < 62; i += 1) artwork(i)],
-      nextCursor: 'next-2',
-    );
-    await pumpFeed();
-    controller.jumpTo(controller.position.maxScrollExtent - 200);
-    await tester.pump();
+      // The page completes while the user stays near the bottom but the scroll
+      // extent barely grows (aligned columns). The next bottom drag must still
+      // page again without scrolling back up.
+      feed = ArtworkFeedState(
+        items: <Artwork>[for (var i = 0; i < 62; i += 1) artwork(i)],
+        nextCursor: 'next-2',
+      );
+      await pumpFeed();
+      controller.jumpTo(controller.position.maxScrollExtent - 200);
+      await tester.pump();
 
-    await tester.drag(find.byType(ArtworkFeedGrid), const Offset(0, -40));
-    await tester.pump();
-    expect(calls, 2);
-  });
+      await tester.drag(find.byType(ArtworkFeedGrid), const Offset(0, -40));
+      await tester.pump();
+      expect(calls, 2);
+    },
+  );
 
   testWidgets('a real drag near the bottom loads next page', (tester) async {
     var calls = 0;
