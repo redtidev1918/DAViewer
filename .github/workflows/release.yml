@@ -37,5 +37,11 @@ jobs:
       repair: ${{ github.event_name == 'pull_request' || inputs.repair || false }}
       stage: ${{ inputs.stage || 'all' }}
     secrets:
+      # Authenticates the release-please run so its PR is authored by a real user
+      # instead of github-actions[bot]. While the secret is absent this resolves
+      # empty and reusable-release.yml falls back to github.token, so the line is
+      # safe before the token exists. Every other repository passes it for free via
+      # `secrets: inherit`; this caller lists secrets explicitly, hence the line.
+      RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
       ANDROID_KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
       ANDROID_KEYSTORE_PROPERTIES: ${{ secrets.KEYSTORE_PROPERTIES }}
