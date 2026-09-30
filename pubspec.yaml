@@ -21,7 +21,7 @@ dependencies:
   flutter_cache_manager: ^3.4.2
   flutter_html: ^3.0.0
   flutter_inappwebview: 6.1.5
-  flutter_riverpod: ^2.6.1
+  flutter_riverpod: ^3.4.3
   go_router: ^17.5.0
   path_provider: ^2.1.6
   share_plus: ^13.3.0
