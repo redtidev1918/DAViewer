@@ -29,7 +29,7 @@ final class FeaturedInCollectionsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final groups = ref
         .watch(moreLikeThisProvider(artworkId))
-        .valueOrNull
+        .value
         ?.featuredInCollections;
     if (groups == null || groups.isEmpty) return const SizedBox.shrink();
     final s = strings(ref.watch(appLanguageProvider));
@@ -50,7 +50,7 @@ final class SuggestedCollectionsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final groups = ref
         .watch(moreLikeThisProvider(artworkId))
-        .valueOrNull
+        .value
         ?.suggestedCollections;
     if (groups == null || groups.isEmpty) return const SizedBox.shrink();
     final s = strings(ref.watch(appLanguageProvider));

@@ -52,7 +52,7 @@ final class _MoreLikeThisSectionState extends ConsumerState<MoreLikeThisSection>
     super.build(context);
     final s = strings(ref.watch(appLanguageProvider));
     final related = ref.watch(moreLikeThisProvider(widget.artworkId));
-    final currentItems = related.valueOrNull?.artworks;
+    final currentItems = related.value?.artworks;
     if (currentItems != null && currentItems.isNotEmpty) {
       _lastItems = currentItems;
     }

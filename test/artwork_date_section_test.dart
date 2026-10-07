@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   Widget host(Widget child) => ProviderScope(
+    retry: (_, _) => null,
     child: MaterialApp(home: Scaffold(body: child)),
   );
 

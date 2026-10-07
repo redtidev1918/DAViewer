@@ -32,7 +32,7 @@ final class _SimilarArtistsSectionState
   Widget build(BuildContext context) {
     super.build(context);
     final artworkId = widget.artworkId;
-    final artists = ref.watch(similarArtistsProvider(artworkId)).valueOrNull;
+    final artists = ref.watch(similarArtistsProvider(artworkId)).value;
     if (artists == null || artists.isEmpty) return const SizedBox.shrink();
     final s = strings(ref.watch(appLanguageProvider));
     return Column(

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:dakit_flutter/dakit_flutter.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 import '../../core/runtime/runtime_provider.dart';
 

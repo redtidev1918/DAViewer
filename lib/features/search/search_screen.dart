@@ -213,7 +213,7 @@ final class _SearchIdleView extends ConsumerWidget {
     final s = strings(ref.watch(appLanguageProvider));
     final theme = Theme.of(context);
     final recommended =
-        ref.watch(recommendedTagsProvider).valueOrNull ?? const <String>[];
+        ref.watch(recommendedTagsProvider).value ?? const <String>[];
 
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),

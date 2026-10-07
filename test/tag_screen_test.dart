@@ -5,6 +5,7 @@ import 'package:daviewer/features/tag/tag_screen.dart';
 import 'package:daviewer/shared/widgets/compact_tag_strip.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -28,6 +29,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         overrides: <Override>[
           tagFeedProvider(('cat', dakit.BrowseSort.recent))
               .overrideWith((ref) => controller),

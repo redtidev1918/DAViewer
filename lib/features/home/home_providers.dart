@@ -1,6 +1,7 @@
 import 'package:dakit_flutter/dakit_flutter.dart' hide WebSession;
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 import '../../core/auth/auth_controller.dart';
 import '../../core/auth/web_session_controller.dart';

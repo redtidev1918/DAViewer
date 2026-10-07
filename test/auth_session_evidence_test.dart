@@ -6,6 +6,7 @@ import 'package:daviewer/core/runtime/app_runtime.dart';
 import 'package:daviewer/core/runtime/runtime_provider.dart';
 import 'package:daviewer/core/settings/app_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -37,6 +38,7 @@ void main() {
       transfers: BackgroundTransferManager(diagnostics: AppLogger.instance),
     );
     final container = ProviderContainer(
+      retry: (_, _) => null,
       overrides: <Override>[runtimeProvider.overrideWithValue(runtime)],
     );
     addTearDown(container.dispose);

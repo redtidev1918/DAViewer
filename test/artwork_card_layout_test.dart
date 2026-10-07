@@ -80,6 +80,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             body: SizedBox(
@@ -103,6 +104,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             body: SizedBox(
@@ -121,6 +123,7 @@ void main() {
   testWidgets('locked preview shows a lock badge', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             body: SizedBox(

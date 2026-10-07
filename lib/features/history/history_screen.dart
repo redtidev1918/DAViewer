@@ -24,7 +24,7 @@ final class HistoryScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(s.history),
         actions: <Widget>[
-          if ((history.valueOrNull ?? const <ArtworkVisit>[]).isNotEmpty)
+          if ((history.value ?? const <ArtworkVisit>[]).isNotEmpty)
             IconButton(
               tooltip: s.clearHistory,
               onPressed: () async {

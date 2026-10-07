@@ -415,7 +415,7 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
       previous,
       next,
     ) {
-      final value = next.valueOrNull;
+      final value = next.value;
       if (value != null && mounted) {
         setState(() => _favourite = value);
       }
@@ -423,7 +423,7 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
 
     // Record once after the artwork actually resolves, so failed loads and
     // transient rebuilds do not pollute local history.
-    final loadedArtwork = artwork.valueOrNull;
+    final loadedArtwork = artwork.value;
     if (loadedArtwork != null && _recordedVisitId != widget.artworkId) {
       _recordedVisitId = widget.artworkId;
       unawaited(_recordVisit(loadedArtwork));
@@ -431,7 +431,7 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(artwork.valueOrNull?.title ?? s.artworkDetail),
+        title: Text(artwork.value?.title ?? s.artworkDetail),
         actions: <Widget>[
           IconButton(
             tooltip: s.previousArtwork,
@@ -449,12 +449,12 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
           ),
           IconButton(
             tooltip: s.share,
-            onPressed: artwork.valueOrNull == null
+            onPressed: artwork.value == null
                 ? null
                 : () => shareDeviantArtLink(
                     context,
-                    uri: artwork.valueOrNull!.pageUri,
-                    title: artwork.valueOrNull!.title,
+                    uri: artwork.value!.pageUri,
+                    title: artwork.value!.title,
                     strings: s,
                   ),
             icon: const Icon(Icons.share_outlined),
@@ -488,15 +488,14 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
               artwork,
               original,
               transfer,
-              description: description.valueOrNull,
-              descriptionHtml: descriptionHtml.valueOrNull,
-              journalHtml: journalHtml.valueOrNull,
-              additionalMedia:
-                  additionalMedia.valueOrNull ?? const <MediaAsset>[],
+              description: description.value,
+              descriptionHtml: descriptionHtml.value,
+              journalHtml: journalHtml.value,
+              additionalMedia: additionalMedia.value ?? const <MediaAsset>[],
               additionalOriginals:
-                  additionalOriginals.valueOrNull ?? const <MediaAsset>[],
-              tags: tags.valueOrNull ?? const <String>[],
-              dates: dates.valueOrNull ?? const ArtworkDates(),
+                  additionalOriginals.value ?? const <MediaAsset>[],
+              tags: tags.value ?? const <String>[],
+              dates: dates.value ?? const ArtworkDates(),
               hasPreviousArtwork: previousArtwork != null,
               hasNextArtwork: nextArtwork != null,
             ),

@@ -35,12 +35,12 @@ final class _MoreFromArtistSectionState
   Widget build(BuildContext context) {
     super.build(context);
     final artworkId = widget.artworkId;
-    final items = ref.watch(moreFromArtistProvider(artworkId)).valueOrNull;
+    final items = ref.watch(moreFromArtistProvider(artworkId)).value;
     if (items == null || items.isEmpty) return const SizedBox.shrink();
     final s = strings(ref.watch(appLanguageProvider));
     final author = ref
         .watch(artworkDetailProvider(artworkId))
-        .valueOrNull
+        .value
         ?.author
         .username;
     return Column(

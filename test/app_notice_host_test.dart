@@ -8,6 +8,7 @@ void main() {
   testWidgets('a dismissed session notice stays hidden', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             appBar: AppBar(title: const Text('App Bar')),
@@ -59,6 +60,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             appBar: AppBar(title: const Text('App Bar')),
@@ -94,6 +96,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             body: Stack(
@@ -141,6 +144,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             appBar: AppBar(title: const Text('App Bar')),

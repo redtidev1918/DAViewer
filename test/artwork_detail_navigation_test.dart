@@ -4,6 +4,7 @@ import 'package:daviewer/features/artwork/artwork_detail_providers.dart';
 import 'package:daviewer/features/artwork/artwork_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
@@ -35,6 +36,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         overrides: <Override>[
           artworkDetailProvider.overrideWith((ref, id) async {
             return Artwork(
