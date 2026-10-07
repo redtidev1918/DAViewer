@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.8](https://github.com/redtidev1918/DAViewer/compare/v0.5.7...v0.5.8) (2026-10-07)
+
+
+### Bug Fixes
+
+* **riverpod:** preserve existing state and retry behavior on v3 ([5b4c9bb](https://github.com/redtidev1918/DAViewer/commit/5b4c9bb7ba3064a7dc0f315a6bb77e8dca255d64))
+
 ## [0.5.7](https://github.com/redtidev1918/DAViewer/compare/v0.5.6...v0.5.7) (2026-09-23)
 
 
