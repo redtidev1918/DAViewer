@@ -1,4 +1,4 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 /// One reminder the shell may show. Persistent banners are deduplicated by
 /// [id]; pages never decide on their own whether a banner is already visible.

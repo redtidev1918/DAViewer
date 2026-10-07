@@ -49,7 +49,8 @@ void main() {
   testWidgets('feature copy hides provider parsing details', (tester) async {
     const rawMessage = 'The official API page does not contain a results list.';
     await tester.pumpWidget(
-      const ProviderScope(
+      ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             body: ArtworkFeedGrid(
@@ -78,6 +79,7 @@ void main() {
     var loginTaps = 0;
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             body: ArtworkFeedGrid(
@@ -123,6 +125,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             body: ArtworkFeedGrid(
@@ -151,6 +154,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             body: ArtworkFeedGrid(
@@ -181,6 +185,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             body: ArtworkFeedGrid(
@@ -214,6 +219,7 @@ void main() {
     var retries = 0;
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             body: ArtworkFeedGrid(
@@ -248,6 +254,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             body: ArtworkFeedGrid(
@@ -286,6 +293,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             body: ArtworkFeedGrid(
@@ -324,6 +332,7 @@ void main() {
 
       Future<void> pumpFeed() => tester.pumpWidget(
         ProviderScope(
+          retry: (_, _) => null,
           child: MaterialApp(
             home: Scaffold(
               body: ArtworkFeedGrid(
@@ -377,6 +386,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             body: ArtworkFeedGrid(
@@ -409,6 +419,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             body: ArtworkFeedGrid(
@@ -443,6 +454,7 @@ void main() {
   testWidgets('tall portrait cards never overflow', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             body: ArtworkFeedGrid(

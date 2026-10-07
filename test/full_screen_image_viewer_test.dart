@@ -18,6 +18,7 @@ void main() {
     var longPressedPage = -1;
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: FullScreenImageViewer(
             imageProvider: MemoryImage(bytes),
@@ -63,6 +64,7 @@ void main() {
     var next = 0;
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Builder(
             builder: (context) => TextButton(
@@ -102,6 +104,7 @@ void main() {
     var longPressedPage = -1;
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: FullScreenImageViewer(
             imageProvider: MemoryImage(bytes),
@@ -148,6 +151,7 @@ void main() {
     var nextArtwork = 0;
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Builder(
             builder: (context) => TextButton(

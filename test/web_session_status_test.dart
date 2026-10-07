@@ -10,6 +10,7 @@ import 'package:daviewer/core/data/web_session.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 
 final class _FakeCookieManager extends Fake implements CookieManager {
@@ -97,6 +98,7 @@ ProviderContainer _containerWith(
   Future<WebSessionProbeResult> Function()? probe,
 }) {
   final container = ProviderContainer(
+    retry: (_, _) => null,
     overrides: <Override>[
       webSessionProvider.overrideWithValue(
         WebSession(
@@ -139,6 +141,7 @@ Future<ProviderContainer> _statusContainer(
   Future<WebSessionProbeResult> Function()? probe,
 }) async {
   final container = ProviderContainer(
+    retry: (_, _) => null,
     overrides: <Override>[
       webSessionProvider.overrideWithValue(
         WebSession(
@@ -173,6 +176,7 @@ Future<ProviderContainer> _statusContainer(
 
 Future<ProviderContainer> _anonymousSessionContainer() async {
   final container = ProviderContainer(
+    retry: (_, _) => null,
     overrides: <Override>[
       webSessionProvider.overrideWithValue(
         WebSession(

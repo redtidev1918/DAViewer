@@ -302,7 +302,7 @@ final class _NotificationsBell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = strings(ref.watch(appLanguageProvider));
     final unread = ref.watch(notificationsUnreadCountProvider);
-    final count = unread.valueOrNull ?? 0;
+    final count = unread.value ?? 0;
     return IconButton(
       tooltip: s.notifications,
       onPressed: () => context.push('/notifications'),

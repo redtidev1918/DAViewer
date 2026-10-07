@@ -1,6 +1,7 @@
 import 'package:dakit_flutter/dakit_flutter.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 import '../../core/auth/session_state.dart';
 import '../../core/auth/web_session_controller.dart';

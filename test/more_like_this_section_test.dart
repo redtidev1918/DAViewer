@@ -7,6 +7,7 @@ import 'package:daviewer/features/artwork/more_like_this_failure.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -108,6 +109,7 @@ void main() {
     var attempts = 0;
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         overrides: <Override>[
           moreLikeThisProvider('art-id').overrideWith((ref) async {
             attempts++;
@@ -145,6 +147,7 @@ void main() {
     var attempts = 0;
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         overrides: <Override>[
           moreLikeThisProvider('art-id').overrideWith((ref) async {
             attempts++;
@@ -178,6 +181,7 @@ void main() {
     final refreshed = Completer<MoreLikeThisResult>();
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         overrides: <Override>[
           moreLikeThisProvider('art-id').overrideWith((ref) async {
             attempts++;

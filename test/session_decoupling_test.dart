@@ -13,6 +13,7 @@ import 'package:daviewer/features/home/home_providers.dart';
 import 'package:daviewer/features/notifications/notifications_providers.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 
 final class _RecordingDioAdapter implements HttpClientAdapter {
@@ -145,6 +146,7 @@ void main() {
         transfers: transfers,
       );
       final container = ProviderContainer(
+        retry: (_, _) => null,
         overrides: <Override>[runtimeProvider.overrideWithValue(runtime)],
       );
       addTearDown(container.dispose);
@@ -240,6 +242,7 @@ void main() {
         transfers: transfers,
       );
       final container = ProviderContainer(
+        retry: (_, _) => null,
         overrides: <Override>[runtimeProvider.overrideWithValue(runtime)],
       );
       addTearDown(container.dispose);
@@ -327,6 +330,7 @@ void main() {
       transfers: transfers,
     );
     final container = ProviderContainer(
+      retry: (_, _) => null,
       overrides: <Override>[runtimeProvider.overrideWithValue(runtime)],
     );
     addTearDown(container.dispose);

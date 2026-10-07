@@ -163,6 +163,7 @@ void main() {
     );
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             body: Align(
@@ -209,6 +210,7 @@ void main() {
     );
     await tester.pumpWidget(
       ProviderScope(
+        retry: (_, _) => null,
         child: MaterialApp(
           home: Scaffold(
             body: Align(

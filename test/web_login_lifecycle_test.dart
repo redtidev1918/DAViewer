@@ -7,6 +7,7 @@ import 'package:daviewer/features/web_login/web_login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 
 final class _LifecyclePlatform extends InAppWebViewPlatform {
@@ -126,6 +127,7 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
+          retry: (_, _) => null,
           overrides: <Override>[runtimeProvider.overrideWithValue(runtime)],
           child: ValueListenableBuilder<int>(
             valueListenable: rebuild,

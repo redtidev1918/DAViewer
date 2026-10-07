@@ -75,7 +75,7 @@ final class _NotificationsScreenState
       );
     }
     final messages = ref.watch(notificationsProvider);
-    final items = messages.valueOrNull ?? const <ProviderMessage>[];
+    final items = messages.value ?? const <ProviderMessage>[];
 
     return Scaffold(
       appBar: AppBar(

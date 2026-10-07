@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 
 import 'app/app.dart';
 import 'core/diagnostics/app_logger.dart';
@@ -84,6 +85,7 @@ Future<void> main() async {
 
   runApp(
     ProviderScope(
+      retry: (_, _) => null,
       overrides: <Override>[
         runtimeProvider.overrideWithValue(runtime),
         crashDetectedProvider.overrideWithValue(crashedLastSession),
