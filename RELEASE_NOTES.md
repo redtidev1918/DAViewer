@@ -3,6 +3,15 @@
 这里只写下载者需要知道的变化，一行一条。内部实现、协议与调试细节请见
 `CHANGELOG.md`。
 
+## 0.5.13
+
+- 已登录冷启动时不再把有效的网页会话误判为未确认：会话探测会等待挑战页跳转完成后再判断，不会再出现推荐页空转。
+- 登录成功后的推荐页只请求一次，不再重复加载第一页。
+- 冷启动先显示上次的推荐内容，随后自动替换为最新推荐；缓存损坏或不可用时不影响正常加载。
+- 下拉刷新与手动重试始终重新获取最新推荐。
+
+- Stop misjudging a valid web session as unconfirmed on a logged-in cold start; the probe waits for the post-challenge navigation, so the feed no longer stalls.
+
 ## 0.5.10
 
 - 个性化推荐先验证网页身份；已记录的通用回退信号会触发登录或重试入口，不再静默显示该批内容。
