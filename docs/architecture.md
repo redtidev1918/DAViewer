@@ -1,8 +1,8 @@
 # DAViewer 架构说明
 
-> English: [DAViewer architecture](/en/architecture.md)
+语言 / Language：中文 · [English](en/architecture.md)
 
-本文界定在处理信息流、详情页、认证、媒体与发版问题最容易模糊的那几条边界。
+本文说明 DAKit 与 DAViewer 的职责，以及作品数据、相关内容、手势和会话的处理规则。
 
 ## SDK 与应用的分界
 
@@ -61,11 +61,11 @@ Provider/解析器名称与原始异常信息属于诊断数据。用户可见�
 
 **合集封面**：「More Like This」预览只有时携带合集缩略图。未携带时，合集卡片通过 `gallection/contents` 惰性解析封面（`collectionCoverProvider`），避免卡片长期空白；文件夹图标占位只是最后手段。
 
-**合集关注未实现。** 官方 API 能关注**用户**（`user/watch`），不能关注某个合集/文件夹；合集关注只存在于未公开的网页接口。在其被逆向（属网页会话工作，不在 DAKit 范围）之前，合集卡片可以原生打开合集，但不提供关注操作。
+合集卡片可以原生打开合集，目前不提供关注操作。官方 `user/watch` 用于关注用户；若新增合集关注，私有协议解析由 `dakit_web` 负责，会话与交互由应用负责。
 
-**更多来自这位作者**（`MoreFromArtistSection`）：读取作者在官方 `gallery/{username}` 首页的其他近期作品。这是干净可用的「作者发现」路径。
+**更多来自这位作者**（`MoreFromArtistSection`）：读取作者在官方 `gallery/{username}` 首页的其他近期作品。该区块用于从当前作品继续浏览作者的近期作品。
 
-**相似作者**（`SimilarArtistsSection`）：DeviantArt 没有公开的相似作者接口——官方 API 只有 `browse/morelikethis`（作品 + 合集），而网站 `biMetadata` 里 `type: "artist"` 是 BI 埋点（作者的账号类型），不是推荐负载。真正的「相似用户」列表来自补全后的未公开接口流式返回（在 `__INITIAL_STATE__`、`__RCACHE__` 与 `dadeviation/init` 中都找不到）。因此 DAViewer 从「More Like This」作品作者推导相似作者（`similarArtistsFrom`）：推荐引擎认定为相关的作品，其作者就是诚实的等价物。未来若有专用数据源，那属于网页会话逆向工作，必须留在 DAKit 之外。
+**相似作者**（`SimilarArtistsSection`）：`similarArtistsFrom` 从「More Like This」作品中提取作者。列表表示相关作品的作者，不等同于网站的专用相似用户推荐。未来新增私有协议解析时放在 `dakit_web`，会话采集和展示仍由应用负责。
 
 ## 手势归属
 
@@ -78,9 +78,9 @@ Provider/解析器名称与原始异常信息属于诊断数据。用户可见�
 
 ## 认证边界
 
-应用只有一个用户身份：OAuth，用于首页、收藏、关注、画廊、下载以及其他一切官方 API。未登录是引导状态，不是信息流错误。每次可见的尝试都独占一个 OAuth/PKCE 事务，并在应用内嵌 WebView 中打开官方登录页（使用桌面 User-Agent）。账号选择、密码、注册、社交登录与安全校验都由 DeviantArt 的页面负责。`dakit://oauth/callback` 在 WebView 内被拦截并完成同一事务。同一 WebView 会话同时提供仅网页适配器所需的 Cookie 与 CSRF token，因此不需要第二次登录。
+应用用 OAuth 账号统一用户身份，驱动每日精选、收藏、关注、画廊、下载等官方 API 功能。首页推荐另需已验证的网页会话。未登录是引导状态，不是信息流错误。每次可见的尝试都独占一个 OAuth/PKCE 事务，并在应用内嵌 WebView 中打开官方登录页（使用桌面 User-Agent）。账号选择、密码、注册、社交登录与安全校验都由 DeviantArt 的页面负责。`dakit://oauth/callback` 在 WebView 内被拦截并完成同一事务。同一 WebView 会话同时提供仅网页适配器所需的 Cookie 与 CSRF token，因此不需要第二次登录。
 
-WebView 的网页会话（Cookie 与 CSRF）属于基础设施状态，不是认证。它绝不能阻塞首页或弹出登录提示；失败时降级为官方 API 回退或重试。
+网页会话（Cookie 与 CSRF）与 OAuth 分别验证。推荐流依赖已登录的网页会话；确认匿名时提示恢复，不展示匿名 Cookie 返回的通用推荐，也不自动切换到每日精选。公开详情适配器失败时按能力规则重试、回退或隐藏可选区块。网页会话故障不清除有效 OAuth。完整规则见 [认证与会话恢复](authentication.md)。
 
 会话恢复只读取当前的安全项（`DAViewer Account`）。0.2.139 之前预览版产生的临时 Keychain 项永不查询、也不自动迁移，因此无法访问的历史记录不会索要 Mac 密码或阻塞授权。临时的网络、上游、解析或安全存储失败都保留既有可用路由；只有凭据缺失/被吊销或用户显式登出，才进入未登录状态。隐藏的浏览器刷新可能轮换匿名 CSRF。页面不完整永远不等于已登出；与 OAuth 账号不一致的历史 Cookie 用户名会被清除。
 
@@ -88,13 +88,15 @@ WebView 的网页会话（Cookie 与 CSRF）属于基础设施状态，不是认
 
 ## 发布契约
 
-- `pubspec.yaml` 是发布流程唯一编辑的版本来源。Flutter 通过 `FLUTTER_BUILD_NAME` 暴露给应用。
-- 每个 tag 必须在 `RELEASE_NOTES.md` 中有对应的顶层章节；CI 用该章节作为 GitHub Release 正文。
+- release-please 管理版本，核对 `pubspec.yaml` 与 `.release-please-manifest.json`。Flutter 通过 `FLUTTER_BUILD_NAME` 暴露应用版本。
+- 当前 manifest 版本必须有 `.github/release-notes/<版本>.md` 中文正文，包含「本次更新」；CI 检查该文件。
 - CI 执行 analyze、格式检查、测试，并构建 Android、macOS 与 Windows。
-- Android 发版需要已配置的上传密钥库。macOS 产物使用私有稳定的自签名预览身份以保持 Keychain 连续性，但仍不是 Apple 签名、也未公证。项目**不购买 Apple Developer Program**，Developer ID 签名与公证明确不在范围内；产物保留 `macos-unsigned-preview` 标记，不将此作为发布阻塞项。
-- 发布只保留最新的 GitHub Release 可见。Git tag 作为源码历史记录保留，发布任务不会删除它们。
+- Android 发版需要上传密钥库。macOS 当前构建脚本直接打包 Flutter release 产物，没有稳定预览证书导入或公证步骤，保留 `macos-unsigned-preview` 标记。工具链和发布参数见 [构建与发布](build.md)。
+- 发布保留策略配置为一个 stable、一个 prerelease 和两个失败草稿。
 
 ## 应用本地状态
+
+作品访问原因、媒体解析和网页会话采用独立状态，来源与代际规则见 [作品访问状态与媒体解析](architecture/artwork-access.md)。
 
 部分状态刻意只保留在客户端，永不同步到 DeviantArt：
 
@@ -105,4 +107,4 @@ WebView 的网页会话（Cookie 与 CSRF）属于基础设施状态，不是认
 - **网页会话 Cookie 快照**（`core/auth/WebSessionStore`）：已登录的 deviantart.com Cookie 与 CSRF/用户名状态一起快照，并在冷启动时平台 WebView 存储丢失（例如跨界应用更新）后重新注入。这能在不重新登录的前提下维持个性化 `rfy` 信息流；快照被限定在当前 OAuth 账号，不构成第二个身份。
 - **主题模式**（`core/theme/ThemeModeController`）：跟随系统 / 浅色 / 深色，注入 MaterialApp 并与上述偏好一起持久化。
 
-这些叠加层必须保持本地：一旦加入「同步到服务器」的行为，就越过了官方 API 边界，应属 DAKit 而非应用。
+这些叠加层必须保持本地：新增服务器同步时，先确认官方 API 是否支持；协议与映射由 DAKit 负责，应用负责同步策略和展示。

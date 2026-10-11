@@ -6,11 +6,9 @@
 
 **Language / 语言:** [中文](README.md) · English
 
-> **An open-source DeviantArt client for Android / macOS / Windows, built on DAKit.**
+DAViewer is an open-source, third-party DeviantArt client built on [DAKit](https://github.com/redtidev1918/DAKit) for Android, macOS, and Windows. Browse artwork and artist galleries, save favourites, watch artists, and download images.
 
-DeviantArt's official client is no longer maintained. DAViewer is a third-party client built on [DAKit](https://github.com/redtidev1918/DAKit) for Android, macOS, and Windows.
-
-📖 [Full documentation](https://redtidev1918.github.io/DAViewer/)
+[Full documentation](https://redtidev1918.github.io/DAViewer/#/en/)
 
 [![GitHub license](https://img.shields.io/github/license/redtidev1918/DAViewer?style=flat)](LICENSE) [![GitHub release](https://img.shields.io/github/v/release/redtidev1918/DAViewer?style=flat)](https://github.com/redtidev1918/DAViewer/releases) [![Platforms](https://img.shields.io/badge/platform-Android%20%7C%20macOS%20%7C%20Windows-blue?style=flat)](https://github.com/redtidev1918/DAViewer/releases) [![Docs](https://img.shields.io/badge/Docs-documentation-6366f1?style=flat-square)](https://redtidev1918.github.io/DAViewer/)
 
@@ -22,7 +20,9 @@ Grab your platform's file from [Releases](https://github.com/redtidev1918/DAView
 - **Windows**: `DAViewer-v<version>-windows.zip`
 - **macOS**: `DAViewer-v<version>-macos-unsigned-preview.zip`
 
-On macOS, right-click the app in Finder and choose **Open** the first time.
+On Android, install the APK. On Windows, extract the ZIP and run `daviewer.exe`, keeping the other files alongside it. On macOS, extract the ZIP and open `DAViewer.app`. The macOS package is an unnotarized preview; on first launch, right-click the app in Finder and choose **Open**.
+
+Choose **Sign in or create an account** and complete sign-in on DeviantArt's official page in the embedded WebView. For you requires a web session; Daily uses the OAuth API. See [Authentication](docs/en/authentication.md) for session recovery.
 
 ## Screenshots
 
@@ -54,22 +54,23 @@ On macOS, right-click the app in Finder and choose **Open** the first time.
 
 ```shell
 flutter pub get
+flutter devices         # List available device IDs
 flutter run -d macos     # macOS
-flutter run -d android   # Android
+flutter run -d <device-id> # Android: use an ID from flutter devices
 flutter run -d windows   # Windows
 ```
 
-The app depends on published DAKit packages — versions in [pubspec.yaml](pubspec.yaml), app/SDK boundary in [Architecture](docs/en/architecture.md).
+The app depends on published DAKit packages. Versions are in [pubspec.yaml](pubspec.yaml); the app/SDK boundary is in [Architecture](docs/en/architecture.md).
 
 Ordinary users need no OAuth app. To use your own, pass `--dart-define=DAKIT_CLIENT_ID=YOUR_PUBLIC_CLIENT_ID` and add `dakit://oauth/callback` to its whitelist.
 
 ## Proxy
 
-The network path is taken from Settings → Proxy first, then the system proxy, then `https_proxy` / `http_proxy` / `all_proxy`. Use the HTTP/Mixed port your proxy app shows — there is no fixed value. Full rules in [Networking and proxy](docs/en/networking.md).
+Proxy selection follows this order: Settings → Proxy, system proxy, `https_proxy` / `http_proxy` / `all_proxy`, build-time `DAKIT_PROXY_URL`, then a direct connection. Use the HTTP/Mixed port shown by your proxy app. See [Networking and proxy](docs/en/networking.md) for each platform's sign-in WebView support.
 
 ## Release
 
-Pushing a `v*` tag creates a Release, with notes taken from `RELEASE_NOTES.md`. To cut one, use Actions → **Release** → Run workflow and pick `patch` / `minor` / `major`, or an exact version.
+ReleaseGraph and release-please manage releases through [.release-policy.yml](.release-policy.yml). Chinese release notes live in `.github/release-notes/<version>.md`. Actions → **Release** can validate or repair an existing version. See [Build notes](docs/en/build.md) for the workflow and inputs.
 
 ```shell
 flutter build apk --release          # Android APK, needs android/key.properties
@@ -83,33 +84,33 @@ Signing and the pinned toolchain are in [Build notes](docs/en/build.md).
 
 - **The page did not open or is stuck**: tap "Done" at the top right and reopen it; you can run the connectivity test first.
 - **Mature content**: Settings → DeviantArt account settings → Mature content settings.
-- **First sign-in on macOS**: the system asks for keychain permission once — choose Allow.
+- **Keychain prompt on macOS**: choose Allow when the system requests access to the app's account storage.
 
 State and recovery rules are in [Authentication and session recovery](docs/en/authentication.md).
 
 ## Contributing
 
-Issues, PRs, and docs are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). After a change, run `dart format lib test`, `flutter analyze`, and `flutter test`. Security reports go to [SECURITY.md](SECURITY.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for bug reports, PRs, and documentation changes. For Dart changes, run `dart format lib test`, `flutter analyze`, and `flutter test`. Security reports go to [SECURITY.md](SECURITY.md).
 
 ## Documentation
 
-This README only covers the start; everything else lives at the
-[docs site](https://redtidev1918.github.io/DAViewer/):
+Choose a document by task, or browse the [docs site](https://redtidev1918.github.io/DAViewer/#/en/):
 
 | What you want | Where |
 | --- | --- |
-| Download a build | [Download page](https://redtidev1918.github.io/DAViewer/download.md) |
+| Download a build | [Download page](docs/en/download.md) |
 | Sign-in and common issues | [Authentication](docs/en/authentication.md) |
 | Networking and proxies | [Networking](docs/en/networking.md) |
 | App/SDK boundary | [Architecture](docs/en/architecture.md) |
 | Local builds and releases | [Build notes](docs/en/build.md) |
+| Check release evidence and remaining risks | [Release gate](docs/release-gate.md), [Regression catalog](docs/regressions/README.md) (gate in Chinese) |
 
 ## Acknowledgements
 
 DAViewer builds on [DAKit](https://github.com/redtidev1918/DAKit) and [Flutter](https://flutter.dev); the embedded
 WebView, state management, routing, image cache, video playback, and rich text come from
 `flutter_inappwebview`, `flutter_riverpod`, `go_router`, `cached_network_image`,
-`chewie` / `video_player`, and `flutter_html` respectively — see [pubspec.yaml](pubspec.yaml) for the full list.
+`chewie` / `video_player`, and `flutter_html` respectively. See [pubspec.yaml](pubspec.yaml) for the full list.
 Private website endpoint research referenced [gallery-dl](https://github.com/mikf/gallery-dl) and
 [deviantart.ts](https://www.npmjs.com/package/deviantart.ts).
 

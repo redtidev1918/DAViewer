@@ -1,68 +1,45 @@
-# DAViewer Release Gate
+# 发布门禁
 
-发布目标不是“无 Bug”，而是：
+每个候选版本都需要独立的验证记录。满足以下条件后才能判定可发布：没有已知 P0/P1，核心路径有实机证据，历史关键缺陷有回归测试，剩余风险注明影响与验证范围。
 
-```text
-没有已知 P0/P1
-核心路径经过真实 Mac 验证
-关键历史 Bug 有永久回归测试
-剩余风险全部明确记录
-```
+## 自动验证
 
-## 必须解决
+- DAViewer：格式检查、`flutter analyze`、`flutter test`。
+- DAKit 有配套改动时：运行受影响包的测试，记录所用 SDK 版本。
+- Android、macOS、Windows 构建和发布资产检查。
+- 当前 manifest 版本的中文 Release 正文，规则见 [构建与发布](build.md)。
 
-- `collections/all` 请求风暴
-- 首页瀑布流不能继续加载
-- WebView 重复加载 / Challenge 反馈环
-- Notice 无法关闭、遮挡 UI
-- 重复登录提示
-- Pagination 重复请求
-- API/Web Session 错误耦合
-- `mature_content` 参数错误
-- 所有已确认的 P0/P1
+通过自动测试不能替代实机验证。测试、证据与缺口见 [回归目录](regressions/README.md)。
 
-## 必须验证
+## 实机验证
 
-- DAViewer 全量测试
-- DAKit 全量测试
-- macOS build
-- Mac 首页真实滚动与分页
-- WebView lifecycle
-- Notice 实机表现
-- 核心 API 请求行为
+| 路径 | 验收内容 |
+| --- | --- |
+| 登录与恢复 | 首次登录、取消后重开、冷启动、登出；过期回调不能恢复旧身份 |
+| 推荐流 | 连续滚动至少两页、贴底继续加载、下拉刷新；重复请求有界 |
+| 网页会话 | 已登录、明确匿名、挑战和网络不可用分别验证；故障不清除有效 OAuth |
+| WebView | 页面重建与挑战提示不造成控制器重建或自动 reload 循环 |
+| 提示条 | 可关闭，不遮挡最后一行、底部导航或刷新手势 |
+| 收藏与通知 | 网页会话变化不触发官方 API 请求风暴 |
+| 代理 | 直连、有效代理、代理停止、清除手动代理；记录平台与实际网络路径 |
+| 内容与下载 | 成人内容参数、受限预览、图片下载、文学作品正文；受限内容样本单独记录 |
 
-## Keychain 验收（环境限制）
+`rfy/deviations` 返回 HTTP 200 不能证明网页会话健康：匿名 Cookie 也能得到通用内容。只有验证层能提交会话结论；裸 HTTP 与已确认的浏览器身份冲突时，使用真实 WebView 仲裁。规则见 [认证与会话恢复](authentication.md)。
 
-项目**不购买 Apple Developer Program**，不要求付费开发者签名。
+## macOS Keychain
 
-```text
-Root cause understood;
-application-side implementation verified;
-stable signing behavior intentionally out of scope
-because the project does not purchase Apple Developer Program signing.
-```
+当前构建不要求付费 Developer ID 签名或公证。ad-hoc / 无 TeamIdentifier 和系统授权提示属于环境限制，不能据此承诺更新后的签名连续性。
 
-接受：
+应用行为仍需验收：使用 `DAViewer Account` 服务，不读取历史 ad-hoc 项，不在启动时循环删除或重建 Keychain 项。应用自身造成的重复授权或读写循环属于缺陷；记录日志后按影响分级。
 
-- Debug：ad-hoc / 无 TeamIdentifier
-- Release：未签名或本地非稳定签名
-- 免费开发环境下系统偶尔要求一次 Keychain 授权
+## 候选版本记录
 
-这属于签名模型造成的系统行为，不因“没有稳定签名”阻塞 `v0.4.16`。若应用自身
-出现循环 `read/delete/create` Keychain item，仍属于 P1 缺陷。
+为每次发布记录：
 
-## 当前状态
+- 版本、commit、DAKit 依赖版本。
+- 自动检查的命令、结果与构建产物。
+- 实机平台、系统版本、操作步骤与日志位置。
+- 已知问题、严重级别、影响与回避方式。
+- 未验证项及其原因；明确是否阻塞发布。
 
-`v0.5.4` 候选已闭环并准备发布。本轮新增：
-
-- 启动页显示网络/代理状态：无代理、直连失败、代理可达与不可达分别有明确文案，
-  用户可以区分网络问题和代理问题。
-- 个性化 `rfy` 请求成功即确认网页会话健康，避免裸首页探测被 WAF 判成 anonymous
-  后误导用户重新登录 Cookie。
-- 回归目录新增 REG-008 / R17；真实设备“无代理冷启动 → 开代理 → 进入首页”的完整
-  日志仍需发版后收集。
-
-上一轮 `v0.5.3`（2026-09-23）已修复推荐页贴底翻页，详情见
-`docs/regressions/006-feed-pagination-edge.md`。剩余 runtime caveats
-（Mac 交互 smoke、真实付费 rfy 样本的 `blurred` 验证）记录在
-`docs/architecture/data-lifecycle-audit.md`；Keychain 付费签名不作为阻塞项。
+本文定义验收条件，不声明某个候选版本已经通过。历史记录见 [回归目录](regressions/README.md)；架构审计与迁移记录见 `architecture/`，其中的结论需结合记录时的版本阅读。

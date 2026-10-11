@@ -7,6 +7,21 @@ never receives or stores a DeviantArt, Google, Apple, Facebook, or Mac password.
 Credentials and provider security checks stay on DeviantArt's official page,
 which the app shows inside its own embedded WebView.
 
+## Sign-in and common issues
+
+Choose **Sign in or create an account** and authorize on DeviantArt's official page in the embedded WebView. A normal sign-in establishes both OAuth and web sessions. The app does not store account passwords.
+
+| Situation | Action |
+| --- | --- |
+| The login page fails to open or gets stuck | Close and reopen it; check the proxy and run the connectivity test in Settings |
+| The official page asks for a challenge or account confirmation | Complete it on that page; the app waits for the authorization callback |
+| For you asks for recovery while Daily works | The web session and OAuth have separate states; follow the recovery prompt |
+| macOS asks for Keychain access | Allow access to the app's account storage; upgrade behavior depends on signing |
+| Mature content is hidden or blurred | Open Settings → DeviantArt account settings → Mature content settings and check website preferences |
+| You need a different account | Sign out first, then sign in; cookie import rejects mixed accounts |
+
+See [Networking and proxy](networking.md) for WebView coverage. The sections below describe implementation and recovery rules.
+
 ## One-entry sign-in contract
 
 The app exposes one **Sign in or create an account** action, which opens the
@@ -50,6 +65,12 @@ session (CSRF token and the `userinfo` cookie) only after the OAuth callback has
 navigated back to the DeviantArt home page, so the app never records a
 signed-out web session from the anonymous login page.
 
+Cookie snapshots preserve each cookie's domain, path, expiry, Secure, and
+HttpOnly metadata. Same-name cookies on different domains remain separate and
+are restored with their original metadata. Legacy `name→value` snapshots migrate
+on read. Concurrent session checks share one in-flight verification; generation
+checks discard late results from earlier attempts.
+
 The login screen **dismisses itself only when OAuth is (or has just become)
 signed in and the server confirms the web session**. A first-time login never
 closes on the web Cookie alone; the screen waits for the OAuth transaction.
@@ -64,9 +85,7 @@ remain reachable before sign-in.
 The in-memory PKCE transaction is authoritative while the app process remains
 alive. Its secure-storage copy exists only to recover a callback after a process
 restart: failure to write, read, or clear that recovery copy must never overturn
-the live authorization result. Token storage is different and remains the hard
-commit point—sign-in is reported as successful only after the new token is
-stored securely.
+the live authorization result. Sign-in is reported as successful only after the new token is stored securely.
 
 The `dakit` scheme is owned by the embedded WebView, which intercepts the OAuth
 callback and never leaves the app. A system browser is used only as a fallback
@@ -98,12 +117,20 @@ the real headless WebView (the same Cookie stack as login): same account →
 healthy; the real browser also anonymous → anonymous and a re-login prompt;
 real-browser probe failure → stays unverified, never a silent downgrade.
 
-Ownership boundary (see `regressions/011`): only the verification layer may
+Ownership boundary (see [REG-011](../regressions/011-session-boundary-refactor.md)): only the verification layer may
 produce a verdict; cookie storage, background probes (CSRF rotation only),
 feed success/failure, and UI have no write access. Every verdict change goes
 through the single `WebSessionStatusController.applyVerification` entry point
 with generation protection and source logging; `webSessionReadyProvider` means
 startup readiness only, never session health.
+
+## Detecting an expired Cookie during use
+
+An explicit web-login restriction or unexplained blurred preview requests a web-session check even within the five-minute healthy cache. A known payment restriction alone does not request a Cookie check. Concurrent cards share one check; later triggers are throttled to 30 seconds and respect network/challenge backoff. Blur is a reason to verify, not evidence that the Cookie expired.
+
+A confirmed anonymous session shows a sign-in action on both the main screen and artwork details. Network failures and challenge pages do not produce an expired-Cookie prompt. A confirmed login clears previous media-resolution markers and reloads detail, extra pages, original-file lookups, and related artwork.
+
+Suspicious related previews are also checked against official OAuth detail data for the same artwork, with full web detail as a fallback. The author and artwork path must match, and the response must provide clear media or an explicit access gate before updating the cache. Genuine paid restrictions remain. Inconclusive checks preserve the server preview without editing its blurred URL. See [artwork access states](artwork-access.md) and [REG-013](../regressions/013-mature-related-preview.md).
 
 ## Authentication transaction lifecycle
 
@@ -134,16 +161,15 @@ State semantics:
   instead of treating it as signed out or prompting repeatedly;
 - `signingIn / signingOut`: a login/logout transaction is in progress.
 
-macOS previews use one private, stable CI signing identity. The identity is
-self-signed, not Apple trusted or notarized, but it prevents a changing ad-hoc
-cdhash from requesting the Mac password after each update. Token and recovery
-storage use the `DAViewer Account` Keychain service; older ad-hoc items are
-never queried, so an inaccessible legacy record cannot block authorization.
+Token and recovery storage use the `DAViewer Account` Keychain service. Older
+ad-hoc items are not queried, so legacy records do not block authorization. The
+current macOS build script has no stable preview-certificate import or
+notarization step; a system Keychain prompt may still appear after an update.
 
-The project does **not purchase Apple Developer Program** and does not require
-paid developer signing. Local `ad-hoc / no TeamIdentifier` is an accepted
-environment limitation; stable signing and notarization are intentionally out
-of scope and are not a Keychain acceptance or Release Gate blocker.
+Local `ad-hoc / no TeamIdentifier` is an accepted environment limit. Missing
+paid Developer ID signing does not block a release, but repeated app-side
+Keychain read/write/delete/create cycles require investigation. See the
+[Release gate](../release-gate.md) (Chinese).
 
 The Home **推荐 / For you** tab is the website's personalized `rfy/deviations`
 feed, fetched with the WebView's Cookie and CSRF token. It requires a signed-in
@@ -158,10 +184,10 @@ sources as equivalent.
 
 A few detail-page features require undocumented public website data, such as
 numeric-id resolution and collection contents. The embedded WebView's web
-session (cookies and CSRF token) provides this on demand. This is infrastructure
-state, not a second user identity: it never blocks Home, never asks the user to
-log in again, and must degrade to a retry or official-API fallback when
-unavailable.
+session (cookies and CSRF token) provides this on demand. These public detail adapters do not require a separate sign-in. When unavailable,
+they retry or use preview data or an official-API fallback according to their
+capability policy. Personalized Home recommendations have the session
+requirements described above.
 
 Legacy browser cookies are accepted only for public adapter compatibility. If
 they expose a username different from the OAuth account, they are cleared to
@@ -187,7 +213,7 @@ strict one-account rule (`evaluateCookieImportIdentity`):
 2. If an OAuth account is signed in, the imported username must match it.
 3. If the live WebView already has a signed-in web session, the imported
    username must match it.
-4. A conflict is rejected **before any cookie is written** — the app never
+4. A conflict is rejected **before any cookie is written**. The app never
    overlays one account's session onto another. To switch accounts the user
    signs out first.
 5. After injection the username is read back from the cookie store. If
@@ -202,8 +228,8 @@ After such an import the app therefore offers the normal embedded sign-in
 once: the DeviantArt page recognizes the imported cookies and typically
 completes without asking for a password, and the user can dismiss the prompt
 (web features keep working; official-API features ask for sign-in again on
-use). Cookies never replace the OAuth token — the official-API session can
-only be established by the OAuth/PKCE flow.
+use). The official-API session can only be established through OAuth/PKCE; importing
+cookies still requires completing OAuth sign-in.
 
 ## Mature content
 

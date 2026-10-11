@@ -66,6 +66,13 @@ final webSessionStatusProvider =
       (ref) => WebSessionStatusController(ref),
     );
 
+/// Content restrictions trigger verification, not an immediate logout verdict.
+final webSessionRestrictionCheckProvider = Provider<Future<void> Function()>(
+  (ref) => ref
+      .read(webSessionStatusProvider.notifier)
+      .recheckAfterContentRestriction,
+);
+
 /// Confirms the signed-in identity against the DeviantArt home page with the
 /// current Cookie header, instead of trusting the local snapshot alone.
 final webSessionVerifierProvider = Provider<WebSessionVerifier>((ref) {
@@ -102,13 +109,29 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   ];
 
   DateTime? _lastSuccess;
+  DateTime? _lastRestrictionCheck;
   int _failures = 0;
   int _generation = 0;
   Future<void>? _activeCheck;
 
-  /// Restores a persisted server-confirmed session snapshot, never during a
-  /// backoff period. The next feed request is the acceptance gate: expired
-  /// cookies surface as a feed error instead of forcing a WAF probe.
+  /// Bypass the healthy cache when a content response is suspicious, while
+  /// coalescing restricted cards and respecting challenge/network cooldowns.
+  Future<void> recheckAfterContentRestriction() async {
+    if (state.isLocked || state.inCooldown || state.needsLogin) return;
+    final active = _activeCheck;
+    if (active != null) return active;
+    final now = DateTime.now();
+    final previous = _lastRestrictionCheck;
+    if (previous != null &&
+        now.difference(previous) < const Duration(seconds: 30)) {
+      return;
+    }
+    _lastRestrictionCheck = now;
+    await check(force: true);
+  }
+
+  /// Verifies the web session through the HTTP and real-browser evidence chain.
+  /// Normal checks reuse recent success and respect transient backoff.
   Future<void> check({bool force = false}) async {
     final active = _activeCheck;
     if (active != null) return active;
@@ -325,6 +348,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   void markHealthy({required String serverUsername}) {
     _generation++;
     _lastSuccess = DateTime.now();
+    _lastRestrictionCheck = null;
     _failures = 0;
     final next = WebSessionStatus(
       state: WebSessionStatusState.healthy,

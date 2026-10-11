@@ -1,4 +1,4 @@
-# Web adapter — compatibility contract
+# Web adapter compatibility contract
 
 **Language / 语言:** [中文](/web_adapter.md) · English
 
@@ -7,12 +7,12 @@ DAViewer talks to two DeviantArt surfaces:
 - **Official OAuth API** (stable, versioned, owned by DAKit).
 - **Website-private JSON/HTML endpoints** (unstable, undocumented) for the few
   detail features the official API does not expose: numeric-id resolution,
-  related-artwork blocks, collection full contents, real deviation search,
-  gallery keyword search, and profile facts (watchers/join date).
+  related-artwork blocks, collection full contents, artwork keyword search,
+  gallery keyword search, and profile fields (watchers/join date).
 
-This document is the compatibility contract for that second, private surface.
-Its job is not to prevent DeviantArt from changing — that is out of our
-control — but to make any change **cheap to detect and cheap to fix**.
+This document records private website data sources, fallbacks, and tests. When
+the website changes, locate the failing adapter before fixing parsing or
+adjusting the fallback.
 
 ## Where the code lives
 
@@ -28,14 +28,14 @@ and UI fallback copy. Product-level wrappers remain under `lib/core/data/`
 (for example, `collection_contents.dart` and `web_session.dart`). HTML/JSON
 parsing must not return to business code.
 
-## The three-layer defense
+## Adapter rules
 
 1. **Stable interface isolation.** Feature code depends on a small interface or
    a DAKit domain model (`CollectionContentsSource.contents`, `Artwork`,
    `DeviationInit`), never on raw HTML/JSON. A site change is fixed inside one
    adapter without touching a screen.
 
-2. **Tolerant parsing + graceful degradation.** Every adapter parses
+2. **Tolerant parsing and fallback.** Every adapter parses
    defensively (a malformed entry is skipped, not fatal) and has a fallback:
    the official API, the preview data, or simply hiding the optional section.
    A web failure must never take down the artwork detail page.
@@ -50,13 +50,13 @@ parsing must not return to business code.
 
 | Feature | Module | Endpoint / source | Session | Fallback | Contract test (snapshot define) |
 | --- | --- | --- | --- | --- | --- |
-| Personalized home feed | `RfyFeedFetcher` (`dakit_web`) | `_puppy/dabrowse/networkbar/rfy/deviations` | web Cookie + CSRF (signed-in) | none (needs the web session; shows sign-in prompt) | `rfy_feed_test.dart` — `updatedTime ?? publishedTime` feeds the artwork timestamp so ordering reflects edits |
-| Numeric→UUID + description + dates | `DeviationInitFetcher` (`dakit_web`) | `_puppy/dadeviation/init` | anonymous browser CSRF | description falls back to the short excerpt; tags empty (official `deviation/metadata` serves only OAuth items); dates fall back to the feed item's publish time | `deviation_init_test.dart` (`DA_DEVIATION_INIT_JSON`) — also parses `publishedTime` / `updatedTime` for the detail date rows |
+| Personalized home feed | `RfyFeedFetcher` (`dakit_web`) | `_puppy/dabrowse/networkbar/rfy/deviations` | web Cookie + CSRF (signed-in) | none (needs the web session; shows sign-in prompt) | `rfy_feed_test.dart`; `updatedTime ?? publishedTime` feeds the artwork timestamp so ordering reflects edits |
+| Numeric→UUID + description + dates | `DeviationInitFetcher` (`dakit_web`) | `_puppy/dadeviation/init` | anonymous browser CSRF | description falls back to the short excerpt; tags empty (official `deviation/metadata` serves only OAuth items); dates fall back to the feed item's publish time | `deviation_init_test.dart` (`DA_DEVIATION_INIT_JSON`); also parses `publishedTime` / `updatedTime` for the detail date rows |
 | Related artwork | `WebMoreLikeThisFetcher` (`dakit_web`) | artwork page `__INITIAL_STATE__` / `__RCACHE__` | none (public) | official `browse/morelikethis` | `web_more_like_this_test.dart` (`DA_MORE_LIKE_THIS_HTML`) |
 | Collection full contents | `WebCollectionContentsFetcher` (`dakit_web`) + DAViewer `WebCollectionContentsSource` | `_puppy/dashared/gallection/contents` (JSON), fallback `deviantart.com/{user}/favourites/{id}?page=N` | anonymous browser CSRF (JSON) / none (SSR) | preview deviations + open-on-web | `web_collection_contents_test.dart` (`DA_COLLECTION_JSON`, `DA_COLLECTION_HTML`) |
 | Deviation search | `WebSearchFetcher` (`dakit_web`) | `_puppy/dabrowse/search/deviations` | web Cookie + CSRF (signed-in) | official `browse/home?q=` (coarse, no web session) | `web_search_test.dart` |
 | Gallery keyword search | `WebGallerySearchFetcher` (`dakit_web`) | `_puppy/dashared/gallection/search` | anonymous browser CSRF | none (search needs the web session) | `web_gallery_search_test.dart` |
-| Profile facts (watchers/join date) | `WebUserProfileFetcher` (`dakit_web`) | `_puppy/dauserprofile/init/about` | anonymous browser CSRF | none (header omits the enrichment) | `web_user_profile_test.dart` |
+| Profile facts (watchers/join date) | `WebUserProfileFetcher` (`dakit_web`) | `_puppy/dauserprofile/init/about` | anonymous browser CSRF | none (profile omits the extra fields) | `web_user_profile_test.dart` |
 
 Shared, non-endpoint helpers (no separate fallback, tested directly):
 
@@ -82,8 +82,8 @@ Sections that are derived or use the official API (`more_from_artist`,
              --dart-define=DA_DEVIATION_INIT_JSON=/path/to/init.json
    ```
 
-2. **Isolate the failure** to one adapter. A red snapshot means "the shape of
-   that one endpoint changed", not "the app is broken".
+2. **Isolate the failure** to one adapter. Compare the new response with the fixture to distinguish
+   an endpoint shape change from a session or network failure.
 
 3. **Fix the parser** in that one file, keeping the mapped DAKit model
    unchanged. Prefer tolerant reads (skip the bad entry) over strict parsing
@@ -97,8 +97,8 @@ Sections that are derived or use the official API (`more_from_artist`,
 
 ## Capturing snapshots
 
-Snapshots are real responses saved locally (they are **not** committed — they
-are large and change every time the site does). To capture one:
+Snapshots are real responses saved locally. Do not commit them: they may contain
+sensitive data and change with the website. To capture one:
 
 - **Public pages** (artwork, collection): save the page HTML with a browser
   User-Agent (login not required).

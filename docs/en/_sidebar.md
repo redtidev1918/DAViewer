@@ -6,7 +6,10 @@
   - [Networking & Proxy](/en/networking.md)
 - Development
   - [Architecture](/en/architecture.md)
+  - [Artwork access states](/en/artwork-access.md)
   - [Web Adapter Contract](/en/web_adapter.md)
   - [Build](/en/build.md)
+  - [Release gate (中文)](/release-gate.md)
+  - [Regression catalog](/regressions/README.md)
 - 中文
   - [中文文档](/)

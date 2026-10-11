@@ -1,15 +1,30 @@
 # 认证与会话恢复
 
-> English: [Authentication and session recovery](/en/authentication.md)
+语言 / Language：中文 · [English](en/authentication.md)
 
 DAViewer 只有一个用户身份：官方 DeviantArt OAuth 会话。应用既不接收也不存储 DeviantArt、Google、Apple、Facebook 或 Mac 的密码。凭据与各服务商的安全校验都留在 DeviantArt 官方页面，应用只在自己的内嵌 WebView 中展示该页面。
+
+## 登录与常见问题
+
+选择「登录或创建账号」，在应用内嵌的 DeviantArt 官方页面完成授权。一次正常登录同时建立 OAuth 和网页会话；应用不会保存账号密码。
+
+| 情况 | 处理方式 |
+| --- | --- |
+| 登录页打不开或卡住 | 关闭登录页后重开；在设置中检查代理并运行连通性测试 |
+| 官方页面要求验证码或账号确认 | 在当前页面完成校验，应用会等待授权回调 |
+| 推荐提示恢复，但每日精选可用 | 网页会话与 OAuth 状态不同；按推荐页提示恢复网页会话 |
+| macOS 提示钥匙串权限 | 允许应用访问账号存储；更新后的授权表现受签名环境影响 |
+| 成人内容被隐藏或模糊 | 打开「设置 → DeviantArt 账号设置 → 成人内容设置」，检查网站账号偏好 |
+| 需要更换账号 | 先登出，再登录；Cookie 导入不允许混用账号 |
+
+代理覆盖范围见 [网络与代理](networking.md)。下面说明会话实现与恢复规则。
 
 ## 单入口登录契约
 
 应用只暴露一个 **登录或创建账号** 操作，它打开内嵌登录界面：
 
 1. DAKit 创建一个 OAuth/PKCE 事务。
-2. DAViewer 以内嵌 WebView 加载官方登录页，并使用桌面 User-Agent —— 因为 DeviantArt 的移动登录页不提供桌面页上的一键 Google/Apple 按钮。
+2. DAViewer 以内嵌 WebView 加载官方登录页，并使用桌面 User-Agent ，因为 DeviantArt 的移动登录页不提供桌面页上的一键 Google/Apple 按钮。
 3. 账号登录、注册、找回密码以及当前提供的全部服务商（DeviantArt、Google、Apple、Facebook）都由 DeviantArt 页面负责。应用内没有单独的「社交登录」路径。
 4. `dakit://oauth/callback` 在 WebView 内被拦截并完成同一事务。WebView 保留其 Cookie 与 CSRF token，因此这一次登录同时建立了后续个性化 `rfy` 信息流与合集适配器所需的网页会话，不再要求第二次登录。
 
@@ -39,7 +54,7 @@ Secure/HttpOnly），而不是折叠成 `name→value` 表：同名的 `.deviant
 
 等待期间用户可以取消并重新打开。取消或开启新尝试都会清除待处理事务，避免过期回调吞掉后续登录。设置、代理、诊断、更新、关于、语言与外观在登录前均可达。
 
-只要应用进程存活，内存中的 PKCE 事务就是权威。它的安全存储副本只用于进程重启后恢复回调：写入、读取或清除该恢复副本失败，绝不能推翻仍在进行的授权结果。token 存储不同，它才是硬提交点——只有新 token 已安全存储，登录才被判定成功。
+只要应用进程存活，内存中的 PKCE 事务就是权威。它的安全存储副本只用于进程重启后恢复回调：写入、读取或清除该恢复副本失败，绝不能推翻仍在进行的授权结果。只有新 token 已安全存储，登录才被判定成功。
 
 `dakit` scheme 由内嵌 WebView 持有，它拦截 OAuth 回调且从不离开应用。只有在没有注册 WebView 监听器作为回退时，以及「内容设置」跳转 DeviantArt 浏览偏好时，才使用系统浏览器。
 
@@ -60,11 +75,19 @@ Cookie 也能拿到 HTTP 200 的通用内容。匿名探测结果由真实 headl
 anonymous 并提示重新登录；真实浏览器无法作答（挑战/网络）→ 保持 unverified，
 绝不静默降级。
 
-职责边界（见 `regressions/011`）：只有验证层能产生 verdict；Cookie 存储、
+职责边界（见 [REG-011](regressions/011-session-boundary-refactor.md)）：只有验证层能产生 verdict；Cookie 存储、
 后台探测（只轮转 CSRF）、feed 成功/失败、UI 都没有写权限。所有 verdict
 变更经由 `WebSessionStatusController.applyVerification` 单一入口，带代际
 保护与 source 日志；`webSessionReadyProvider` 只表示启动 readiness，不等于
 会话健康。
+
+## 使用中发现 Cookie 失效
+
+启动后，明确的网页登录限制或原因不明的模糊预览会请求网页会话复核，绕过最近成功的五分钟缓存。明确的纯付费限制不单独触发 Cookie 校验。同一批卡片共享在途校验，后续触发间隔至少 30 秒，并遵守网络和验证页面的退避状态。模糊图本身不能证明 Cookie 失效；仍由上述服务端验证链判断。
+
+确认匿名后，主页面和作品详情页均显示重新登录入口。网络错误或验证页面不会被报成 Cookie 过期。登录页确认会话恢复后，会清除作品媒体的旧解析标记，并重新加载详情、附加图片、原图查询和更多推荐。
+
+更多推荐中的可疑预览还会通过官方 OAuth 详情接口核对同一作品。官方查询失败时，可回退到完整网页详情。作者与作品路径匹配、返回明确媒体或访问限制后，才更新缓存；真实付费限制继续保留。两种来源都无法确认时保留服务端预览，不修改模糊图 URL。详细状态规则见 [作品访问状态](architecture/artwork-access.md)，回归记录见 [REG-013](regressions/013-mature-related-preview.md)。
 
 ## 认证事务生命周期
 
@@ -92,17 +115,15 @@ anonymous 并提示重新登录；真实浏览器无法作答（挑战/网络）
   不等同于未登录，不触发重复登录提示；
 - `signingIn / signingOut`：登录/登出进行中。
 
-macOS 预览版使用同一个私有稳定的 CI 签名身份。该身份是自签名的，不被 Apple 信任也未公证，但它能避免每次更新后变化的 ad-hoc cdhash 索要 Mac 密码。token 与恢复存储使用 `DAViewer Account` Keychain 服务；更早的 ad-hoc 项永不查询，因此无法访问的历史记录不会阻塞授权。
+token 与恢复存储使用 `DAViewer Account` Keychain 服务；更早的 ad-hoc 项不查询，避免历史记录阻塞授权。当前 macOS 构建脚本没有导入稳定预览证书或公证步骤，因此更新后仍可能出现系统钥匙串授权提示。
 
-项目**不购买 Apple Developer Program**，也不要求付费开发者签名。本地
-`ad-hoc / 无 TeamIdentifier` 是接受的环境限制；稳定签名与公证明确不在本项目的
-发布范围内，不作为 Keychain 验收或 Release Gate 的阻塞项。
+本地 `ad-hoc / 无 TeamIdentifier` 是接受的环境限制，不因缺少付费 Developer ID 签名阻止发布；应用自身重复读写、删除或创建 Keychain 项仍需排查。发布验收见 [发布门禁](release-gate.md)。
 
 首页 **推荐 / For you** 标签是网站的个性化 `rfy/deviations` 信息流，使用 WebView 的 Cookie 与 CSRF token 拉取。它需要已登录的网页会话；网页会话缺失、正在恢复或被权威判定匿名时，该标签展示登录/恢复提示，**绝不静默渲染匿名 Cookie 拿到的通用内容**，也绝不自动切到 **每日精选 / Daily** 标签（该标签使用官方 OAuth API，不依赖网页会话，只在用户主动切换时显示）。产品上不得把这两个数据源表述为等价。
 
 ## 公开网页适配器
 
-少数详情页功能需要未公开的公开网页数据，例如数字 id 解析与合集内容。内嵌 WebView 的网页会话（Cookie 与 CSRF token）按需提供这些能力。它属于基础设施状态，不是第二个用户身份：绝不阻塞首页、绝不要求用户再次登录，不可用时必须降级为重试或官方 API 回退。
+少数详情页功能需要未公开的公开网页数据，例如数字 id 解析与合集内容。内嵌 WebView 的网页会话（Cookie 与 CSRF token）按需提供这些能力。这些公开详情适配器不要求单独登录；不可用时按能力规则重试、使用预览或官方 API 回退。首页个性化推荐的会话要求见上文。
 
 历史浏览器 Cookie 仅为兼容公开适配器而接受。若它们暴露的用户名与 OAuth 账号不同，会被清除，以防混账号数据。
 
@@ -115,10 +136,10 @@ macOS 预览版使用同一个私有稳定的 CI 签名身份。该身份是自�
 1. 导入的 Cookie 必须带有已登录的 `userinfo` 用户名；匿名粘贴会被拒绝。
 2. 若已登录 OAuth 账号，导入的用户名必须与之一致。
 3. 若 WebView 已有已登录网页会话，导入的用户名必须与之一致。
-4. 冲突会在**写入任何 Cookie 之前**被拒绝——应用绝不把一个账号的会话叠加到另一个账号上。要切换账号需先登出。
+4. 冲突会在**写入任何 Cookie 之前**被拒绝。应用不把一个账号的会话叠加到另一个账号上。要切换账号需先登出。
 5. 注入完成后会从 Cookie 存储回读用户名。若 DeviantArt 不认可所声称的会话（Cookie 过期/无效），则恢复原有 Cookie，不持久化任何内容。
 
-导入校验通过后，快照会被持久化、网页会话状态被更新，并触发一次 CSRF 刷新，使网页适配器使用新会话。仅网页的导入会话（无 OAuth 账号）可驱动网页适配器与个性化信息流，但官方 API 功能仍需 OAuth 登录。因此导入之后，应用会再提供一次常规内嵌登录：DeviantArt 页面会识别导入的 Cookie，通常无需输入密码即可完成，用户也可以关闭该提示（网页功能继续可用；官方 API 功能在使用时再次要求登录）。Cookie 永不替代 OAuth token —— 官方 API 会话只能通过 OAuth/PKCE 流程建立。
+导入校验通过后，快照会被持久化、网页会话状态被更新，并触发一次 CSRF 刷新，使网页适配器使用新会话。仅网页的导入会话（无 OAuth 账号）可驱动网页适配器与个性化信息流，但官方 API 功能仍需 OAuth 登录。因此导入之后，应用会再提供一次常规内嵌登录：DeviantArt 页面会识别导入的 Cookie，通常无需输入密码即可完成，用户也可以关闭该提示（网页功能继续可用；官方 API 功能在使用时再次要求登录）。官方 API 会话只能通过 OAuth/PKCE 流程建立；导入 Cookie 后仍需完成 OAuth 登录。
 
 ## 成人内容
 

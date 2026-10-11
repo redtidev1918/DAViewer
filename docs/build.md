@@ -1,61 +1,107 @@
-# DAViewer 构建说明
+# 构建与发布
 
-> English: [DAViewer build notes](/en/build.md)
+语言 / Language：中文 · [English](en/build.md)
 
-README 放不下、又不适合省略的工具链、发版与构建代理细节。
+本地构建使用与 CI 相同的工具链。版本和发布规则分别见 `pubspec.yaml`、`.release-please-manifest.json`、`.release-policy.yml` 与 `.github/workflows/release.yml`。
 
-## 工具链版本固定
+## 开发环境
 
-Flutter 3.47 默认使用 AGP 9.1.0，但稳定版 `flutter_inappwebview`（6.1.5）的 Android 子包仍引用 `proguard-android.txt`（AGP 9 已移除该文件），其 beta 版 macOS 子包在 Swift 6 下也无法编译。因此本项目固定以下工具链（均满足 Flutter 3.47 的 Gradle ≥ 8.14 / Kotlin ≥ 2.2.20 下限）：
-
-| 组件 | 版本 | 说明 |
-| --- | --- | --- |
-| Android Gradle Plugin | `8.13.2` | 8.x 保留 `proguard-android.txt`，且支持 compileSdk 36 |
-| Gradle | `8.14.2` | Flutter 3.47 下限为 8.14 |
-| Kotlin | `2.2.20` | Flutter 3.47 下限为 2.2.20 |
-| flutter_inappwebview | `6.1.5`（精确） | 稳定版；不要升到 `6.2.0-beta`（macOS 构建失败） |
-
-这些值位于 `android/settings.gradle.kts`、`android/gradle/wrapper/gradle-wrapper.properties` 与 `pubspec.yaml`。升级插件或 Flutter 之前，请先确认 `flutter_inappwebview` 的 Android/macOS 子包与新 AGP/Swift 工具链兼容。
-
-## 发布契约
-
-- 推送到 `main` 触发 CI 质量检查与 Android/macOS/Windows 构建；推送 `v*` tag 会创建 GitHub Release，其说明取自 `RELEASE_NOTES.md` 中对应的面向用户章节。缺少该章节会**阻止**发版，而不是退化成提交信息或内部实现说明。
-- 发布用 APK 始终使用上传密钥库签名（CI 机密 `KEYSTORE_B64` / `KEYSTORE_PROPERTIES`）；缺少本地 `android/key.properties` 的 release 构建会**故意失败**，从而不可能用 debug 签名的 APK 覆盖此前上传签名的发布版。
-- macOS 发布 tag 需要私有预览证书机密。CI 用该稳定自签名身份签名、重新应用仓库内声明的 entitlements、校验两种 CPU 架构，并让应用保持运行 8 秒完成启动冒烟测试。非发布构建可回退到 ad-hoc 签名。产物仍带 `macos-unsigned-preview` 标记，因为预览身份不是 Apple Developer ID，包也未公证。
-- 项目**不购买 Apple Developer Program**；稳定签名与公证明确不在发布范围内。
-  本地 `ad-hoc / 无 TeamIdentifier` 是接受的环境限制，不作为 Release Gate
-  阻塞项。
-
-### 一键发版
-
-Actions → **Release** → Run workflow → 选择 `patch` / `minor` / `major`（或具体版本）→ 运行。它会升版本、提交、推 tag，CI 随后构建并发布。
-
-本地验证构建：
+安装 Flutter 3.47.1，并准备目标平台的构建工具。Android 使用 Android SDK；macOS 构建在 macOS 上进行；Windows 构建在 Windows 上进行。
 
 ```shell
-flutter build apk --release          # Android APK（需要 android/key.properties）
-flutter build macos --release        # macOS 应用
-flutter build windows --release      # Windows 应用
+flutter doctor
+flutter pub get
+flutter devices
+flutter run -d <设备ID>
 ```
 
-## 构建走代理
+桌面设备 ID 为 `macos` 或 `windows`；Android 使用 `flutter devices` 列出的设备 ID。应用默认带有公开 OAuth client ID。使用自己的应用时，附加 `--dart-define=DAKIT_CLIENT_ID=你的_PUBLIC_CLIENT_ID`，并注册回调 `dakit://oauth/callback`。
 
-`flutter pub get` 使用 Dart 的 HTTP 客户端，不读 Git 代理配置：
+## 固定工具链
+
+| 组件 | 仓库固定版本 | 配置位置 |
+| --- | --- | --- |
+| Flutter | `3.47.1` | `.github/workflows/ci.yml`、`.release-policy.yml` |
+| Android Gradle Plugin | `8.13.2` | `android/settings.gradle.kts` |
+| Gradle | `8.14.2` | `android/gradle/wrapper/gradle-wrapper.properties` |
+| Kotlin | `2.2.20` | `android/settings.gradle.kts` |
+| flutter_inappwebview | `6.1.5`（精确版本） | `pubspec.yaml` |
+
+升级 Flutter 或 WebView 插件时，同时验证 Android 与 macOS 子包的编译兼容性。
+
+## 验证与构建
+
+Dart 改动提交前运行与 CI 相同的质量检查：
 
 ```shell
+dart format --output=none --set-exit-if-changed lib test
+flutter analyze
+flutter test
+```
+
+在对应平台执行 release 构建：
+
+```shell
+flutter build apk --release      # 需要 android/key.properties
+flutter build macos --release
+flutter build windows --release
+```
+
+Android release 构建需要上传密钥库与 `android/key.properties`，缺少配置时构建会失败。CI 使用 `KEYSTORE_B64` 与 `KEYSTORE_PROPERTIES`；PR 的 dry-run 在没有签名机密时可构建 debug APK，但该包不能作为正式发布包。
+
+macOS 当前脚本执行 Flutter release 构建后压缩 `DAViewer.app`，没有导入稳定预览证书、Developer ID 签名或公证步骤。产物名保留 `macos-unsigned-preview`。本地 ad-hoc 签名或缺少 TeamIdentifier 属于环境限制；升级后的 Keychain 授权表现需实机验证，不能承诺签名身份连续性。
+
+## 发布流程
+
+`.github/workflows/release.yml` 调用 ReleaseGraph；`.release-policy.yml` 选择 release-please 版本管理、三平台构建、资产检查和保留策略。PR 执行 dry-run，`main` 推送、定时任务和手动触发进入发布流程。当前工作流没有 `v*` tag 推送触发器。
+
+1. 通过 release-please 管理版本变更，核对 `pubspec.yaml` 与 `.release-please-manifest.json`。
+2. 在 `.github/release-notes/<版本>.md` 中编写中文正文，包含「本次更新」。CI 检查当前 manifest 版本的文件是否存在并含中文。
+3. 通过质量检查、构建和资产验证。发布前人工验收见 [发布门禁](release-gate.md)。
+4. 发布后，脚本更新中英文下载页并触发 Pages 部署。`CHANGELOG.md` 与 `RELEASE_NOTES.md` 保留历史更新记录。
+
+手动操作入口为 Actions → **Release** → Run workflow：
+
+| 参数 | 用途 |
+| --- | --- |
+| `version` | 已有版本号；留空读取 manifest |
+| `dry_run` | 构建和验证，不发布 |
+| `force` | 重新执行已健康的版本 |
+| `repair` | 修复当前不完整版本 |
+| `stage` | 恢复阶段标签，默认 `all` |
+
+发布资产名为 `DAViewer-v<版本>.apk`、`DAViewer-v<版本>-windows.zip` 和 `DAViewer-v<版本>-macos-unsigned-preview.zip`。保留策略分别保留一个 stable 和一个 prerelease，以及两个失败草稿；不要把发布页保留数量当作源码历史。
+
+## 构建代理
+
+构建工具的代理与应用内代理分开配置。以下命令中的 `7890` 和 `7892` 都是示例，请替换成代理软件显示的 HTTP/Mixed 端口。
+
+Bash / zsh：
+
+```bash
 export http_proxy=http://127.0.0.1:7890
 export https_proxy=http://127.0.0.1:7890
-# 或使用一个通用代理（大小写变量都受支持）：
-# 7892 只是示例，请替换成你自己代理的 HTTP/Mixed 端口。
-# export all_proxy=http://127.0.0.1:7892
 export no_proxy=localhost,127.0.0.1
 flutter pub get
 ```
 
-Gradle Wrapper 运行在 JVM 上，不保证读取 `all_proxy`。当 Android 工具链下载需要代理时，显式传入 JVM 代理属性：
+PowerShell：
 
-```shell
-# 把 7892 替换成代理应用实际显示的 HTTP/Mixed 端口。
+```powershell
+$env:http_proxy = 'http://127.0.0.1:7890'
+$env:https_proxy = 'http://127.0.0.1:7890'
+$env:no_proxy = 'localhost,127.0.0.1'
+flutter pub get
+```
+
+Gradle 在 JVM 中运行。Android 工具链下载需要代理时，显式设置 JVM 代理属性：
+
+```bash
 export GRADLE_OPTS="-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=7892 -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=7892"
+flutter build apk --debug
+```
+
+```powershell
+$env:GRADLE_OPTS = '-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=7892 -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=7892'
 flutter build apk --debug
 ```

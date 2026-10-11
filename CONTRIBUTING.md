@@ -1,96 +1,58 @@
 # Contributing to DAViewer
 
-Thanks for wanting to help! DAViewer is a community client for DeviantArt built
-on [DAKit](https://github.com/redtidev1918/DAKit). Contributions of any size are
-welcome — bug reports, fixes, features, translations, and documentation.
+DAViewer is a DeviantArt client built on [DAKit](https://github.com/redtidev1918/DAKit). You can contribute bug reports, fixes, features, translations, and documentation.
 
 ## Before you start
 
-- **SDK vs app**: DAViewer is the app; [DAKit](https://github.com/redtidev1918/DAKit)
-  is the SDK it depends on. If a change belongs in the SDK (API adapters, OAuth,
-  domain models, transfers), open the PR over there and publish it first, then
-  bump the dependency here.
-- Search existing [issues](https://github.com/redtidev1918/DAViewer/issues) and
-  PRs before opening a new one.
-- For security issues, see [SECURITY.md](SECURITY.md) and do **not** file them
-  publicly.
+Search existing [issues](https://github.com/redtidev1918/DAViewer/issues) and pull requests. Report security issues through [SECURITY.md](SECURITY.md).
+
+DAKit owns OAuth, official API mapping, domain models, transfers, and generic private-protocol parsing in `dakit_web`. DAViewer owns WebView sessions, source selection, caching, navigation, and presentation. For an SDK change, submit it upstream and publish the package before updating this app's dependency. See [Architecture](docs/en/architecture.md).
 
 ## Development setup
 
-1. Install Flutter 3.47.1 (the project pins this version).
-2. `flutter pub get`
-3. Run `dart format lib test`, `flutter analyze`, and `flutter test` before
-   committing — all must pass.
-4. For a full build, see [Build notes](docs/build.md).
+Install Flutter 3.47.1, then run:
 
-> The project deliberately pins `flutter_inappwebview 6.1.5` and specific
-> Gradle/AGP/Kotlin versions (see the [toolchain pin](docs/build.md#toolchain-pin)).
-> Do not upgrade these without verifying the toolchain compatibility.
+```shell
+flutter doctor
+flutter pub get
+flutter devices
+flutter run -d <device-id>
+```
+
+For platform tools, signing, and build proxies, see [Building and releasing](docs/en/build.md). Flutter, Gradle, AGP, Kotlin, and `flutter_inappwebview` are pinned; verify Android and macOS compatibility before upgrading them.
 
 ## Project structure
 
-```text
-lib/
-  main.dart                    App entry, proxy injection, ProviderScope
-  app/                         AppShell, theme, router
-  core/
-    auth/                      Sign-in state, session restore, logout, WebView OAuth bridge
-    data/                      Unified data access layer (official API + web fallback)
-    diagnostics/               File logging, global error capture
-    downloads/                 Completed-download shared-storage saver
-    feed/                      Paged feed controller
-    l10n/                      Chinese/English strings and language state
-    network/                   Proxy detection, open-in-browser, dynamic proxy Dio
-    runtime/                   DAKit composition root
-    search/                    Search history persistence
-    settings/                  Persisted user preferences (language, theme)
-    theme/                     Theme mode controller
-  features/
-    web_login/                 Web-session commit and OAuth login page
-    home/                      Home (native For you / Daily feeds)
-    watched/                   Watched feed (first-class "following" tab + avatar strip)
-    search/                    Search
-    artwork/                   Artwork detail, media playback, download, favourite
-    artist/                    Artist profile, gallery, favourites, watch
-    favourites/                Current account favourites
-    watching/                  Watched users list
-    downloads/                 Download list
-    notifications/             Message center + local read-state store
-    settings/                  Settings, proxy, language, theme, logs, about
-    diagnostics/               Log & diagnostics page
-    splash/                    Splash screen
-  shared/widgets/              Shared artwork card, empty/error states, timestamps
-android/
-macos/
-windows/
-test/
-```
+| Path | Responsibility |
+| --- | --- |
+| `lib/app/` | App shell, theme, router |
+| `lib/core/auth/` | OAuth state, web-session storage, verification, login bridge |
+| `lib/core/data/` | Data access, source policy, repository request gate |
+| `lib/core/runtime/` | DAKit composition |
+| `lib/core/network/` | Proxy selection, HTTP routing, WebView proxy configuration |
+| `lib/core/feed/` | Feed request state and pagination |
+| `lib/core/history/`, `lib/core/search/` | Visit history, search history, tag interests |
+| `lib/core/diagnostics/`, `lib/core/notice/` | Logging, error reports, notices |
+| `lib/core/l10n/`, `lib/core/settings/`, `lib/core/theme/` | Translations and persisted preferences |
+| `lib/features/` | Screens and feature providers |
+| `lib/shared/widgets/` | Artwork cards and shared UI |
+| `android/`, `macos/`, `windows/` | Platform projects |
+| `test/` | Unit and widget tests |
+| `docs/`, `docs/en/` | Chinese and English documentation |
 
-## Workflow
+## Making a change
 
-1. Fork the repository and create a branch from `main`.
-2. Make your change. Keep commits focused and descriptive.
-3. `flutter analyze` and `flutter test` locally.
-4. Open a pull request. Explain **what** changed and **why**.
+1. Create a focused branch from `main`.
+2. Make the change and add regression coverage when behavior changes.
+3. For Dart changes, run `dart format lib test`, `flutter analyze`, and `flutter test`. CI checks formatting without rewriting files.
+4. Open a pull request describing the problem, resulting behavior, and validation. Include device evidence when the change depends on WebView, Keychain, or native gestures.
 
-> Pushing to `main` runs the full CI pipeline (quality checks plus Android, macOS,
-> and Windows builds). For documentation-only commits, add `[skip ci]` to the
-> commit message (e.g. `docs: fix typo [skip ci]`) to skip CI. A GitHub Release
-> is created only when a `v*` tag is pushed (via the manual Release workflow), so
-> ordinary pushes never release by themselves.
+Keep user-facing strings in `lib/core/l10n/app_strings.dart` in Chinese and English. Treat feed artwork as sparse: hydrate detail-only fields through the repository and merge through `ArtworkStore`, preserving richer cached data. At 1x zoom, horizontal gestures may switch artwork; once zoomed, the image viewer owns panning and outer navigation recognizers must be disabled.
 
-## Style
+Documentation changes should keep corresponding Chinese and English guides aligned. Check relative links and documented commands against repository configuration. Download pages are generated: edit `.github/scripts/update_download_page.py` or `docs/download-preview.md`, then regenerate them rather than patching the output alone. Preserve the verification scope of historical audit and regression records.
 
-- Follow the existing code style; run `dart format lib test` before committing.
-- Keep user-facing strings in `lib/core/l10n/app_strings.dart` (Chinese + English).
-- Treat list-endpoint artwork as potentially sparse. Hydrate detail-only fields
-  through the canonical repository and merge them through `ArtworkStore`; never
-  let a later feed refresh erase richer cached data.
-- At 1x zoom, horizontal gestures may navigate between artworks. Once zoomed,
-  the image viewer owns both axes and outer navigation recognizers must be off.
-- Prefer small, reviewable PRs over large, mixed ones.
+## CI and releases
 
-## Getting help
+CI runs analysis, formatting checks, tests, and release-note validation on PRs and pushes to `main`. The Release workflow calls ReleaseGraph with dry-run enabled for PRs; published assets are built for Android, macOS, and Windows. Release versioning uses release-please, and Chinese release bodies live in `.github/release-notes/<version>.md`.
 
-Open an issue with the `question` label, or start a discussion. Maintainers and
-the community will help you get unblocked.
+See [Building and releasing](docs/en/build.md) for workflow inputs and [Release gate](docs/release-gate.md) for manual acceptance requirements. Report a bug with its app version, platform, reproduction steps, and relevant redacted diagnostics.

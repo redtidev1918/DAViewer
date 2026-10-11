@@ -11,14 +11,15 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/auth/auth_controller.dart';
 import '../../core/auth/auth_state.dart';
-import '../../core/auth/session_state.dart';
 import '../../core/auth/web_session_controller.dart';
 import '../../core/auth/web_session_refresher.dart';
+import '../../core/auth/web_session_status.dart';
 import '../../core/data/web_session.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/runtime/runtime_provider.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../core/updates/update_checker.dart';
+import '../artwork/artwork_detail_providers.dart';
 
 const String _githubUrl = 'https://github.com/redtidev1918/DAViewer';
 const String _releasesUrl = 'https://github.com/redtidev1918/DAViewer/releases';
@@ -484,7 +485,9 @@ Future<void> _showAccountCookies(
   );
   if (importedUser == null || importedUser.isEmpty) return;
   if (!context.mounted) return;
+  ref.read(artworkSessionRecoveryProvider)();
   unawaited(ref.read(webSessionRefresherProvider).refresh());
+  unawaited(ref.read(webSessionStatusProvider.notifier).check(force: true));
   ScaffoldMessenger.of(context)
       .showSnackBar(SnackBar(content: Text(s.cookiesImported(importedUser))));
   // A web-only session powers the personalized feed, but official-API

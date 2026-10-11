@@ -2,8 +2,8 @@
 
 **Language / 语言:** [中文](/architecture.md) · English
 
-This document defines the boundaries that are easiest to blur when fixing feed,
-detail, authentication, media, and release bugs.
+This document describes DAKit and DAViewer responsibilities, artwork data flow,
+related content, gestures, and session handling.
 
 ## SDK and app boundary
 
@@ -123,26 +123,19 @@ collection thumbnail. When it does not, the collection card lazily resolves the
 cover from `gallection/contents` (`collectionCoverProvider`), so cards do not
 stay blank; the folder-icon placeholder is only the last resort.
 
-**Watching a collection is not implemented.** The official API can watch a
-*user* (`user/watch`), not a specific collection/folder; a collection watch
-exists only in an undocumented web surface. Until that is reverse-engineered
-(web-session work, out of DAKit), collection cards open the collection natively
-but offer no follow action.
+Collection cards open the collection natively but currently offer no follow
+action. The official `user/watch` endpoint follows users. If collection watching
+is added, private-protocol parsing belongs in `dakit_web`; sessions and
+interaction stay in the app.
 
 **More from this artist** (`MoreFromArtistSection`): the author's other recent
-works, read from the official `gallery/{username}` first page. This is the
-cleanly available "artist discovery" path.
+works, read from the official `gallery/{username}` first page. This section lets users continue browsing the artist's recent work.
 
-**Similar artists** (`SimilarArtistsSection`): DeviantArt has no public
-similar-artists endpoint — the official API only offers `browse/morelikethis`
-(deviations + collections), and the website's `biMetadata` `type: "artist"` hint
-is BI tracking (the author's account type), not a recommendation payload. The
-real "similar deviants" list streams post-hydration from an undocumented
-endpoint (absent from `__INITIAL_STATE__`, `__RCACHE__`, and `dadeviation/init`).
-DAViewer therefore derives similar artists from the "More Like This" artwork
-authors (`similarArtistsFrom`): artists whose work the recommendation engine
-surfaced as related are the honest equivalent. A future dedicated source would
-be a web-session reverse-engineering effort and must stay out of DAKit.
+**Similar artists** (`SimilarArtistsSection`): `similarArtistsFrom` extracts
+authors from the "More Like This" artwork. This list represents authors of
+related artwork, not the website's dedicated similar-user recommendations.
+Future private-protocol parsing belongs in `dakit_web`; session acquisition and
+presentation stay in the app.
 
 ## Gesture ownership
 
@@ -160,8 +153,8 @@ state-dependent:
 
 ## Authentication boundary
 
-The app has one user identity: OAuth for Home, favourites, watch, galleries,
-downloads, and every other official API. Signed-out state is onboarding, not a
+The OAuth account defines user identity for Daily, favourites, watch, galleries,
+downloads, and other official API features. For you also requires a verified web session. Signed-out state is onboarding, not a
 feed error. Each visible attempt owns one OAuth/PKCE transaction and opens the
 official login page in the app's embedded WebView (with a desktop User-Agent).
 DeviantArt's page owns account selection, passwords, registration, social
@@ -170,9 +163,12 @@ the WebView and completes that same transaction. The same WebView session also
 supplies the web cookies and CSRF token for website-only adapters, so there is
 no second login.
 
-The WebView's web session (cookies and CSRF) is infrastructure state, not
-authentication. It must never block Home or display a login prompt, and its
-failure degrades to an official-API fallback or retry.
+The web session (cookies and CSRF) is verified separately from OAuth. For you
+requires a signed-in web session; a confirmed anonymous session shows recovery
+UI without rendering generic recommendations or switching to Daily. Public detail
+adapters retry, fall back, or hide optional sections according to their capability
+policy. A web-session failure does not clear valid OAuth. See
+[Authentication and session recovery](authentication.md) for the full rules.
 
 Session restoration reads only the current secure item (`DAViewer Account`).
 Ad-hoc Keychain items from previews before 0.2.139 are never queried or
@@ -188,21 +184,20 @@ must stay reachable from the login screen.
 
 ## Release contract
 
-- `pubspec.yaml` is the only source version edited by the release workflow.
-  Flutter exposes it to the app as `FLUTTER_BUILD_NAME`.
-- Every tag must have a matching top-level section in `RELEASE_NOTES.md`; CI uses
-  that section as the GitHub Release body.
+- release-please manages versions; check `pubspec.yaml` against
+  `.release-please-manifest.json`. Flutter exposes the app version as `FLUTTER_BUILD_NAME`.
+- The current manifest version must have Chinese notes in
+  `.github/release-notes/<version>.md` with a 本次更新 section; CI checks the file.
 - CI analyzes, checks formatting, tests, and builds Android, macOS, and Windows.
-- Android releases require the configured upload keystore. macOS artifacts use
-  a private stable self-signed preview identity for Keychain continuity, but
-  remain non-Apple-signed and unnotarized. The project does **not purchase
-  Apple Developer Program**; Developer ID signing and notarization are
-  intentionally out of scope, so artifacts keep the `macos-unsigned-preview`
-  marker and this is not a release blocker.
-- Publishing keeps only the newest GitHub Release visible. Git tags remain as
-  the source-history record and are not deleted by the release job.
+- Android releases require the upload keystore. The current macOS script archives
+  the Flutter release output without importing a stable preview certificate or
+  notarizing the app. Artifacts keep the `macos-unsigned-preview` marker. See
+  [Building and releasing](build.md) for the toolchain and release inputs.
+- Retention is configured for one stable release, one prerelease, and two failed drafts.
 
 ## App-local state
+
+Artwork access evidence, media resolution, and web-session health use separate states. Source precedence and session epochs are specified in [Artwork access and media resolution](artwork-access.md).
 
 Some state is deliberately kept client-side and never synced to DeviantArt:
 
@@ -217,6 +212,9 @@ Some state is deliberately kept client-side and never synced to DeviantArt:
 - **Search interests** (`core/search/InterestStore`): lightweight persisted
   tag-view counts that drive the personalized "recommended tags" on the search
   page across restarts.
+- **Visit history** (`core/history/VisitHistoryStore`): artwork visits are
+  deduplicated by most recent visit and stored locally, up to 200 entries. The
+  entry point is at the top right of Search.
 - **Web-session cookie snapshot** (`core/auth/WebSessionStore`): the signed-in
   deviantart.com cookies are snapshotted alongside the CSRF/username state and
   re-injected on a cold start when the platform WebView store lost them (e.g.
@@ -226,5 +224,5 @@ Some state is deliberately kept client-side and never synced to DeviantArt:
 - **Theme mode** (`core/theme/ThemeModeController`): system / light / dark, fed
   into the MaterialApp and persisted with the preferences above.
 
-These overlays must stay local: adding a "sync to server" behavior would cross
-into the official API boundary and belongs in DAKit, not in the app.
+Before adding server sync, verify that the official API supports it. DAKit owns
+protocols and mapping; the app owns synchronization policy and presentation.

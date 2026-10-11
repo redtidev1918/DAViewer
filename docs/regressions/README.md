@@ -30,6 +30,8 @@ machine cannot produce the required evidence.
 | R20  | single verdict write path; background probes are pure observers | Verified | test/web_session_verdict_policy_test.dart (full evidence matrix incl. authoritative real-browser anonymous and unavailable→unverified) plus all 298 existing tests passing after routing every verdict mutation through WebSessionStatusController.applyVerification (generation-guarded). Refresher writes only CSRF (updateCsrf); AppNoticeHost no longer starts session checks. See 011. |
 | R21  | literature deviations render text instead of blank detail/broken previews | Verified | test/literature_deviation_test.dart covers the text card, body fetch for a /art/ literature deviation, and no body request for image works. flutter analyze is clean; the full suite (312 tests) passes. See 012. |
 
+| R22 | mature related previews preserve restriction reasons and use canonical media; expired web sessions expose recovery | Partial | `artwork_access_state_test.dart`, `artwork_media_hydration_test.dart`, `web_session_status_test.dart`, and `artwork_detail_navigation_test.dart` cover combined restrictions, unknown causes, source boundaries, stale results, web fallback, card updates, verification, and recovery. The full suite passes 337 tests; the reported live artwork still needs account/device confirmation. See [013](013-mature-related-preview.md). |
+
 ## Evidence still required before calling the architecture closed
 
 - Mac run: record actual collections/all request count and caller around the

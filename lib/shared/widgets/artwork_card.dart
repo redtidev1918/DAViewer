@@ -10,6 +10,8 @@ import '../../core/diagnostics/error_text.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/sharing/app_share.dart';
 import '../../features/artwork/artwork_access.dart';
+import '../../features/artwork/artwork_access_controller.dart';
+import '../../features/artwork/artwork_access_presentation.dart';
 import '../../features/artwork/artwork_store.dart';
 import '../../features/artwork/favourite_actions.dart';
 
@@ -48,19 +50,28 @@ final class ArtworkCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final artwork =
+        ref.watch(artworkStoreProvider.select((map) => map[this.artwork.id])) ??
+        this.artwork;
     final s = strings(ref.watch(appLanguageProvider));
     final theme = Theme.of(context);
     // Track the favourite flag through the store so a favourite action here is
     // reflected immediately (and mirrored in the detail screen).
-    final favourited = ref.watch(
-      artworkStoreProvider.select(
-        (map) => map[artwork.id]?.isFavourited ?? artwork.isFavourited,
-      ),
-    );
+    final favourited = artwork.isFavourited;
     // Prefer a static image for the grid thumbnail; fall back to any media
     // (video / animation) so every card shows something.
     final media = artwork.media;
-    final image = media.where((m) => m.kind == MediaKind.image).firstOrNull;
+    final image =
+        media
+            .where(
+              (m) =>
+                  m.kind == MediaKind.image &&
+                  m.role == MediaRole.preview &&
+                  m.availability == MediaAvailability.available &&
+                  !isBlurredPreview(m),
+            )
+            .firstOrNull ??
+        media.where((m) => m.kind == MediaKind.image).firstOrNull;
     final thumbnail = image ?? media.firstOrNull;
     final hasVideo = media.any((m) => m.kind == MediaKind.video);
     // Animated GIFs are mapped as image assets with an `image/gif` MIME type
@@ -72,7 +83,10 @@ final class ArtworkCard extends ConsumerWidget {
           m.mimeType == 'image/gif' ||
           (m.uri?.path.toLowerCase().endsWith('.gif') ?? false),
     );
-    final viewLock = artworkViewLock(artwork);
+    final accessState = ref.watch(
+      artworkAccessControllerProvider.select((states) => states[artwork.id]),
+    );
+    final accessNotice = artworkAccessPresentation(artwork, accessState, s);
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -170,12 +184,13 @@ final class ArtworkCard extends ConsumerWidget {
                         icon: Icons.filter_none,
                       ),
                     ),
-                  if (viewLock != null)
+                  if (accessNotice != null)
                     Positioned(
                       left: 6,
                       bottom: 6,
                       child: _LockBadge(
-                        tooltip: artworkViewLockLabel(s, viewLock),
+                        tooltip: accessNotice.label,
+                        icon: accessNotice.icon,
                       ),
                     ),
                 ],
@@ -308,9 +323,10 @@ final class ArtworkCard extends ConsumerWidget {
 }
 
 final class _LockBadge extends StatelessWidget {
-  const _LockBadge({required this.tooltip});
+  const _LockBadge({required this.tooltip, required this.icon});
 
   final String tooltip;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
@@ -322,7 +338,7 @@ final class _LockBadge extends StatelessWidget {
           color: Colors.black54,
           shape: BoxShape.circle,
         ),
-        child: const Icon(Icons.lock_outline, size: 13, color: Colors.white),
+        child: Icon(icon, size: 13, color: Colors.white),
       ),
     );
   }

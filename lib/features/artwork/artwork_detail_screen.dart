@@ -15,9 +15,11 @@ import '../../core/runtime/runtime_provider.dart';
 import '../../core/sharing/app_share.dart';
 import '../../shared/widgets/app_error_state.dart';
 import '../../shared/widgets/skeleton.dart';
+import '../../shared/widgets/app_notice_host.dart';
 import '../downloads/download_helpers.dart';
 import '../history/history_providers.dart';
 import 'artwork_detail_providers.dart';
+import 'artwork_access_controller.dart';
 import 'artwork_detail_sections.dart';
 import 'artwork_navigation.dart';
 import 'artwork_store.dart';
@@ -472,35 +474,49 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
           ),
         ],
       ),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 250),
-        child: artwork.when(
-          loading: () => const SkeletonDetail(key: ValueKey('skeleton-art')),
-          error: (error, stackTrace) => AppErrorState(
-            key: const ValueKey('error-art'),
-            message: friendlyErrorMessage(error),
-            onRetry: () =>
-                ref.invalidate(artworkDetailProvider(widget.artworkId)),
-          ),
-          data: (artwork) => KeyedSubtree(
-            key: const ValueKey('content'),
-            child: _buildBody(
-              artwork,
-              original,
-              transfer,
-              description: description.value,
-              descriptionHtml: descriptionHtml.value,
-              journalHtml: journalHtml.value,
-              additionalMedia: additionalMedia.value ?? const <MediaAsset>[],
-              additionalOriginals:
-                  additionalOriginals.value ?? const <MediaAsset>[],
-              tags: tags.value ?? const <String>[],
-              dates: dates.value ?? const ArtworkDates(),
-              hasPreviousArtwork: previousArtwork != null,
-              hasNextArtwork: nextArtwork != null,
+      body: Stack(
+        children: <Widget>[
+          Positioned.fill(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: artwork.when(
+                loading: () =>
+                    const SkeletonDetail(key: ValueKey('skeleton-art')),
+                error: (error, stackTrace) => AppErrorState(
+                  key: const ValueKey('error-art'),
+                  message: friendlyErrorMessage(error),
+                  onRetry: () =>
+                      ref.invalidate(artworkDetailProvider(widget.artworkId)),
+                ),
+                data: (artwork) => KeyedSubtree(
+                  key: const ValueKey('content'),
+                  child: _buildBody(
+                    artwork,
+                    original,
+                    transfer,
+                    description: description.value,
+                    descriptionHtml: descriptionHtml.value,
+                    journalHtml: journalHtml.value,
+                    additionalMedia:
+                        additionalMedia.value ?? const <MediaAsset>[],
+                    additionalOriginals:
+                        additionalOriginals.value ?? const <MediaAsset>[],
+                    tags: tags.value ?? const <String>[],
+                    dates: dates.value ?? const ArtworkDates(),
+                    hasPreviousArtwork: previousArtwork != null,
+                    hasNextArtwork: nextArtwork != null,
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
+          const Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: AppNoticeHost(),
+          ),
+        ],
       ),
     );
   }
@@ -552,7 +568,19 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
             ),
             const SizedBox(height: 16),
           ],
-          ArtworkHeader(artwork: artwork, s: s),
+          ArtworkHeader(
+            artwork: artwork,
+            s: s,
+            accessState: ref.watch(
+              artworkAccessControllerProvider.select(
+                (states) => states[artwork.id],
+              ),
+            ),
+            onRetry: () {
+              ref.invalidate(artworkMediaHydrationProvider(artwork.id));
+              ref.invalidate(artworkDetailProvider(artwork.id));
+            },
+          ),
           ArtworkDateSection(
             publishedAt: dates.publishedAt ?? artwork.publishedAt,
             updatedAt: dates.updatedAt,

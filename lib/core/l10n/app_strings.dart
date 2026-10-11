@@ -132,8 +132,8 @@ final class AppStrings {
       ? '推荐内容暂时无法加载。请下拉刷新，或在设置中检查网络代理。'
       : 'Recommendations could not load. Pull to refresh or check the proxy in Settings.';
   String get webSessionBanner => _lang == AppLanguage.zh
-      ? '个性化推荐需要 App 内网页会话 Cookie；当前 Cookie 不可用，请进入 App 内网页重新获取。'
-      : 'Personalized recommendations need the in-app web-session Cookie; it is unavailable now. Open the in-app web page to restore it.';
+      ? 'DeviantArt 网页登录已失效或缺失。请在应用内重新登录，恢复个性化推荐和网页作品内容。'
+      : 'Your DeviantArt web sign-in has expired or is missing. Sign in again inside the app to restore personalized recommendations and website content.';
   String get noImage => _lang == AppLanguage.zh ? '暂无图片' : 'No image';
   String get imageLoadFailed =>
       _lang == AppLanguage.zh ? '图片加载失败' : 'Failed to load';
@@ -313,6 +313,15 @@ final class AppStrings {
       : 'Subscription or purchase required to view';
   String get availabilityRestricted =>
       _lang == AppLanguage.zh ? '受限' : 'Restricted';
+  String get matureLoginRequired => _lang == AppLanguage.zh
+      ? '成年内容需要网页登录'
+      : 'Web sign-in required for mature content';
+  String get matureSettingsRestricted => _lang == AppLanguage.zh
+      ? '成年内容受浏览设置限制'
+      : 'Mature content restricted by browsing settings';
+  String get previewRestrictionUnknown => _lang == AppLanguage.zh
+      ? '预览受限，原因未确认'
+      : 'Restricted preview; reason unconfirmed';
   String get availabilityUnavailable =>
       _lang == AppLanguage.zh ? '不可下载' : 'Unavailable';
   String get availabilityMissing =>

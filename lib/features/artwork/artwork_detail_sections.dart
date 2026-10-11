@@ -7,44 +7,54 @@ import '../../shared/widgets/compact_tag_strip.dart';
 import '../../shared/widgets/relative_time_text.dart';
 
 import '../../core/l10n/app_strings.dart';
-import 'artwork_access.dart';
+import 'artwork_access_presentation.dart';
+import 'artwork_access_state.dart';
 import 'rich_html.dart';
 
 /// The artwork title and author link, with the author's avatar for a more
 /// scannable, social-style header.
 final class ArtworkHeader extends StatelessWidget {
-  const ArtworkHeader({required this.artwork, required this.s, super.key});
+  const ArtworkHeader({
+    required this.artwork,
+    required this.s,
+    this.accessState,
+    this.onRetry,
+    super.key,
+  });
 
   final Artwork artwork;
   final AppStrings s;
+  final ArtworkAccessState? accessState;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final author = artwork.author;
-    final viewLock = artworkViewLock(artwork);
+    final accessNotice = artworkAccessPresentation(artwork, accessState, s);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(artwork.title, style: theme.textTheme.headlineSmall),
-        if (viewLock != null) ...<Widget>[
+        if (accessNotice != null) ...<Widget>[
           const SizedBox(height: 6),
           Row(
             children: <Widget>[
-              Icon(
-                Icons.lock_outline,
-                size: 16,
-                color: theme.colorScheme.error,
-              ),
+              Icon(accessNotice.icon, size: 16, color: theme.colorScheme.error),
               const SizedBox(width: 6),
-              Text(
-                artworkViewLockLabel(s, viewLock),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.error,
+              Expanded(
+                child: Text(
+                  accessNotice.label,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
                 ),
               ),
             ],
           ),
+          if (accessState?.phase == ArtworkAccessPhase.retryableFailure &&
+              onRetry != null)
+            TextButton(onPressed: onRetry, child: Text(s.retry)),
         ],
         const SizedBox(height: 8),
         InkWell(

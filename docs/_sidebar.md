@@ -6,7 +6,10 @@
   - [网络与代理](/networking.md)
 - 开发
   - [架构说明](/architecture.md)
+  - [作品访问状态](/architecture/artwork-access.md)
   - [Web 适配器契约](/web_adapter.md)
   - [构建说明](/build.md)
+  - [发布门禁](/release-gate.md)
+  - [回归目录](/regressions/README.md)
 - English
   - [English index](/en/)

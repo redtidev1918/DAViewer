@@ -8,6 +8,8 @@ import 'package:flutter_riverpod/legacy.dart';
 import '../../core/auth/session_state.dart';
 import '../../core/auth/web_session_controller.dart';
 import '../../core/auth/web_session_refresher.dart';
+import '../../core/auth/web_session_status.dart'
+    show webSessionRestrictionCheckProvider;
 import '../../core/data/data_access.dart';
 import '../../core/diagnostics/app_logger.dart';
 
@@ -16,6 +18,10 @@ import 'package:dakit_web/dakit_web.dart';
 import '../../core/runtime/runtime_provider.dart';
 import '../../core/search/interest_store.dart';
 import 'artwork_store.dart';
+import 'artwork_access.dart';
+import 'artwork_access_controller.dart';
+import 'artwork_access_state.dart';
+import 'artwork_web_repository.dart';
 import 'more_like_this_failure.dart';
 
 /// True for numeric ids used by public website URLs (the OAuth API accepts
@@ -27,12 +33,28 @@ bool isNumericDeviationId(String id) => RegExp(r'^\d+$').hasMatch(id);
 /// from the link's URL segment.
 final linkUsernameProvider = StateProvider<String?>((ref) => null);
 
+/// Retry session-dependent detail data after a confirmed web login.
+final artworkSessionRecoveryProvider = Provider<void Function()>((ref) {
+  return () {
+    ref.invalidate(artworkMediaHydrationProvider);
+    ref.read(artworkStoreProvider.notifier).clearMediaResolutions();
+    ref.invalidate(webArtworkInitPayloadProvider);
+    ref.invalidate(deviationInitProvider);
+    ref.invalidate(artworkDetailProvider);
+    ref.invalidate(originalFileProvider);
+    ref.invalidate(journalHtmlProvider);
+    ref.invalidate(moreLikeThisProvider);
+  };
+});
+
 /// Resolves a numeric website id to the OAuth UUID plus the full description,
 /// via the private web `dadeviation/init` endpoint and a public browser token.
 /// Returns `null` for ids that are already OAuth UUIDs.
-final deviationInitProvider = FutureProvider.autoDispose
-    .family<DeviationInit?, String>((ref, artworkId) async {
+final webArtworkInitPayloadProvider = FutureProvider.autoDispose
+    .family<Map<Object?, Object?>?, String>((ref, artworkId) async {
       if (!isNumericDeviationId(artworkId)) return null;
+      final access = ref.read(artworkAccessControllerProvider.notifier);
+      final epoch = access.sessionEpoch;
       var csrf = ref.watch(
         webSessionControllerProvider.select((web) => web.csrf),
       );
@@ -49,12 +71,35 @@ final deviationInitProvider = FutureProvider.autoDispose
       final username =
           cached?.author.username ?? ref.read(linkUsernameProvider) ?? '';
       final runtime = ref.watch(runtimeProvider);
-      return DeviationInitFetcher(runtime.dio!).fetch(
+      final payload = await ArtworkWebRepository(runtime.dio!).init(
         deviationId: artworkId,
         username: username,
         cookieHeader: cookieHeader,
         csrfToken: csrf,
       );
+      if (epoch == access.sessionEpoch) {
+        final raw = Map<Object?, Object?>.from(payload['deviation'] as Map);
+        if (raw['author'] is! Map) raw.remove('author');
+        final mapped = WebDeviationMapper.mapDeviation(raw);
+        final evidence = ArtworkAccessEvidence.fromWeb(
+          raw,
+          mapped,
+          source: ArtworkAccessSource.webDetail,
+        );
+        access.observe(artworkId, evidence, epoch: epoch);
+        if (evidence.requestsSessionCheck) {
+          unawaited(ref.read(webSessionRestrictionCheckProvider)());
+        }
+      }
+      return payload;
+    });
+
+final deviationInitProvider = FutureProvider.autoDispose
+    .family<DeviationInit?, String>((ref, artworkId) async {
+      final payload = await ref.watch(
+        webArtworkInitPayloadProvider(artworkId).future,
+      );
+      return payload == null ? null : DeviationInitFetcher.parseInit(payload);
     });
 
 /// The OAuth UUID for an artwork id (numeric web ids are resolved through
@@ -253,9 +298,16 @@ final artworkDetailProvider = FutureProvider.autoDispose
     .family<Artwork, String>((ref, artworkId) async {
       final cached = ref.read(artworkStoreProvider)[artworkId];
       if (cached != null) {
+        final access = ref
+            .read(artworkAccessControllerProvider.notifier)
+            .forId(artworkId);
+        final artwork =
+            (needsArtworkMediaHydration(cached) || access.needsResolution)
+            ? await ref.watch(artworkMediaHydrationProvider(artworkId).future)
+            : cached;
         // Viewing a work is an interest signal for the recommended tags.
-        unawaited(InterestStore.recordTags(cached.tags));
-        return cached;
+        unawaited(InterestStore.recordTags(artwork.tags));
+        return artwork;
       }
       final runtime = ref.watch(runtimeProvider);
       // Numeric website ids (pasted links) must be resolved to the OAuth UUID
@@ -266,6 +318,97 @@ final artworkDetailProvider = FutureProvider.autoDispose
       ref.read(artworkStoreProvider.notifier).putAll(<Artwork>[artwork]);
       unawaited(InterestStore.recordTags(artwork.tags));
       return artwork;
+    });
+
+/// Rechecks suspicious web previews through the same signed-in official API as
+/// artist galleries. Failures preserve the server preview and its restrictions.
+final artworkMediaHydrationProvider = FutureProvider.autoDispose
+    .family<Artwork, String>((ref, artworkId) async {
+      final store = ref.read(artworkStoreProvider.notifier);
+      final cached = store.byId(artworkId)!;
+      if (store.hasResolvedMedia(artworkId)) return cached;
+      final access = ref.read(artworkAccessControllerProvider.notifier);
+      final epoch = access.sessionEpoch;
+      final lease = ref.keepAlive();
+      var disposed = false;
+      ref.onDispose(() => disposed = true);
+      try {
+        // Cross-provider mutations start after provider initialization.
+        await Future<void>.value();
+        if (disposed || epoch != access.sessionEpoch) return cached;
+        access.beginResolution(artworkId);
+        // Content evidence requests verification, never an auth verdict.
+        final initialEvidence = access.forId(artworkId).mainEvidence;
+        if (initialEvidence?.requestsSessionCheck ?? true) {
+          unawaited(ref.read(webSessionRestrictionCheckProvider)());
+        }
+        final runtime = ref.read(runtimeProvider);
+        if (runtime.transport == null) {
+          throw StateError('Official media lookup is unavailable');
+        }
+        final uuid = await ref.watch(artworkUuidProvider(artworkId).future);
+        final detail = await dataAccessFor(runtime).artworkById(uuid);
+        if (disposed || epoch != access.sessionEpoch) return cached;
+        // Never let a misresolved ID replace a different recommendation.
+        if (detail.pageUri.path != cached.pageUri.path ||
+            detail.author.username.toLowerCase() !=
+                cached.author.username.toLowerCase()) {
+          throw const FormatException('Canonical artwork identity mismatch');
+        }
+        final evidence = ArtworkAccessEvidence.fromArtwork(
+          detail,
+          source: ArtworkAccessSource.officialDetail,
+        );
+        if (!evidence.isConclusive) {
+          throw const FormatException('Canonical media access is inconclusive');
+        }
+        final resolved = detail.copyWith(id: artworkId);
+        store.setResolvedMedia(resolved, evidence: evidence, epoch: epoch);
+        return store.byId(artworkId) ?? cached;
+      } on Object catch (error) {
+        debugPrint('[media] detail hydration failed for $artworkId: $error');
+        if (!disposed && epoch == access.sessionEpoch) {
+          // Mature multi-image works can be absent from the OAuth endpoint.
+          // A complete web detail is an independent canonical media source.
+          Map<Object?, Object?>? payload;
+          if (isNumericDeviationId(artworkId)) {
+            try {
+              payload = await ref.watch(
+                webArtworkInitPayloadProvider(artworkId).future,
+              );
+            } on Object {
+              // Neither canonical source was able to answer this lookup.
+            }
+          }
+          if (disposed || epoch != access.sessionEpoch) return cached;
+          final raw = payload?['deviation'];
+          if (raw is Map && raw['author'] is Map) {
+            final detail = WebDeviationMapper.mapDeviation(
+              Map<Object?, Object?>.from(raw),
+            );
+            final webEvidence = ArtworkAccessEvidence.fromWeb(
+              Map<Object?, Object?>.from(raw),
+              detail,
+              source: ArtworkAccessSource.webDetail,
+            );
+            if (detail.pageUri.path == cached.pageUri.path &&
+                detail.author.username.toLowerCase() ==
+                    cached.author.username.toLowerCase() &&
+                webEvidence.isConclusive) {
+              store.setResolvedMedia(
+                detail.copyWith(id: artworkId),
+                evidence: webEvidence,
+                epoch: epoch,
+              );
+              return store.byId(artworkId) ?? cached;
+            }
+          }
+          access.resolutionFailed(artworkId, epoch);
+        }
+        return cached;
+      } finally {
+        lease.close();
+      }
     });
 
 /// The authoritative result of probing DeviantArt's original-download
@@ -407,6 +550,8 @@ final artworkDescriptionHtmlProvider = FutureProvider.autoDispose
 final moreLikeThisProvider = FutureProvider.autoDispose
     .family<MoreLikeThisResult, String>((ref, artworkId) async {
       final runtime = ref.watch(runtimeProvider);
+      final access = ref.read(artworkAccessControllerProvider.notifier);
+      final epoch = access.sessionEpoch;
       final artwork = await ref.watch(artworkDetailProvider(artworkId).future);
       final numericId = isNumericDeviationId(artworkId)
           ? artworkId
@@ -419,14 +564,28 @@ final moreLikeThisProvider = FutureProvider.autoDispose
         try {
           final webSession = ref.read(webSessionProvider);
           final cookieHeader = await webSession.cookieHeader();
-          final artworks = await WebMoreLikeThisFetcher(runtime.dio!).fetch(
+          final batch = await ArtworkWebRepository(runtime.dio!).related(
             pageUri: artwork.pageUri,
             deviationId: numericId,
             cookieHeader: cookieHeader,
           );
+          final artworks = batch.artworks;
           if (artworks.isNotEmpty) {
-            webArtworks = artworks;
+            if (epoch != access.sessionEpoch) {
+              return const MoreLikeThisResult(artworks: <Artwork>[]);
+            }
             ref.read(artworkStoreProvider.notifier).putAll(artworks);
+            for (final entry in batch.evidence.entries) {
+              access.observe(entry.key, entry.value, epoch: epoch);
+            }
+            webArtworks = await hydrateRelatedArtworkMedia(
+              artworks,
+              needsHydration: (artwork) =>
+                  needsArtworkMediaHydration(artwork) ||
+                  access.forId(artwork.id).needsResolution,
+              hydrate: (artwork) =>
+                  ref.watch(artworkMediaHydrationProvider(artwork.id).future),
+            );
             debugPrint(
               '[moreLikeThis] website source returned ${artworks.length} '
               'items for $numericId',
@@ -446,6 +605,9 @@ final moreLikeThisProvider = FutureProvider.autoDispose
         final uuid = await ref.watch(artworkUuidProvider(artworkId).future);
         final result = await OfficialDiscoveryRepository(runtime.transport!)
             .moreLikeThis(uuid);
+        if (epoch != access.sessionEpoch) {
+          return const MoreLikeThisResult(artworks: <Artwork>[]);
+        }
         ref.read(artworkStoreProvider.notifier).putAll(result.artworks);
         debugPrint(
           '[moreLikeThis] OAuth source returned ${result.artworks.length} '
@@ -471,6 +633,32 @@ final moreLikeThisProvider = FutureProvider.autoDispose
         );
       }
     });
+
+/// Only suspicious previews need extra lookups; limit concurrency while keeping
+/// website order and allowing an individual lookup to fail independently.
+Future<List<Artwork>> hydrateRelatedArtworkMedia(
+  List<Artwork> artworks, {
+  required Future<Artwork> Function(Artwork artwork) hydrate,
+  bool Function(Artwork artwork)? needsHydration,
+}) async {
+  final result = List<Artwork>.of(artworks);
+  final indices = <int>[
+    for (var i = 0; i < artworks.length; i++)
+      if ((needsHydration ?? needsArtworkMediaHydration)(artworks[i])) i,
+  ];
+  for (var start = 0; start < indices.length; start += 3) {
+    await Future.wait(
+      indices.skip(start).take(3).map((index) async {
+        try {
+          result[index] = await hydrate(artworks[index]);
+        } on Object {
+          // Keep the original server-provided preview on a failed lookup.
+        }
+      }),
+    );
+  }
+  return List<Artwork>.unmodifiable(result);
+}
 
 /// Merges the website's related artwork with the official preview's
 /// collections (and its artwork as the fallback). Website artwork wins when

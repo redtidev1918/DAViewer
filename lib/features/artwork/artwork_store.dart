@@ -2,6 +2,8 @@ import 'package:dakit_core/dakit_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'artwork_access.dart';
+import 'artwork_access_controller.dart';
+import 'artwork_access_state.dart';
 
 /// Whether the canonical source has already told us a list-like field's
 /// real value, as opposed to the field being missing from a sparse payload.
@@ -30,6 +32,39 @@ final class ArtworkStore extends Notifier<Map<String, Artwork>> {
 
   Artwork? byId(String id) => state[id];
 
+  bool hasResolvedMedia(String id) =>
+      ref.read(artworkAccessControllerProvider.notifier).forId(id).phase ==
+      ArtworkAccessPhase.confirmed;
+
+  /// Access results belong to the session that fetched them.
+  void clearMediaResolutions() =>
+      ref.read(artworkAccessControllerProvider.notifier).resetSession();
+
+  /// A signed-in detail response may correct a provisional list-level gate.
+  /// Keep that media when the same sparse recommendation is cached again on tap.
+  bool setResolvedMedia(
+    Artwork artwork, {
+    required ArtworkAccessEvidence evidence,
+    required int epoch,
+  }) {
+    final access = ref.read(artworkAccessControllerProvider.notifier);
+    if (epoch != access.sessionEpoch || !evidence.isConclusive) return false;
+    final cached = state[artwork.id];
+    if (cached == null) return false;
+    access.confirm(artwork.id, evidence, epoch);
+    final gate = evidence.viewGate;
+    final incoming = gate == null ? artwork : applyViewLock(artwork, gate);
+    state = <String, Artwork>{
+      ...state,
+      artwork.id: mergeArtwork(
+        cached: cached,
+        incoming: incoming,
+        accessResolved: true,
+      ),
+    };
+    return true;
+  }
+
   /// Whether the canonical detail endpoint has already confirmed this
   /// artwork's tags. This distinguishes a genuinely tagless work from a
   /// compact feed item whose `tags` field was omitted upstream.
@@ -51,10 +86,20 @@ final class ArtworkStore extends Notifier<Map<String, Artwork>> {
     for (final artwork in artworks) {
       if (artwork.id.isEmpty) continue;
       final cached = next[artwork.id];
+      ref
+          .read(artworkAccessControllerProvider.notifier)
+          .observe(artwork.id, ArtworkAccessEvidence.fromArtwork(artwork));
       // List endpoints are allowed to return sparse artwork objects. Never let
       // a later feed refresh erase tags that the canonical detail endpoint has
       // already hydrated.
-      next[artwork.id] = mergeArtwork(cached: cached, incoming: artwork);
+      final incoming = cached != null && hasResolvedMedia(artwork.id)
+          ? artwork.copyWith(
+              media: cached.media,
+              downloadAvailability: cached.downloadAvailability,
+              isDownloadable: cached.isDownloadable,
+            )
+          : artwork;
+      next[artwork.id] = mergeArtwork(cached: cached, incoming: incoming);
       if (artwork.tags.isNotEmpty) _resolvedTagIds.add(artwork.id);
     }
     if (next.length > _maxEntries) {
@@ -63,6 +108,9 @@ final class ArtworkStore extends Notifier<Map<String, Artwork>> {
         entries.skip(entries.length - _maxEntries),
       );
       _resolvedTagIds.removeWhere((id) => !next.containsKey(id));
+      ref
+          .read(artworkAccessControllerProvider.notifier)
+          .retainIds(next.keys.toSet());
     }
     state = next;
   }
@@ -95,14 +143,20 @@ final class ArtworkStore extends Notifier<Map<String, Artwork>> {
 /// - a later payload that carried no access metadata never erases a confirmed
 ///   view/download gate (e.g. subscription-only art seen in the feed). Missing
 ///   gate info means "unknown", never "known available".
-Artwork mergeArtwork({Artwork? cached, required Artwork incoming}) {
+Artwork mergeArtwork({
+  Artwork? cached,
+  required Artwork incoming,
+  bool accessResolved = false,
+}) {
   if (cached == null) return incoming;
   var merged = incoming;
   if (merged.tags.isEmpty && cached.tags.isNotEmpty) {
     merged = merged.copyWith(tags: cached.tags);
   }
   final cachedLock = artworkViewLock(cached);
-  if (cachedLock != null && artworkViewLock(merged) == null) {
+  if (!accessResolved &&
+      cachedLock != null &&
+      artworkViewLock(merged) == null) {
     merged = applyViewLock(merged, cachedLock);
   }
   return merged;

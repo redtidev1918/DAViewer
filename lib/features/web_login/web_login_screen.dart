@@ -20,6 +20,7 @@ import '../../core/diagnostics/error_text.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/runtime/runtime_provider.dart';
 import '../home/home_providers.dart';
+import '../artwork/artwork_detail_providers.dart';
 
 /// Hosts the embedded DeviantArt WebView.
 ///
@@ -162,11 +163,15 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
             'signed-in report on login path; waiting for home navigation',
           );
         } else {
+          final firstConfirmation = !_serverConfirmedWebSession;
           _serverConfirmedWebSession = true;
           ref
               .read(webSessionStatusProvider.notifier)
               .markHealthy(serverUsername: username);
           ref.invalidate(personalizedFeedProvider);
+          if (firstConfirmation) {
+            ref.read(artworkSessionRecoveryProvider)();
+          }
           final oauthSignedIn = ref.read(authControllerProvider).oauthSignedIn;
           if (shouldCloseWebLoginAfterWebSession(
             serverConfirmedNavigation: true,

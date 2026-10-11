@@ -1,4 +1,7 @@
 {
   "displayName": "DAViewer",
-  "docsWorkflow": "static.yml"
+  "docsWorkflow": "static.yml",
+  "previewFiles": {
+    "en": "docs/en/download-preview.md"
+  }
 }

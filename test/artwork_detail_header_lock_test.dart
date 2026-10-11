@@ -30,7 +30,8 @@ void main() {
       ),
     );
 
-    expect(find.byIcon(Icons.lock_outline), findsOneWidget);
+    expect(find.byIcon(Icons.block), findsOneWidget);
+    expect(find.byIcon(Icons.lock_outline), findsNothing);
     expect(find.text('受限'), findsOneWidget);
   });
 }

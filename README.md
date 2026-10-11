@@ -6,9 +6,7 @@
 
 **语言 / Language:** 中文 · [English](README.en.md)
 
-> **基于 DAKit 的开源 DeviantArt 客户端，支持 Android / macOS / Windows。**
-
-DeviantArt 官方客户端已经停止维护。DAViewer 是基于 [DAKit](https://github.com/redtidev1918/DAKit) 的第三方客户端，支持 Android、macOS 和 Windows。
+DAViewer 是基于 [DAKit](https://github.com/redtidev1918/DAKit) 的开源 DeviantArt 第三方客户端，支持 Android、macOS 和 Windows。可以浏览作品、查看作者画廊、收藏、关注和下载图片。
 
 [完整文档](https://redtidev1918.github.io/DAViewer/)
 
@@ -16,13 +14,15 @@ DeviantArt 官方客户端已经停止维护。DAViewer 是基于 [DAKit](https:
 
 ## 下载
 
-从 [Releases](https://github.com/redtidev1918/DAViewer/releases) 取对应平台的文件：
+从 [Releases](https://github.com/redtidev1918/DAViewer/releases) 下载对应平台的文件：
 
 - **Android**：`DAViewer-v<版本>.apk`
 - **Windows**：`DAViewer-v<版本>-windows.zip`
 - **macOS**：`DAViewer-v<版本>-macos-unsigned-preview.zip`
 
-macOS 首次打开需要在 Finder 里右键点 App，选「打开」。
+Android 安装 APK；Windows 解压后运行 `daviewer.exe`，保留同目录的其他文件；macOS 解压后打开 `DAViewer.app`。macOS 包是未公证的预览版，首次打开可在 Finder 中右键选择「打开」。
+
+打开应用后，选择「登录或创建账号」，在内嵌的 DeviantArt 官方页面完成登录。推荐流需要网页会话，每日精选使用 OAuth API；会话恢复问题见 [登录与会话](docs/authentication.md)。
 
 ## 截图
 
@@ -54,8 +54,9 @@ macOS 首次打开需要在 Finder 里右键点 App，选「打开」。
 
 ```shell
 flutter pub get
+flutter devices         # 查看可用设备 ID
 flutter run -d macos     # macOS
-flutter run -d android   # Android
+flutter run -d <设备ID>  # Android，使用 flutter devices 列出的 ID
 flutter run -d windows   # Windows
 ```
 
@@ -65,11 +66,11 @@ flutter run -d windows   # Windows
 
 ## 代理
 
-网络路径依次取「设置 → 网络代理」、系统代理、`https_proxy` / `http_proxy` / `all_proxy`。端口填代理软件显示的 HTTP/Mixed 端口，没有固定值。完整规则见 [网络与代理](docs/networking.md)。
+代理按「设置 → 网络代理」、系统代理、`https_proxy` / `http_proxy` / `all_proxy`、构建期 `DAKIT_PROXY_URL`、直连的顺序选择。端口填代理软件显示的 HTTP/Mixed 端口。各平台登录 WebView 的覆盖范围见 [网络与代理](docs/networking.md)。
 
 ## 发布
 
-打 `v*` 标签会创建 Release，说明取自 `RELEASE_NOTES.md`。要出包走 Actions → **Release** → Run workflow，选 `patch` / `minor` / `major` 或填版本号。
+发布由 ReleaseGraph 和 release-please 管理，配置见 [.release-policy.yml](.release-policy.yml)。每个版本的中文 Release 正文放在 `.github/release-notes/<版本>.md`；Actions → **Release** 可手动验证或修复已有版本。参数和流程见 [构建说明](docs/build.md)。
 
 ```shell
 flutter build apk --release          # Android APK，需 android/key.properties
@@ -83,25 +84,26 @@ flutter build windows --release      # Windows
 
 - **登录页打不开或卡住**：点右上角「完成」重开；登录前可以先跑一次连通性测试。
 - **成人内容**：「设置 → DeviantArt 账号设置 → 成人内容设置」。
-- **macOS 首次登录**：系统会问一次钥匙串权限，选「允许」。
+- **macOS 钥匙串提示**：系统请求访问应用账号存储时，选「允许」。
 
 状态与恢复规则见 [登录与会话说明](docs/authentication.md)。
 
 ## 参与
 
-Issue、PR、文档都欢迎，见 [CONTRIBUTING.md](CONTRIBUTING.md)。改动后跑 `dart format lib test`、`flutter analyze`、`flutter test`；安全问题走 [SECURITY.md](SECURITY.md)。
+Issue、PR、文档都欢迎，见 [CONTRIBUTING.md](CONTRIBUTING.md)。Dart 改动后跑 `dart format lib test`、`flutter analyze`、`flutter test`；安全问题走 [SECURITY.md](SECURITY.md)。
 
 ## 文档
 
-README 只讲怎么开始；完整内容在[文档站](https://redtidev1918.github.io/DAViewer/)：
+按任务选择文档，也可打开[文档站](https://redtidev1918.github.io/DAViewer/)：
 
 | 你想做什么 | 文档 |
 | --- | --- |
-| 下载安装包 | [下载页](https://redtidev1918.github.io/DAViewer/download.md) |
+| 下载安装包 | [下载页](docs/download.md) |
 | 登录与常见问题 | [登录与会话](docs/authentication.md) |
 | 网络与代理 | [网络与代理](docs/networking.md) |
 | 看应用与 SDK 的边界 | [架构说明](docs/architecture.md) |
 | 本地构建、发版 | [构建说明](docs/build.md) |
+| 核对发布前验证与剩余风险 | [发布门禁](docs/release-gate.md)、[回归目录](docs/regressions/README.md) |
 
 ## 致谢
 

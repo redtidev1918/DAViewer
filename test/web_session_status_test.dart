@@ -389,6 +389,66 @@ void main() {
       expect(container.read(webSessionStatusProvider).isHealthy, isTrue);
     });
 
+    test(
+      'restricted content rechecks a recently healthy but expired cookie',
+      () async {
+        final adapter = _CountingHtmlAdapter(_anonymousHomeHtml);
+        final container = _containerWith(
+          adapter,
+          probe: () async => const WebSessionProbeResult.anonymous(),
+        );
+        addTearDown(container.dispose);
+        final controller = container.read(webSessionStatusProvider.notifier);
+        controller.markHealthy(serverUsername: 'artist');
+
+        await controller.recheckAfterContentRestriction();
+
+        expect(adapter.calls, 1);
+        expect(container.read(webSessionStatusProvider).needsLogin, isTrue);
+      },
+    );
+
+    test(
+      'repeated restricted cards share and throttle healthy verification',
+      () async {
+        final adapter = _CountingHtmlAdapter(_signedInHomeHtml);
+        final container = _containerWith(adapter);
+        addTearDown(container.dispose);
+        final controller = container.read(webSessionStatusProvider.notifier);
+        controller.markHealthy(serverUsername: 'artist');
+
+        await Future.wait(<Future<void>>[
+          controller.recheckAfterContentRestriction(),
+          controller.recheckAfterContentRestriction(),
+        ]);
+        await controller.recheckAfterContentRestriction();
+
+        expect(adapter.calls, 1);
+        expect(container.read(webSessionStatusProvider).isHealthy, isTrue);
+      },
+    );
+
+    test(
+      'content recheck does not label a browser challenge as expired',
+      () async {
+        final container = _containerWith(
+          _CountingHtmlAdapter(_anonymousHomeHtml),
+          probe: () async => const WebSessionProbeResult.unavailable(),
+        );
+        addTearDown(container.dispose);
+        final controller = container.read(webSessionStatusProvider.notifier);
+        controller.markHealthy(serverUsername: 'artist');
+
+        await controller.recheckAfterContentRestriction();
+
+        expect(
+          container.read(webSessionStatusProvider).state,
+          WebSessionStatusState.unverified,
+        );
+        expect(container.read(webSessionStatusProvider).needsLogin, isFalse);
+      },
+    );
+
     test('a stale anonymous check never overrides a newer login', () async {
       final gate = Completer<ResponseBody>();
       final container = _containerWith(_GatedHtmlAdapter(gate));

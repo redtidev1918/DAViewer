@@ -1,5 +1,8 @@
 import 'package:dakit_flutter/dakit_flutter.dart';
 import 'package:daviewer/app/router.dart';
+import 'package:daviewer/core/auth/web_session_status.dart';
+import 'package:daviewer/core/l10n/app_strings.dart';
+import 'package:daviewer/shared/widgets/app_notice_host.dart';
 import 'package:daviewer/features/artwork/artwork_detail_providers.dart';
 import 'package:daviewer/features/artwork/artwork_navigation.dart';
 import 'package:flutter/material.dart';
@@ -30,6 +33,11 @@ void main() {
           ),
         ),
         GoRoute(path: '/artwork/:id', pageBuilder: artworkDetailPage),
+        GoRoute(
+          path: '/web-login',
+          builder: (context, state) =>
+              const Scaffold(body: Text('Restore session')),
+        ),
       ],
     );
     addTearDown(router.dispose);
@@ -88,5 +96,19 @@ void main() {
     await tester.pumpAndSettle();
     expect(router.state.uri.path, '/artwork/c');
     expect(find.text('Artwork c'), findsWidgets);
+
+    // Details live outside AppShell, but confirmed expired cookies must still
+    // expose the same recovery action on the page where content is affected.
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(AppNoticeHost)),
+    );
+    container.read(webSessionStatusProvider.notifier).state =
+        const WebSessionStatus(state: WebSessionStatusState.anonymous);
+    await tester.pump();
+    final s = strings(container.read(appLanguageProvider));
+    expect(find.text(s.webSessionBanner), findsOneWidget);
+    await tester.tap(find.text(s.login));
+    await tester.pumpAndSettle();
+    expect(router.state.uri.path, '/web-login');
   });
 }

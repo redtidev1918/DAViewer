@@ -22,6 +22,25 @@ bool _isViewGate(MediaAvailability availability) =>
     availability == MediaAvailability.restricted ||
     availability == MediaAvailability.loginRequired;
 
+/// A blurred server preview is not evidence of a purchase requirement. Resolve
+/// it through the signed-in detail endpoint instead of editing the CDN URL.
+bool needsArtworkMediaHydration(Artwork artwork) =>
+    artwork.media.any((asset) => isBlurredPreview(asset)) ||
+    (artwork.isMature &&
+        artworkViewLock(artwork) == MediaAvailability.purchaseRequired);
+
+bool isBlurredPreview(MediaAsset asset) =>
+    asset.role == MediaRole.preview &&
+    (asset.uri?.path.contains('blur_') ?? false);
+
+bool hasClearArtworkPreview(Artwork artwork) => artwork.media.any(
+  (asset) =>
+      asset.role == MediaRole.preview &&
+      asset.availability == MediaAvailability.available &&
+      asset.uri != null &&
+      !isBlurredPreview(asset),
+);
+
 /// Short user-facing label for a locked preview/detail.
 String artworkViewLockLabel(AppStrings s, MediaAvailability availability) =>
     switch (availability) {
