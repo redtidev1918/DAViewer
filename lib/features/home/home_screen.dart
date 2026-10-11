@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_controller.dart';
 import '../../core/auth/web_session_controller.dart';
+import '../../core/auth/personalized_session_status.dart';
 import '../../core/auth/web_session_status.dart';
 import '../../core/data/da_uri.dart';
 import '../../core/diagnostics/app_logger.dart';
@@ -219,12 +220,17 @@ final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
     final webSessionDead = ref.watch(
       webSessionStatusProvider.select((status) => status.needsLogin),
     );
-    if (webSessionDead) {
+    final recommendationDegraded = ref.watch(
+      personalizedSessionStatusProvider.select(
+        (status) => status.needsRecovery,
+      ),
+    );
+    if (webSessionDead || recommendationDegraded) {
       if (!_recoveryUiLogged) {
         _recoveryUiLogged = true;
         AppLogger.instance.warning(
           'home',
-          'recovery UI shown status=anonymous '
+          'recovery UI shown status=${webSessionDead ? 'needs-login' : 'recommendation-degraded'} '
               'claimed=${ref.read(webSessionControllerProvider).username}',
         );
       }
@@ -234,12 +240,24 @@ final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Text(s.recommendedSignInHint, textAlign: TextAlign.center),
+              Text(
+                webSessionDead
+                    ? s.recommendedSignInHint
+                    : s.recommendedSessionDegraded,
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 12),
               FilledButton(
                 onPressed: () => context.push('/web-login'),
                 child: Text(s.login),
               ),
+              if (!webSessionDead)
+                TextButton(
+                  onPressed: () => unawaited(
+                    ref.read(personalizedFeedProvider.notifier).refresh(),
+                  ),
+                  child: Text(s.retry),
+                ),
             ],
           ),
         ),

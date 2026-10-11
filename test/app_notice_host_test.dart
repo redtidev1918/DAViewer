@@ -1,10 +1,72 @@
 import 'package:daviewer/core/auth/web_session_status.dart';
+import 'package:daviewer/core/auth/personalized_session_status.dart';
 import 'package:daviewer/shared/widgets/app_notice_host.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('degraded recommendations prompt without a global logout', (
+    tester,
+  ) async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final identity = container.read(webSessionStatusProvider.notifier);
+    identity.markHealthy(serverUsername: 'artist');
+    final recommendations = container.read(
+      personalizedSessionStatusProvider.notifier,
+    );
+    recommendations.observe(
+      cookieHeader: 'fake=session',
+      degraded: true,
+      generation: identity.generation,
+    );
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: Scaffold(body: AppNoticeHost())),
+      ),
+    );
+    await tester.pump();
+    expect(find.textContaining('通用内容'), findsOneWidget);
+    expect(container.read(webSessionStatusProvider).needsLogin, isFalse);
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pump();
+
+    identity.state = const WebSessionStatus(
+      state: WebSessionStatusState.healthy,
+      serverUsername: 'artist',
+    );
+    await tester.pump();
+    expect(find.textContaining('通用内容'), findsNothing);
+    expect(
+      container.read(personalizedSessionStatusProvider).needsRecovery,
+      isTrue,
+    );
+
+    // A transient identity probe recovering is the same recommendation incident.
+    identity.state = const WebSessionStatus(
+      state: WebSessionStatusState.unverified,
+    );
+    await tester.pump();
+    identity.state = const WebSessionStatus(
+      state: WebSessionStatusState.healthy,
+      serverUsername: 'artist',
+    );
+    await tester.pump();
+    expect(find.textContaining('通用内容'), findsNothing);
+
+    identity.markHealthy(serverUsername: 'artist');
+    await tester.pump();
+    recommendations.observe(
+      cookieHeader: 'fake=new-session',
+      degraded: true,
+      generation: identity.generation,
+    );
+    await tester.pump();
+    expect(find.textContaining('通用内容'), findsOneWidget);
+  });
+
   testWidgets('dismissal survives route replacement but resets offscreen', (
     tester,
   ) async {

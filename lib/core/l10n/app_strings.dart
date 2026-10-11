@@ -202,6 +202,9 @@ final class AppStrings {
   String get recommendedSessionUnverified => _lang == AppLanguage.zh
       ? '无法确认个性化推荐所需的网页会话。请稍后重试，或通过网页登录确认账号。'
       : 'The web session for personalized recommendations could not be confirmed. Retry later or confirm your account through web sign-in.';
+  String get recommendedSessionDegraded => _lang == AppLanguage.zh
+      ? '推荐接口疑似退回通用内容，个性化推荐尚未恢复。请通过网页登录确认账号或更新 Cookie。'
+      : 'Recommendations appear to have fallen back to generic content. Confirm your account through web sign-in or refresh the Cookie.';
   String newVersionAvailable(String version) => _lang == AppLanguage.zh
       ? '发现新版本 $version'
       : 'New version $version available';

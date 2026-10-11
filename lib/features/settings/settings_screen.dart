@@ -19,6 +19,8 @@ import '../../core/l10n/app_strings.dart';
 import '../../core/runtime/runtime_provider.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../core/updates/update_checker.dart';
+import '../../core/auth/personalized_session_status.dart';
+import '../home/home_providers.dart';
 import '../artwork/artwork_detail_providers.dart';
 
 const String _githubUrl = 'https://github.com/redtidev1918/DAViewer';
@@ -488,6 +490,8 @@ Future<void> _showAccountCookies(
   if (importedUser == null || importedUser.isEmpty) return;
   if (!context.mounted) return;
   ref.read(artworkSessionRecoveryProvider)();
+  ref.read(personalizedSessionStatusProvider.notifier).reset();
+  ref.invalidate(personalizedFeedProvider);
   unawaited(ref.read(webSessionRefresherProvider).refresh());
   unawaited(ref.read(webSessionStatusProvider.notifier).check(force: true));
   ScaffoldMessenger.of(context)

@@ -114,6 +114,9 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   int _generation = 0;
   Future<void>? _activeCheck;
 
+  /// Explicit login/lockout supersedes recommendation requests too.
+  int get generation => _generation;
+
   /// Bypass the healthy cache when a content response is suspicious, while
   /// coalescing restricted cards and respecting challenge/network cooldowns.
   Future<void> recheckAfterContentRestriction() =>

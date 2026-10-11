@@ -44,6 +44,10 @@ Personalized recommendation gating: see [REG-016](016-personalized-session-gate.
 Constructed anonymous and challenge responses block requests before generic
 HTTP 200 content can be accepted. The reported live session remains unverified.
 
+Recommendation degradation and recovery: see [REG-017](017-recommendation-capability.md).
+The recorded group-2 signal is handled separately from website identity;
+automated tests cover rejection, recovery, notices, changed cookies and late results.
+
 - Mac run: record actual collections/all request count and caller around the
   favourites/home flows.
 - Mac run: capture webview login screen/controller/load challenge counts;

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
 import '../../core/auth/auth_controller.dart';
+import '../../core/auth/personalized_session_status.dart';
 import '../../core/auth/web_session_controller.dart';
 import '../../core/auth/web_session_status.dart';
 
@@ -78,7 +79,14 @@ final personalizedFeedProvider =
         // "每日精选"-style generic items silently masquerade as personalized
         // recommendations.
         if (!ref.read(webSessionStatusProvider).needsLogin) {
-          await ref.read(webSessionStatusProvider.notifier).check();
+          final currentHeader = await webSession.cookieHeader();
+          await ref
+              .read(webSessionStatusProvider.notifier)
+              .check(
+                force: ref
+                    .read(personalizedSessionStatusProvider.notifier)
+                    .cookieChanged(currentHeader),
+              );
         }
         if (!ref.mounted) {
           throw const DAKitException(
@@ -109,6 +117,9 @@ final personalizedFeedProvider =
         }
         var csrf = ref.read(webSessionControllerProvider).csrf;
         var cookieHeader = await webSession.cookieHeader();
+        final generation = ref
+            .read(webSessionStatusProvider.notifier)
+            .generation;
         var page = await _tryFetchRfy(dio, csrf, cookieHeader, request);
         if (page == null) {
           // An app update can clear the live WebView cookie store even though
@@ -144,7 +155,11 @@ final personalizedFeedProvider =
 
         // A verdict may change while the feed is in flight. Do not commit
         // generic results after expiry or a switch to a different account.
+        final currentHeader = await webSession.cookieHeader();
         if (!ref.mounted ||
+            currentHeader != cookieHeader ||
+            generation !=
+                ref.read(webSessionStatusProvider.notifier).generation ||
             !ref.read(webSessionStatusProvider).isHealthy ||
             ref.read(webSessionControllerProvider).username !=
                 webSessionState.username) {
@@ -154,7 +169,36 @@ final personalizedFeedProvider =
             message: 'The personalized web session could not be confirmed.',
           );
         }
+        final degraded = rfyCursorSignalsGenericFallback(page.nextCursor);
+        ref
+            .read(personalizedSessionStatusProvider.notifier)
+            .observe(
+              cookieHeader: cookieHeader,
+              degraded: degraded,
+              generation: generation,
+            );
+        if (degraded) {
+          AppLogger.instance.warning(
+            'home',
+            'rfy generic fallback rejected source=vespa_content_group_2 '
+                'generation=$generation',
+          );
+          // Preserve the capability incident even if a home probe confirms the
+          // username again. Only a usable feed or explicit recovery clears it.
+          await ref
+              .read(webSessionStatusProvider.notifier)
+              .recheckAfterWebSignal('rfy-generic-fallback');
+          throw const DAKitException(
+            kind: DAKitFailureKind.network,
+            code: 'rfy.session.degraded',
+            message: 'Recommendations returned a generic fallback signal.',
+          );
+        }
         ref.read(artworkStoreProvider.notifier).putAll(page.items);
+        AppLogger.instance.info(
+          'home',
+          'personalized feed accepted items=${page.items.length} generation=$generation',
+        );
         return page;
       });
       AppLogger.instance.info(
@@ -213,11 +257,12 @@ Future<Page<Artwork>?> _tryFetchRfy(
     }).length;
     logger.info(
       'home',
-      'personalized feed success elapsedMs=${stopwatch.elapsedMilliseconds} '
+      'rfy transport success elapsedMs=${stopwatch.elapsedMilliseconds} '
           'cursor=${request.cursor ?? 'initial'} '
           'items=${page.items.length} '
           'gated=${page.items.where((a) => artworkViewLock(a) != null).length} '
-          'blurred=$blurred',
+          'blurred=$blurred '
+          'genericFallback=${rfyCursorSignalsGenericFallback(page.nextCursor)}',
     );
     return page;
   } on Object catch (error, stack) {

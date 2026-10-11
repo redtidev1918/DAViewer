@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dakit_flutter/dakit_flutter.dart' hide WebSession;
 import 'package:daviewer/core/auth/web_session_controller.dart';
+import 'package:daviewer/core/auth/personalized_session_status.dart';
 import 'package:daviewer/core/auth/web_session_refresher.dart'
     hide webSessionProbeProvider;
 import 'package:daviewer/core/auth/web_session_status.dart';
@@ -13,6 +15,7 @@ import 'package:daviewer/core/runtime/app_runtime.dart';
 import 'package:daviewer/core/runtime/runtime_provider.dart';
 import 'package:daviewer/features/home/home_screen.dart';
 import 'package:daviewer/features/home/home_providers.dart';
+import 'package:daviewer/features/artwork/artwork_store.dart';
 import 'package:daviewer/shared/widgets/artwork_feed_grid.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -22,6 +25,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 
 final class _FakeCookieManager extends Fake implements CookieManager {
+  String csrfCookie = 'token';
   @override
   Future<List<Cookie>> getCookies({
     required WebUri url,
@@ -30,12 +34,15 @@ final class _FakeCookieManager extends Fake implements CookieManager {
     InAppWebViewController? iosBelow11WebViewController,
   }) async => <Cookie>[
     Cookie(name: 'userinfo', value: 'artist'),
-    Cookie(name: 'csrf', value: 'token'),
+    Cookie(name: 'csrf', value: csrfCookie),
   ];
 }
 
 /// Serves the rfy endpoint and counts first-page requests by cursor.
 final class _RfyAdapter implements HttpClientAdapter {
+  String? nextCursor;
+  Future<void>? gate;
+  void Function()? onFetch;
   int calls = 0;
   final List<String> cursors = <String>[];
 
@@ -50,9 +57,12 @@ final class _RfyAdapter implements HttpClientAdapter {
   ) async {
     if (options.uri.path.endsWith('/rfy/deviations')) {
       calls += 1;
+      onFetch?.call();
+      await gate;
       final cursor = options.queryParameters['cursor'] as String?;
       cursors.add(cursor ?? 'initial');
       return _json(<String, Object?>{
+        if (nextCursor != null) 'nextCursor': nextCursor,
         'deviations': <Object?>[
           <String, Object?>{
             'deviationId': 12345,
@@ -131,6 +141,145 @@ ResponseBody _json(Map<String, Object?> body) => ResponseBody.fromString(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  ProviderContainer feedContainer(
+    _RfyAdapter rfy,
+    _HomeProbeAdapter probe, {
+    _FakeCookieManager? cookies,
+  }) {
+    final container = ProviderContainer(
+      retry: (_, _) => null,
+      overrides: [
+        runtimeProvider.overrideWithValue(
+          AppRuntime(
+            clientId: 'test',
+            oauth: null,
+            transport: null,
+            transfers: _sharedTransfers,
+            dio: Dio()..httpClientAdapter = rfy,
+          ),
+        ),
+        webSessionProvider.overrideWithValue(
+          WebSession(() => cookies ?? _FakeCookieManager()),
+        ),
+        webSessionVerifierProvider.overrideWithValue(
+          WebSessionVerifier(Dio()..httpClientAdapter = probe),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    container
+        .read(webSessionControllerProvider.notifier)
+        .state = const WebSessionState(
+      csrf: 'token',
+      isLoggedIn: true,
+      username: 'artist',
+    );
+    container
+        .read(webSessionStatusProvider.notifier)
+        .markHealthy(serverUsername: 'artist');
+    return container;
+  }
+
+  test(
+    'generic signal is rejected even when identity verification succeeds',
+    () async {
+      final rfy = _RfyAdapter()
+        ..nextCursor = base64Url.encode(
+          utf8.encode(jsonEncode({'vespa_content_group': 2})),
+        );
+      final container = feedContainer(rfy, _HomeProbeAdapter());
+      await container.read(personalizedFeedProvider.notifier).refresh();
+
+      expect(container.read(webSessionStatusProvider).isHealthy, isTrue);
+      expect(
+        container.read(personalizedSessionStatusProvider).needsRecovery,
+        isTrue,
+      );
+      expect(container.read(personalizedFeedProvider).items, isEmpty);
+      expect(container.read(artworkStoreProvider)['12345'], isNull);
+      expect(
+        (container.read(personalizedFeedProvider).error as DAKitException).code,
+        'rfy.session.degraded',
+      );
+
+      // An explicit recovery supersedes the incident and retries the same feed.
+      container
+          .read(webSessionStatusProvider.notifier)
+          .markHealthy(serverUsername: 'artist');
+      expect(
+        container.read(personalizedSessionStatusProvider).needsRecovery,
+        isFalse,
+      );
+      rfy.nextCursor = null;
+      await container.read(personalizedFeedProvider.notifier).refresh();
+      expect(container.read(personalizedFeedProvider).items, hasLength(1));
+      expect(
+        container.read(personalizedSessionStatusProvider).phase,
+        PersonalizedSessionPhase.usable,
+      );
+    },
+  );
+
+  test('changed cookies bypass a recently healthy identity lease', () async {
+    final cookies = _FakeCookieManager();
+    final probe = _HomeProbeAdapter();
+    final container = feedContainer(_RfyAdapter(), probe, cookies: cookies);
+    final feed = container.read(personalizedFeedProvider.notifier);
+    await feed.refresh();
+    expect(probe.calls, 0);
+    cookies.csrfCookie = 'rotated';
+    await feed.refresh();
+    expect(probe.calls, 1);
+    expect(container.read(personalizedFeedProvider).items, hasLength(1));
+  });
+
+  test(
+    'a late generic result cannot replace a newer same-account login',
+    () async {
+      final gate = Completer<void>();
+      final entered = Completer<void>();
+      final rfy = _RfyAdapter()
+        ..nextCursor = base64Url.encode(
+          utf8.encode(jsonEncode({'vespa_content_group': 2})),
+        )
+        ..gate = gate.future
+        ..onFetch = entered.complete;
+      final container = feedContainer(rfy, _HomeProbeAdapter());
+      final pending = container
+          .read(personalizedFeedProvider.notifier)
+          .refresh();
+      await entered.future;
+      container
+          .read(webSessionStatusProvider.notifier)
+          .markHealthy(serverUsername: 'artist');
+      gate.complete();
+      await pending;
+      expect(
+        container.read(personalizedSessionStatusProvider).needsRecovery,
+        isFalse,
+      );
+      expect(container.read(personalizedFeedProvider).items, isEmpty);
+      expect(container.read(artworkStoreProvider)['12345'], isNull);
+    },
+  );
+
+  test('a cookie rotation during a feed request discards its result', () async {
+    final gate = Completer<void>();
+    final entered = Completer<void>();
+    final cookies = _FakeCookieManager();
+    final rfy = _RfyAdapter()
+      ..gate = gate.future
+      ..onFetch = entered.complete;
+    final container = feedContainer(rfy, _HomeProbeAdapter(), cookies: cookies);
+    final pending = container.read(personalizedFeedProvider.notifier).refresh();
+    await entered.future;
+    cookies.csrfCookie = 'rotated';
+    gate.complete();
+    await pending;
+    expect(container.read(personalizedFeedProvider).items, isEmpty);
+    expect(container.read(artworkStoreProvider)['12345'], isNull);
+  });
 
   for (final anonymous in [true, false]) {
     test(
