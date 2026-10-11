@@ -33,7 +33,6 @@
 | Windows | 动态应用代理 | 共享 WebView2 `--proxy-server` | 同一共享 WebView2 `--proxy-server` |
 | macOS 14+ | 动态应用代理 | `WKWebsiteDataStore.proxyConfigurations` | 同一 `WKWebsiteDataStore.proxyConfigurations` |
 | macOS 12/13 | 动态应用代理 | 仅操作系统系统代理 | 仅操作系统系统代理 |
-| Linux | 非当前构建目标（无 `linux/` 平台目录；CI 仅构建 Android/macOS/Windows） | — | — |
 
 Windows 的隐藏 WebView 与 Cookie 读取共用同一个 WebView2 环境。登录界面与网页适配器因此使用同一套 Cookie 和代理配置。
 

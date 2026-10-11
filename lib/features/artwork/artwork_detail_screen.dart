@@ -17,6 +17,7 @@ import '../../core/sharing/app_share.dart';
 import '../../shared/widgets/app_error_state.dart';
 import '../../shared/widgets/skeleton.dart';
 import '../../shared/widgets/app_notice_host.dart';
+import '../../shared/widgets/artwork_favourite_button.dart';
 import '../downloads/download_helpers.dart';
 import '../history/history_providers.dart';
 import 'artwork_detail_providers.dart';
@@ -176,6 +177,12 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
       if (!mounted) return;
       setState(() => _favourite = isFavourite);
       _heartController.forward(from: 0);
+      final s = strings(ref.read(appLanguageProvider));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isFavourite ? s.favouritedToast : s.unfavouritedToast),
+        ),
+      );
     } on Object catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -418,17 +425,14 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
     final previousArtwork = widget.browseSession?.previousOf(widget.artworkId);
     final nextArtwork = widget.browseSession?.nextOf(widget.artworkId);
 
-    // Reflect the real favourite state once it loads (the heart must show as
-    // filled when re-opening an already-favourited artwork).
-    ref.listen<AsyncValue<bool>>(favouriteStatusProvider(widget.artworkId), (
-      previous,
-      next,
-    ) {
-      final value = next.value;
-      if (value != null && mounted) {
-        setState(() => _favourite = value);
-      }
-    });
+    final cachedFavourite = ref.watch(
+      artworkStoreProvider.select(
+        (items) => items[widget.artworkId]?.isFavourited,
+      ),
+    );
+    _favourite = cachedFavourite ?? artwork.value?.isFavourited ?? _favourite;
+    final favouriteBusy =
+        _favBusy || ref.watch(favouriteBusyProvider(widget.artworkId));
 
     // Record once after the artwork actually resolves, so failed loads and
     // transient rebuilds do not pollute local history.
@@ -470,14 +474,21 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
           ),
           IconButton(
             tooltip: _favourite ? s.unfavourite : s.favourite,
-            onPressed: _toggleFavourite,
-            icon: ScaleTransition(
-              scale: _heartScale,
-              child: Icon(
-                _favourite ? Icons.favorite : Icons.favorite_border,
-                color: _favourite ? Colors.red : null,
-              ),
-            ),
+            onPressed: favouriteBusy || artwork.value == null
+                ? null
+                : _toggleFavourite,
+            icon: favouriteBusy
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : ScaleTransition(
+                    scale: _heartScale,
+                    child: Icon(
+                      _favourite ? Icons.favorite : Icons.favorite_border,
+                      color: _favourite ? Colors.red : null,
+                    ),
+                  ),
           ),
         ],
       ),
@@ -592,6 +603,10 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
             publishedAt: dates.publishedAt ?? artwork.publishedAt,
             updatedAt: dates.updatedAt,
             s: s,
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: ArtworkFavouriteButton(artwork: artwork, showLabel: true),
           ),
           const Divider(),
           ArtworkDescriptionSection(

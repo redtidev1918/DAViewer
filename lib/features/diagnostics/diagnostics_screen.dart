@@ -7,6 +7,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/diagnostics/app_logger.dart';
 import '../../core/diagnostics/crash_marker.dart';
 import '../../core/diagnostics/report_builder.dart';
+import '../../core/diagnostics/log_redactor.dart';
+import '../../core/auth/auth_controller.dart';
+import '../../core/auth/web_session_controller.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/updates/update_checker.dart';
 
@@ -66,10 +69,16 @@ final class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
 
   Future<void> _reportProblem(AppStrings s) async {
     var includeLog = false;
+    final names = <String>[
+      ref.read(authControllerProvider).account?.username ?? '',
+      ref.read(webSessionControllerProvider).username,
+    ];
+    final excerpt = LogRedactor.redactAll(_logTail, accountNames: names);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
+          scrollable: true,
           title: Text(s.reportPreviewTitle),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -90,6 +99,11 @@ final class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
                 title: Text(s.includeLog),
                 controlAffinity: ListTileControlAffinity.leading,
               ),
+              if (includeLog)
+                SizedBox(
+                  height: 180,
+                  child: SingleChildScrollView(child: SelectableText(excerpt)),
+                ),
             ],
           ),
           actions: <Widget>[
@@ -109,7 +123,7 @@ final class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
     final url = ReportBuilder.issueUrl(
       version: appVersion,
       platform: ReportBuilder.currentPlatform(),
-      logExcerpt: includeLog ? _logTail : null,
+      logExcerpt: includeLog ? excerpt : null,
     );
     await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }

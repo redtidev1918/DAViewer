@@ -30,7 +30,6 @@ Future<SystemProxyConfig?> detectSystemProxy() async {
   final logger = AppLogger.instance;
   if (Platform.isMacOS) return _detectMacOsProxy(logger);
   if (Platform.isWindows) return _detectWindowsProxy(logger);
-  if (Platform.isLinux) return _detectLinuxProxy(logger);
   return null;
 }
 
@@ -173,70 +172,4 @@ SystemProxyConfig? parseWindowsProxyServer(String value) {
   final port = uri.hasPort ? uri.port : 8080;
   if (port <= 0 || port > 65535) return null;
   return SystemProxyConfig(host: uri.host, port: port);
-}
-
-Future<SystemProxyConfig?> _detectLinuxProxy(AppLogger logger) async {
-  try {
-    final mode = await _readGsettings('org.gnome.system.proxy', 'mode');
-    if (mode != 'manual') {
-      logger.info(
-        'proxy',
-        mode == 'auto'
-            ? 'Linux: GNOME PAC proxy is not available to dart:io; '
-                  'checking environment fallback'
-            : 'Linux: GNOME proxy mode is ${mode.isEmpty ? 'unknown' : mode}',
-      );
-      return null;
-    }
-
-    final proxy = parseLinuxProxySettings(
-      mode: mode,
-      httpsHost: await _readGsettings('org.gnome.system.proxy.https', 'host'),
-      httpsPort: await _readGsettings('org.gnome.system.proxy.https', 'port'),
-      httpHost: await _readGsettings('org.gnome.system.proxy.http', 'host'),
-      httpPort: await _readGsettings('org.gnome.system.proxy.http', 'port'),
-    );
-    if (proxy == null) {
-      logger.warning('proxy', 'Linux: manual proxy settings are incomplete');
-      return null;
-    }
-    logger.info('proxy', 'Linux: detected $proxy');
-    return proxy;
-  } on Object catch (error, stack) {
-    logger.warning('proxy', 'Linux proxy detection failed', error, stack);
-    return null;
-  }
-}
-
-Future<String> _readGsettings(String schema, String key) async {
-  final result = await Process.run('gsettings', <String>['get', schema, key]);
-  if (result.exitCode != 0) return '';
-  return (result.stdout as String? ?? '')
-      .trim()
-      .replaceAll("'", '')
-      .replaceAll('"', '');
-}
-
-/// Selects GNOME's effective static proxy without treating stale values from
-/// `none` or unsupported PAC `auto` mode as active. HTTPS takes precedence
-/// because all DeviantArt endpoints use TLS through an HTTP CONNECT proxy.
-SystemProxyConfig? parseLinuxProxySettings({
-  required String mode,
-  required String httpsHost,
-  required String httpsPort,
-  required String httpHost,
-  required String httpPort,
-}) {
-  if (mode.trim().toLowerCase() != 'manual') return null;
-  for (final candidate in <(String, String)>[
-    (httpsHost.trim(), httpsPort.trim()),
-    (httpHost.trim(), httpPort.trim()),
-  ]) {
-    final (host, rawPort) = candidate;
-    final port = int.tryParse(rawPort);
-    if (host.isNotEmpty && port != null && port > 0 && port <= 65535) {
-      return SystemProxyConfig(host: host, port: port);
-    }
-  }
-  return null;
 }

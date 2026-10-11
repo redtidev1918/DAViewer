@@ -126,8 +126,8 @@ final class AppStrings {
   String get noRecommendations =>
       _lang == AppLanguage.zh ? '暂无推荐' : 'No recommendations yet.';
   String get recommendedSignInHint => _lang == AppLanguage.zh
-      ? '个性化推荐需要 DeviantArt 网页会话 Cookie。当前会话没有 Cookie，推荐只会显示通用内容；点击登录，在 App 内网页完成一次登录以获取 Cookie。'
-      : 'Personalized recommendations need the DeviantArt web-session Cookie. Without it the feed shows only generic content; tap Login and finish one web sign-in inside the app to restore the Cookie.';
+      ? '个性化推荐需要 DeviantArt 网页会话 Cookie。当前会话尚未恢复，此标签暂不加载推荐；点击登录，在 App 内网页完成登录以恢复会话。'
+      : 'Personalized recommendations need the DeviantArt web-session Cookie. Until the web session is restored, this tab does not load recommendations. Tap Login and finish signing in on the in-app web page.';
   String get recommendedFeedLoadFailure => _lang == AppLanguage.zh
       ? '推荐内容暂时无法加载。请下拉刷新，或在设置中检查网络代理。'
       : 'Recommendations could not load. Pull to refresh or check the proxy in Settings.';
@@ -222,8 +222,8 @@ final class AppStrings {
   String get reportPreviewTitle =>
       _lang == AppLanguage.zh ? '报告内容预览' : 'Review report';
   String get reportPreviewBody => _lang == AppLanguage.zh
-      ? '将在你的浏览器中打开 GitHub Issue，只包含下方内容（不含账号、令牌或 Cookie）。提交前可自行编辑。'
-      : 'This opens a GitHub issue in your browser with only the content below (no account, tokens, or cookies). You can edit it before submitting.';
+      ? '将在浏览器中打开 GitHub Issue。日志会遮盖已知账号名、令牌、Cookie、邮箱、IP 和用户目录，但仍请检查下方预览；提交前可编辑。'
+      : 'This opens a GitHub issue in your browser. Logs mask known account names, tokens, cookies, emails, IPs and user directories. Review the preview for other private details; you can edit before submitting.';
   String get includeLog => _lang == AppLanguage.zh
       ? '附带日志片段（已脱敏）'
       : 'Include a redacted log excerpt';

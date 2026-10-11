@@ -39,7 +39,7 @@ DAViewer 只有一个用户身份：官方 DeviantArt OAuth 会话。应用既�
 - **OAuth 会话**（安全存储）驱动官方 API：每日作品、作品查询、收藏、关注与下载，以及搜索结果中的用户列表。
 - **网页会话**（WebView 的 Cookie 加 CSRF token 与登录态，本地持久化并在启动时恢复）驱动仅网页可用的适配器：个性化 `rfy/deviations` 信息流、合集内容，以及搜索结果中的作品列表（优先网页端点 `_puppy/dabrowse/search/deviations`，官方 `browse/home?q=` 作为回退）。已登录 Cookie 会快照进应用自身存储，并在冷启动时平台 WebView 存储丢失（例如跨界应用更新）后重新注入，从而不必重新登录也能保住个性化信息流。
 
-网页会话的 Cookie 快照以**明文 JSON** 写在应用支持目录下的 `web_session.json`；只有 OAuth token 走系统安全存储（`DAViewer Account`）。因此这个文件等同于登录凭据：不要把它复制到不受信任的位置，也不要在截图或日志中暴露。应用不会把它上传到任何地方。
+网页会话的 Cookie、CSRF 和账号信息使用平台安全存储，独立于 OAuth token。升级时自动迁移应用支持目录内旧的 `web_session.json`：写入安全存储并读回验证后才删除旧文件。存储不可用或数据损坏时保留原凭据供重试，不回退到明文写入。迁移成功前，旧文件仍等同于登录凭据，请勿复制或公开。
 
 一次内嵌登录同时建立两种会话。WebView 只在 OAuth 回调回到 DeviantArt 首页之后才上报网页会话（CSRF token 与 `userinfo` Cookie），因此应用不会把匿名登录页的未登录状态记录为网页会话。
 

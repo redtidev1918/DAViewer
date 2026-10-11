@@ -42,7 +42,7 @@ final class SearchHistoryStore {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return load();
     try {
-      final history = await load();
+      final history = <String>[...await load()];
       history.remove(trimmed);
       history.insert(0, trimmed);
       final capped = history.take(_maxEntries).toList(growable: false);
@@ -77,7 +77,7 @@ final class SearchHistoryStore {
   /// Removes a single query from history and returns the updated list.
   static Future<List<String>> remove(String query) async {
     try {
-      final history = await load();
+      final history = <String>[...await load()];
       history.remove(query);
       final file = await _file();
       await file.writeAsString(jsonEncode(history));

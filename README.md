@@ -14,7 +14,11 @@ DAViewer 不是 DeviantArt 官方应用，与 DeviantArt 没有隶属或合作�
 
 **语言 / Language:** 中文 · [English](README.en.md)
 
+作品卡片的心形按钮可直接收藏；详情页会显示“收藏 / 已收藏”。操作期间按钮显示进度，收藏列表随成功操作刷新。
+
 ## 截图
+
+以下为旧版本的真实设备截图，卡片布局和标签名称与当前版本不同；待重新采集后替换。
 
 <p align="center">
   <img src="docs/screenshots/home_feed.jpg" width="30%" alt="首页推荐" />

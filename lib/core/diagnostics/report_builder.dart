@@ -16,6 +16,7 @@ final class ReportBuilder {
     required String version,
     required String platform,
     String? logExcerpt,
+    Iterable<String> accountNames = const [],
   }) {
     final body = StringBuffer()
       ..writeln('## Description')
@@ -29,7 +30,7 @@ final class ReportBuilder {
         ..writeln()
         ..writeln('## Log excerpt (redacted)')
         ..writeln('```')
-        ..writeln(LogRedactor.redactAll(logExcerpt))
+        ..writeln(LogRedactor.redactAll(logExcerpt, accountNames: accountNames))
         ..writeln('```');
     }
     final title = Uri.encodeQueryComponent('[Bug] ');
