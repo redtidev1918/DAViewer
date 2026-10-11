@@ -44,15 +44,29 @@ flutter test                                               # 410 tests, all pass
 - `docs/regressions/README.md`：新增 R24–R26 与需真机补充的证据清单。
 - `docs/authentication.md` 与 `docs/en/authentication.md`：冷启动契约补充导航收敛判据、首屏请求所有权、缓存定位（双语同步）。
 
-## 5. Release
+## 5. Release（2026-10-11 更新：已正式发版 v0.5.13）
 
-- 未在本机执行正式 Release：本机没有 Android SDK/JDK，构建 APK 需要下载数 GB（用户对代理流量敏感，已明确禁止未经确认的大流量动作）。
-- 仓库使用 release-please 自动发版（`flutter test` 由 CI 在 GitHub runner 上构建产物，零本地流量）。合并本分支到 `main` 后由 CI 流程产出正式版本与 APK/AAB。
-- `CHANGELOG.md` / `RELEASE_NOTES.md` 由 release-please 依据约定式提交生成，因此本分支不手改。
+- PR #92 已合并（merge commit `bad6c63f`）；release-please PR #93 与中文发布说明 PR #94 亦已合并。
+- **正式版本：`v0.5.13`**（pubspec `0.5.13+225`，manifest `0.5.13`），tag 指向合并提交 `b88c374`。
+- 发布运行 [38166050679](https://github.com/redtidev1918/DAViewer/actions/runs/38166050679)：release-please / build-plan / 三平台 build / finalize 全部 success。
+- 签名证据：ubuntu 构建日志 `dry-run: false`、`✓ Built build/app/outputs/flutter-apk/app-release.apk (66.9MB)`（正式 release APK，非 PR 阶段 debug dry-run）。
+- 资产：`DAViewer-v0.5.13.apk`（63.8 MB）、Windows zip、macOS zip、`SHA256SUMS`、`RELEASE-METADATA.json`。
+- Release URL：<https://github.com/redtidev1918/DAViewer/releases/tag/v0.5.13>
 
-## 6. Deployment
+## 6. Deployment（2026-10-11 更新：已部署）
 
-- GitHub Pages 与下载页当前仍指向 `v0.5.12`（`6c0ecd4`）。版本、Release、下载链接的一致性依赖第 5 步的正式发版，未发版前不做手工改动，避免站点版本与 Release 不一致。
+- `docs/download.md` 已由 `Update download page` 工作流自动更新到 `v0.5.13`（含 APK/Windows/macOS 直链与 SHA256SUMS）。
+- GitHub Pages 部署 success：<https://redtidev1918.github.io/DAViewer/>（HTTP 200，下载页 `docsite-release-tag: v0.5.13`）。
+- APK 下载直链 HEAD 200，指向 v0.5.13 Release。
+
+## 6b. 验收等级（当前）
+
+| 等级 | 结论 | 依据 |
+|---|---|---|
+| Level 1 — Code Verified | **PASS** | `dart format` 0 changed；`flutter analyze` 无问题；本地全量 419 passed（含新增 `artwork_feed_cache_test.dart` 9 条缓存单测，PR #95）；CI Analyze and test 全绿 |
+| Level 2 — Release Verified | **PASS** | v0.5.13 tag/Release/资产/校验和/元数据一致；构建日志确认签名 release 路径（dry-run: false）；下载页与 Pages 同步 v0.5.13 |
+| Level 3 — Android Verified | **PENDING** | 无 Android 真机，见 §7 |
+| Level 4 — Original Incident Verified | **PENDING** | 原始故障条件（真实 WAF 挑战页）未在真机复现 |
 
 ## 7. Pending（无 Android 真机，不得声明 Production Verified）
 
