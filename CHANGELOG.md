@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.11](https://github.com/redtidev1918/DAViewer/compare/v0.5.10...v0.5.11) (2026-10-11)
+
+
+### Bug Fixes
+
+* resolve open viewer and session issues and simplify favourites ([#89](https://github.com/redtidev1918/DAViewer/issues/89)) ([57af95e](https://github.com/redtidev1918/DAViewer/commit/57af95e856972f1a8159c8583b50bdfa80f655b3))
+
 ## [0.5.10](https://github.com/redtidev1918/DAViewer/compare/v0.5.9...v0.5.10) (2026-10-11)
 
 
