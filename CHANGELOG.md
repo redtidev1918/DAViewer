@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.9](https://github.com/redtidev1918/DAViewer/compare/v0.5.8...v0.5.9) (2026-10-11)
+
+
+### Bug Fixes
+
+* prompt cookie refresh when the web session expires in use ([6ac93a5](https://github.com/redtidev1918/DAViewer/commit/6ac93a5fc0e255f4cd5051ea82e8ffc71e795eb6))
+* reset shared session notice dismissal after recovery ([4a091e7](https://github.com/redtidev1918/DAViewer/commit/4a091e71cc806cf9126506bb53f1f5bb2112d414))
+* resolve artwork access states and refresh web sessions ([a732904](https://github.com/redtidev1918/DAViewer/commit/a73290438317dbdfd8d3cb88c575fee48735633d))
+* surface media 401/403 failures to the web session checker ([c0db31a](https://github.com/redtidev1918/DAViewer/commit/c0db31aca8083e6805b2539a80afa1174dd7ac09))
+
 ## [0.5.8](https://github.com/redtidev1918/DAViewer/compare/v0.5.7...v0.5.8) (2026-10-07)
 
 
