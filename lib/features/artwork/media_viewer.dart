@@ -396,14 +396,8 @@ final class _TappableImage extends StatelessWidget {
               placeholder: (context, url) =>
                   const ColoredBox(color: AppTheme.placeholderColor),
               errorWidget: (context, url, error) {
-                MediaSessionSignal.report(
-                  context,
-                  error,
-                  'media-preview-403',
-                );
-                return const ColoredBox(
-                  color: AppTheme.placeholderColor,
-                );
+                MediaSessionSignal.report(context, error, 'media-preview-403');
+                return const ColoredBox(color: AppTheme.placeholderColor);
               },
             ),
           ),
