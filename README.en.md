@@ -28,38 +28,48 @@ DAViewer is not an official DeviantArt app and has no affiliation or partnership
 
 ### Browse and discover
 
-- **For you**: a personalized feed built from your DeviantArt web session.
-- **Daily**: DeviantArt's daily picks.
-- **Watched**: new work from the artists you watch, in one feed, with a strip for switching between artists.
-- **Search and tags**: results as you type, switchable between artwork and users; type `#tag` to jump straight to a tag, and sort artwork results by default or newest.
-- **Open a link**: paste a DeviantArt artwork or artist URL into the link button in the Home app bar.
+| Feature | Description |
+| --- | --- |
+| For you | A personalized feed built from your DeviantArt web session. |
+| Daily | DeviantArt's daily picks. |
+| Watched | New work from the artists you watch, in one feed, with a strip for switching between artists. |
+| Search and tags | Results as you type, switchable between artwork and users, with `#tag` shortcuts and a default / newest sort. |
+| Open a link | Paste a DeviantArt artwork or artist URL to jump straight to it. |
 
 ### Artwork
 
-- **Large images and multi-image works**: full-screen viewing, double-tap zoom, and paged works, with swiping between adjacent artworks.
-- **Video and animated works**: video plays automatically and loops, with a scrubber, volume, and playback speed.
-- **Work information**: title, author, description, tags, and whether the original can be downloaded plus its file size.
-- **More like this**: keep discovering related works from an artwork, and refresh at any time.
+| Feature | Description |
+| --- | --- |
+| Large and multi-image works | Full-screen viewing, double-tap zoom, and paged works, with swiping between adjacent artworks. |
+| Video and animated works | Video plays automatically and loops, with a scrubber, volume, and playback speed. |
+| Work information | Title, author, description, tags, and whether the original can be downloaded plus its file size. |
+| More like this | Keep discovering related works from an artwork, and refresh at any time. |
 
 ### Artists and interaction
 
-- **Artist pages**: profile, gallery, saved works, journals, and custom folders, with search inside a gallery.
-- **Watch**: follow or unfollow from an artist's page, and review the artists you watch in the watched list.
-- **Favourites**: favourite from an artwork page, and browse your favourites and collections under the Favourites tab.
-- **Notifications**: DeviantArt's message feed, with the unread count on the Home bell.
+| Feature | Description |
+| --- | --- |
+| Artist pages | Profile, gallery, saved works, journals, and custom folders, with search inside a gallery. |
+| Watch | Follow or unfollow from an artist's page, and review the artists you watch in the watched list. |
+| Favourites | Favourite from an artwork page, and browse your favourites and collections under the Favourites tab. |
+| Notifications | DeviantArt's message feed, with the unread count on the Home bell. |
 
 ### Downloads
 
-- **Original first**: when a work can be downloaded, its original is saved directly, and multi-image works can be downloaded all at once.
-- **Fallback when restricted**: if the original is paid, restricted, or gone, only image-only works fall back to the image currently on screen (which is not the original); works that contain video never fall back.
-- **Download management**: watch progress under the Downloads tab, pause, resume, cancel, and retry a transfer, and open a finished file.
+| Feature | Description |
+| --- | --- |
+| Original first | When a work can be downloaded, its original is saved directly; multi-image works can be downloaded all at once. |
+| Fallback when restricted | If the original is paid, restricted, or gone, only image-only works fall back to the image currently on screen (which is not the original). Works that contain video never fall back. |
+| Download management | Watch progress under the Downloads tab, pause, resume, cancel, and retry a transfer, then open a finished file. |
 
 ### Personalization and tools
 
-- **Theme and language**: light / dark / system, with a Chinese or English interface.
-- **Proxy**: enter a proxy address by hand, or let the app use the system proxy.
-- **Visit history**: the artworks you opened recently, kept on this device, up to 200 entries, clearable in one tap.
-- **Update check**: tells you when a new version exists and opens the release page in your browser.
+| Feature | Description |
+| --- | --- |
+| Theme and language | Light / dark / system, with a Chinese or English interface. |
+| Proxy | Enter a proxy address by hand, or let the app use the system proxy. |
+| Visit history | The artworks you opened recently, kept on this device, up to 200 entries, clearable in one tap. |
+| Update check | Tells you when a new version exists and opens the release page in your browser. |
 
 Browsing, search, favourites, watch, and downloads all require signing in with a DeviantArt account; while signed out, only the sign-in screen, Settings, and visit history are usable.
 
@@ -85,33 +95,60 @@ See [Authentication and session recovery](docs/en/authentication.md) for the ful
 
 ## FAQ
 
-**I signed in, so why is it asking me to sign in again?**
+<details>
+<summary>I signed in, so why is it asking me to sign in again?</summary>
 
-The personalized feed and a few related features use DeviantArt's web session, which is stored separately from your sign-in and expires on its own. Sign in once more inside the app when prompted. If a network challenge is the cause, the app says so instead of reporting "not signed in" — switching network or proxy node and refreshing after a minute or two works better than signing in repeatedly. See [Authentication and session recovery](docs/en/authentication.md).
+The personalized feed and a few related features use DeviantArt's web session, which is stored separately from your sign-in and expires on its own. Sign in once more inside the app when prompted.
 
-**The personalized feed or Daily will not load. What now?**
+If a network challenge is the cause, the app says so instead of reporting "not signed in". Switching network or proxy node and refreshing after a minute or two works better than signing in repeatedly. See [Authentication and session recovery](docs/en/authentication.md).
 
-Check that your network and proxy work (Settings → Proxy has a connectivity test), then pull to refresh.
+</details>
 
-**How do I see mature content?**
+<details>
+<summary>How do I see mature content?</summary>
 
 DAViewer can only request mature content; whether it is shown is decided by the browsing preference on your DeviantArt account. Open DeviantArt's own setting from Settings → DeviantArt account settings, then sign in again in the app.
 
-**Why can't I download some originals?**
+</details>
+
+<details>
+<summary>The personalized feed or Daily will not load. What now?</summary>
+
+Check that your network and proxy work (Settings → Proxy has a connectivity test), then pull to refresh.
+
+</details>
+
+<details>
+<summary>How do I configure a proxy?</summary>
+
+Enter an address under Settings → Proxy as `host:port` or `http://host:port`, using the HTTP / Mixed port your proxy app shows; with nothing set, the app falls back to the system proxy and environment variables.
+
+Only HTTP CONNECT proxies are supported — not SOCKS5, not proxy URLs with credentials, and not PAC — and WebView coverage differs by platform. See [Networking and proxy](docs/en/networking.md).
+
+</details>
+
+<details>
+<summary>Why can't I download some originals?</summary>
 
 Paid, private, subscriber-only, or copyright-restricted works do not offer their original, and the app shows the reason on the artwork page; see [Downloads](#downloads) for the fallback rules.
 
-**How do I configure a proxy?**
+</details>
 
-Enter an address under Settings → Proxy as `host:port` or `http://host:port`, using the HTTP / Mixed port your proxy app shows; with nothing set, the app falls back to the system proxy and environment variables. Only HTTP CONNECT proxies are supported — not SOCKS5, not proxy URLs with credentials, and not PAC — and WebView coverage differs by platform. See [Networking and proxy](docs/en/networking.md).
-
-**macOS says the developer cannot be verified.**
+<details>
+<summary>macOS says the developer cannot be verified.</summary>
 
 This is an unsigned, unnotarized preview. Right-click the app in Finder and choose **Open**, or allow it under System Settings → Privacy & Security.
 
-**How do I report a problem?**
+</details>
 
-Settings → Diagnostics generates a pre-filled GitHub issue link; the log has tokens, cookies, and similar values removed first, and you can review it before submitting. You can also open an issue directly on [GitHub](https://github.com/redtidev1918/DAViewer/issues). For security reports, see [SECURITY.md](SECURITY.md).
+<details>
+<summary>How do I report a problem?</summary>
+
+Settings → Diagnostics generates a pre-filled GitHub issue link; the log has tokens, cookies, and similar values removed first, and you can review it before submitting.
+
+You can also open an issue directly on [GitHub](https://github.com/redtidev1918/DAViewer/issues). For security reports, see [SECURITY.md](SECURITY.md).
+
+</details>
 
 ## Development and contributing
 
