@@ -12,8 +12,8 @@
 
 1. 会话状态只有一个来源：`WebSessionStatusProvider`。
 2. 服务端确认有 TTL 缓存与指数退避，UI 重建不触发验证请求。
-3. 提醒只由 `AppNoticeController` 驱动，页面不再各自写横批；渲染 host 挂在
-   router 之上，任何路由都能立即看到恢复入口。
+3. 业务提醒由 `AppNoticeController` 管理，会话提醒由统一会话状态派生。host 放在
+   Navigator 内的页面 overlay 中，被 push 的页面也提供恢复入口。
 4. 登录页只接受手动刷新，App 不自动刷新挑战页。
 5. Release 更新文本由每版本中文 notes 保证，并由 CI 校验。
 6. 判断会话失效的入口只有一个：`WebSessionCoordinator`。页面与仓库层只上报
@@ -28,6 +28,7 @@ core/auth/web_session_status.dart      状态机 + TTL + 退避
 core/auth/web_session_coordinator.dart 触发点：响应信号、周期、前后台切换
 core/auth/media_session_signal.dart    媒体桥：非共享 Dio 栈的 401/403 上报
 core/notice/app_notices.dart           统一通知模型
+core/notice/web_session_notice.dart    跨路由关闭记录；确认恢复后清空
 shared/widgets/app_notice_host.dart    提醒 overlay；传入 child 时覆盖整个路由
 app/app.dart                           AppLifecycleListener 驱动 pause/resume，并包裹 router
 features/web_login/...                 只消费状态、手动刷新、挑战锁定
@@ -90,14 +91,18 @@ Cookie 失效，真正付费的作品永远不会触发登录提醒。桥同样�
 仲裁，避免把 WAF 的假阴性变成登出。本地存在 Cookie 只代表有机会验证，不代表
 会话有效。
 
-只有 `healthy` 允许推荐请求。忘记验证结果由 `WebSessionStatusProvider`
-统一管理；任何页面都不得直接调用服务端验证。
+推荐请求要求本地已确认网页登录，明确的 `anonymous` 结论会阻止请求。
+`unknown`、`unverified` 与 `unavailable` 期间仍允许尝试，避免验证探针的网络故障
+让可用的推荐接口一起停用。推荐接口返回 200 不会更新会话健康结论；协调器继续复核。
 
 ## 提醒与恢复
 
 `AppNoticeController` 持有业务提醒并去重；会话提醒直接派生自
 `WebSessionStatusProvider`。`AppNoticeHost` 用底部 overlay 展示，避免覆盖
-AppBar 与内容；关闭状态由 host 自己持有，不再复用业务提醒控制器。
+AppBar 与内容。`webSessionNoticeDismissalProvider` 保存跨路由的关闭记录：关闭同一
+会话提醒后，切换页面不会重复弹出；确认 `healthy` 后清空记录，后续失效可再次提醒。
+这个 provider 在 host 卸载后仍监听会话变化，因此在登录页恢复、再进入详情页也能
+识别新的故障；恢复和再次失效发生在两次 UI 绘制之间时也不会丢失提醒。
 
 提醒必须出现在用户当前所在的页面。host 需要 ambient `Overlay` 与 router
 祖先，所以不能挂在 Navigator 之上：`AppShell` 与作品详情页把 `AppNoticeHost`

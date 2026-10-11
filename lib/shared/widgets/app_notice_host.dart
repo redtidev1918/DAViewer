@@ -6,6 +6,7 @@ import '../../core/auth/web_session_status.dart';
 import '../../core/diagnostics/app_logger.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/notice/app_notices.dart';
+import '../../core/notice/web_session_notice.dart';
 
 /// Renders the current notice as an overlay at the bottom of the page, so it
 /// never pushes or shifts the page layout. Pages never show their own
@@ -40,7 +41,6 @@ final class NoticeOverlay extends StatelessWidget {
 }
 
 final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
-  final Set<String> _dismissedNoticeIds = <String>{};
   bool _loginNoticeLogged = false;
 
   @override
@@ -53,13 +53,8 @@ final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
   Widget build(BuildContext context) {
     final notice = ref.watch(appNoticeControllerProvider).current;
     final session = ref.watch(webSessionStatusProvider);
+    final dismissedNoticeIds = ref.watch(webSessionNoticeDismissalProvider);
     final s = strings(ref.watch(appLanguageProvider));
-
-    // Dismissal suppresses only the current session-state occurrence. After a
-    // healthy period the same state is a new occurrence and may prompt again.
-    if (session.isHealthy && _dismissedNoticeIds.isNotEmpty) {
-      _dismissedNoticeIds.clear();
-    }
 
     final sessionNotice = _sessionNotice(session, s);
     if (sessionNotice != null && !_loginNoticeLogged) {
@@ -74,7 +69,7 @@ final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
       _loginNoticeLogged = false;
     }
     final visibleSessionNotice =
-        sessionNotice != null && _dismissedNoticeIds.contains(sessionNotice.id)
+        sessionNotice != null && dismissedNoticeIds.contains(sessionNotice.id)
         ? null
         : sessionNotice;
     final effective = visibleSessionNotice ?? notice;
@@ -116,7 +111,7 @@ final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
 
   void _dismiss(AppNotice notice, AppNotice? sessionNotice) {
     if (identical(notice, sessionNotice)) {
-      setState(() => _dismissedNoticeIds.add(notice.id));
+      ref.read(webSessionNoticeDismissalProvider.notifier).dismiss(notice.id);
       return;
     }
     ref.read(appNoticeControllerProvider.notifier).clear(notice.id);

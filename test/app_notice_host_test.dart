@@ -5,6 +5,49 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('dismissal survives route replacement but resets offscreen', (
+    tester,
+  ) async {
+    final container = ProviderContainer(retry: (_, _) => null);
+    addTearDown(container.dispose);
+
+    Future<void> showHost({
+      required bool visible,
+      required String route,
+    }) async {
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: Scaffold(
+              key: ValueKey(route),
+              body: visible ? const AppNoticeHost() : const SizedBox.shrink(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+    }
+
+    final status = container.read(webSessionStatusProvider.notifier);
+    status.markLocked();
+    await showHost(visible: true, route: 'detail');
+    expect(find.byIcon(Icons.close), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pump();
+
+    await showHost(visible: true, route: 'artist');
+    expect(find.byIcon(Icons.close), findsNothing);
+
+    await showHost(visible: false, route: 'login');
+    status.markHealthy(serverUsername: 'artist');
+    // No notice host can observe this recovery. A later incident still needs
+    // a new prompt, including when both transitions happen between frames.
+    status.markLocked();
+    await showHost(visible: true, route: 'detail-again');
+    expect(find.byIcon(Icons.close), findsOneWidget);
+  });
+
   testWidgets('a dismissed session notice stays hidden', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
