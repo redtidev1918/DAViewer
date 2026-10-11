@@ -53,10 +53,8 @@ final personalizedFeedProvider =
             message: 'The network layer is not available.',
           );
         }
-        // Gate on the WebView-confirmed session, not a WAF-sensitive Dio home
-        // probe on every request. A bare probe that reports anonymous is not
-        // proof the WebView signed out; a confirmed session proceeds to the
-        // actual rfy fetch. Explicit Retry still re-runs the server check.
+        // A local identity is only a candidate. Require a recent server
+        // confirmation; check() reuses its healthy lease for five minutes.
         final webSessionState = ref.read(webSessionControllerProvider);
         if (webSessionState.isLoggedIn != true ||
             webSessionState.username.trim().isEmpty) {
@@ -79,17 +77,34 @@ final personalizedFeedProvider =
         // decides whether the fetch may run at all. Otherwise the user sees
         // "每日精选"-style generic items silently masquerade as personalized
         // recommendations.
-        final verdict = ref.read(webSessionStatusProvider).state;
-        if (verdict == WebSessionStatusState.anonymous) {
+        if (!ref.read(webSessionStatusProvider).needsLogin) {
+          await ref.read(webSessionStatusProvider.notifier).check();
+        }
+        if (!ref.mounted) {
+          throw const DAKitException(
+            kind: DAKitFailureKind.network,
+            code: 'rfy.session.superseded',
+            message: 'The recommendation request was superseded.',
+          );
+        }
+        final verdict = ref.read(webSessionStatusProvider);
+        if (verdict.needsLogin) {
           AppLogger.instance.warning(
             'home',
-            'rfy skipped: web session verdict anonymous '
+            'rfy skipped: web session verdict ${verdict.state.name} '
                 'claimed=${webSessionState.username}',
           );
           throw const DAKitException(
             kind: DAKitFailureKind.authentication,
             code: 'web.session.unavailable',
             message: 'The personalized feed requires a signed-in web session.',
+          );
+        }
+        if (!verdict.isHealthy) {
+          throw const DAKitException(
+            kind: DAKitFailureKind.network,
+            code: 'rfy.session.unverified',
+            message: 'The personalized web session could not be confirmed.',
           );
         }
         var csrf = ref.read(webSessionControllerProvider).csrf;
@@ -127,6 +142,18 @@ final personalizedFeedProvider =
           );
         }
 
+        // A verdict may change while the feed is in flight. Do not commit
+        // generic results after expiry or a switch to a different account.
+        if (!ref.mounted ||
+            !ref.read(webSessionStatusProvider).isHealthy ||
+            ref.read(webSessionControllerProvider).username !=
+                webSessionState.username) {
+          throw const DAKitException(
+            kind: DAKitFailureKind.network,
+            code: 'rfy.session.unverified',
+            message: 'The personalized web session could not be confirmed.',
+          );
+        }
         ref.read(artworkStoreProvider.notifier).putAll(page.items);
         return page;
       });

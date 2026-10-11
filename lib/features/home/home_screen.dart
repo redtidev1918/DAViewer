@@ -217,9 +217,7 @@ final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
     // content an anonymous rfy request happens to return. The user chose the
     // recommendations tab: show the recovery state, not a different feed.
     final webSessionDead = ref.watch(
-      webSessionStatusProvider.select(
-        (status) => status.state == WebSessionStatusState.anonymous,
-      ),
+      webSessionStatusProvider.select((status) => status.needsLogin),
     );
     if (webSessionDead) {
       if (!_recoveryUiLogged) {
@@ -252,6 +250,9 @@ final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
     final needsWebLogin =
         feed.error is DAKitException &&
         (feed.error! as DAKitException).code == 'web.session.unavailable';
+    final sessionUnverified =
+        feed.error is DAKitException &&
+        (feed.error! as DAKitException).code == 'rfy.session.unverified';
 
     return ArtworkFeedGrid(
       scrollController: _scrollController,
@@ -259,17 +260,19 @@ final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
       emptyMessage: s.noRecommendations,
       errorMessage: needsWebLogin
           ? s.recommendedSignInHint
+          : sessionUnverified
+          ? s.recommendedSessionUnverified
           : s.recommendedFeedLoadFailure,
-      // Pull-to-refresh goes straight to the real rfy request. A WAF-sensitive
-      // home-page probe before every pull would add ~1.5s and is not an
-      // authoritative logout signal; the feed request itself is the session
-      // acceptance gate and carries its own CSRF refresh/retry path.
+      // Fresh confirmations reuse the lease; expiry first runs the shared
+      // verification chain. A 200 feed response never confirms identity.
       onRefresh: () => ref.read(personalizedFeedProvider.notifier).refresh(),
       onLoadMore: () => ref.read(personalizedFeedProvider.notifier).loadMore(),
       onRetryLoadMore: () =>
           ref.read(personalizedFeedProvider.notifier).retryLoadMore(),
-      errorActionLabel: needsWebLogin ? s.login : null,
-      errorOnAction: needsWebLogin ? () => context.push('/web-login') : null,
+      errorActionLabel: needsWebLogin || sessionUnverified ? s.login : null,
+      errorOnAction: needsWebLogin || sessionUnverified
+          ? () => context.push('/web-login')
+          : null,
     );
   }
 }

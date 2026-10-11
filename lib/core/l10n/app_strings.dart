@@ -199,6 +199,9 @@ final class AppStrings {
   String get updateCheckFailed => _lang == AppLanguage.zh
       ? '检查更新失败，请检查网络后重试。'
       : 'Could not check for updates. Check your connection and try again.';
+  String get recommendedSessionUnverified => _lang == AppLanguage.zh
+      ? '无法确认个性化推荐所需的网页会话。请稍后重试，或通过网页登录确认账号。'
+      : 'The web session for personalized recommendations could not be confirmed. Retry later or confirm your account through web sign-in.';
   String newVersionAvailable(String version) => _lang == AppLanguage.zh
       ? '发现新版本 $version'
       : 'New version $version available';

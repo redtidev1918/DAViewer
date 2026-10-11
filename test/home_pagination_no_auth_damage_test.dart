@@ -151,10 +151,7 @@ ProviderContainer _container({
   // The verdict chain confirmed the session healthy before any feed activity.
   container
       .read(webSessionStatusProvider.notifier)
-      .state = const WebSessionStatus(
-    state: WebSessionStatusState.healthy,
-    serverUsername: 'artist',
-  );
+      .markHealthy(serverUsername: 'artist');
   return container;
 }
 

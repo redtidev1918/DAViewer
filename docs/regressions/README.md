@@ -40,6 +40,10 @@ Automated coverage includes release build arguments, API fallback, restart,
 concurrent checks, failure preservation and persisted dismissal. Real installer
 version display and lifecycle timing still need device verification.
 
+Personalized recommendation gating: see [REG-016](016-personalized-session-gate.md).
+Constructed anonymous and challenge responses block requests before generic
+HTTP 200 content can be accepted. The reported live session remains unverified.
+
 - Mac run: record actual collections/all request count and caller around the
   favourites/home flows.
 - Mac run: capture webview login screen/controller/load challenge counts;

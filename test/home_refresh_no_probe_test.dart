@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:dakit_flutter/dakit_flutter.dart' hide WebSession;
 import 'package:daviewer/core/auth/web_session_controller.dart';
+import 'package:daviewer/core/auth/web_session_refresher.dart'
+    hide webSessionProbeProvider;
 import 'package:daviewer/core/auth/web_session_status.dart';
 import 'package:daviewer/core/auth/web_session_verifier.dart';
 import 'package:daviewer/core/data/web_session.dart';
@@ -10,6 +12,7 @@ import 'package:daviewer/core/diagnostics/app_logger.dart';
 import 'package:daviewer/core/runtime/app_runtime.dart';
 import 'package:daviewer/core/runtime/runtime_provider.dart';
 import 'package:daviewer/features/home/home_screen.dart';
+import 'package:daviewer/features/home/home_providers.dart';
 import 'package:daviewer/shared/widgets/artwork_feed_grid.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -83,6 +86,8 @@ final class _RfyAdapter implements HttpClientAdapter {
 /// Serves the DeviantArt home page the way the web-session verifier reads it,
 /// and counts every probe.
 final class _HomeProbeAdapter implements HttpClientAdapter {
+  _HomeProbeAdapter({this.username = 'artist'});
+  final String username;
   int calls = 0;
 
   @override
@@ -97,11 +102,11 @@ final class _HomeProbeAdapter implements HttpClientAdapter {
     calls += 1;
     final escaped = jsonEncode(<String, Object?>{
       '@publicSession': <String, Object?>{
-        'user': <String, Object?>{'username': 'artist'},
+        'user': <String, Object?>{'username': username},
       },
     });
     return ResponseBody.fromString(
-      'window.__INITIAL_STATE__ = JSON.parse("$escaped");',
+      'window.__INITIAL_STATE__ = JSON.parse(${jsonEncode(escaped)});',
       200,
       headers: <String, List<String>>{
         Headers.contentTypeHeader: <String>['text/html'],
@@ -125,6 +130,70 @@ ResponseBody _json(Map<String, Object?> body) => ResponseBody.fromString(
 );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final anonymous in [true, false]) {
+    test(
+      anonymous
+          ? 'unknown stale Cookie is verified before accepting generic HTTP 200'
+          : 'browser challenge blocks unverified recommendations without expiry',
+      () async {
+        final rfy = _RfyAdapter();
+        final probe = _HomeProbeAdapter(username: 'anonymous');
+        final container = ProviderContainer(
+          retry: (_, _) => null,
+          overrides: [
+            runtimeProvider.overrideWithValue(
+              AppRuntime(
+                clientId: 'test',
+                oauth: null,
+                transport: null,
+                transfers: _sharedTransfers,
+                dio: Dio()..httpClientAdapter = rfy,
+              ),
+            ),
+            webSessionProvider.overrideWithValue(
+              WebSession(_FakeCookieManager.new),
+            ),
+            webSessionVerifierProvider.overrideWithValue(
+              WebSessionVerifier(Dio()..httpClientAdapter = probe),
+            ),
+            webSessionProbeProvider.overrideWithValue(
+              () async => anonymous
+                  ? const WebSessionProbeResult.anonymous()
+                  : const WebSessionProbeResult.unavailable(),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+        container
+            .read(webSessionControllerProvider.notifier)
+            .state = const WebSessionState(
+          csrf: 'token',
+          isLoggedIn: true,
+          username: 'artist',
+        );
+
+        await container.read(personalizedFeedProvider.notifier).refresh();
+
+        expect(probe.calls, 1);
+        expect(
+          rfy.calls,
+          0,
+          reason: 'generic HTTP 200 is not personalization proof',
+        );
+        expect(container.read(personalizedFeedProvider).items, isEmpty);
+        expect(container.read(webSessionStatusProvider).needsLogin, anonymous);
+        final error =
+            container.read(personalizedFeedProvider).error as DAKitException;
+        expect(
+          error.code,
+          anonymous ? 'web.session.unavailable' : 'rfy.session.unverified',
+        );
+      },
+    );
+  }
+
   testWidgets(
     'pull-to-refresh re-fetches rfy without a home-page verifier probe',
     (tester) async {
@@ -162,6 +231,10 @@ void main() {
         username: 'artist',
       );
 
+      container
+          .read(webSessionStatusProvider.notifier)
+          .markHealthy(serverUsername: 'artist');
+
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
@@ -170,12 +243,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // rfy returning 200 no longer proves the web session is signed in: an
-      // anonymous Cookie also gets a generic rfy answer. Only the verifier /
-      // real-browser probe chain may mark the session healthy, so the status
-      // stays unknown here and a later anonymous verdict can surface the
-      // login reminder instead of silently serving generic content.
-      expect(container.read(webSessionStatusProvider).isHealthy, isFalse);
+      // The fresh login confirmation is reused. HTTP 200 did not establish it.
+      expect(container.read(webSessionStatusProvider).isHealthy, isTrue);
 
       // The controller's initial auto-load is the only first-page fetch so
       // far, and no WAF-sensitive home-page probe ran.
