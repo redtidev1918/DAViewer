@@ -42,10 +42,14 @@ flutter test
 Run release builds on the corresponding platform:
 
 ```shell
-flutter build apk --release      # Requires android/key.properties
-flutter build macos --release
-flutter build windows --release
+flutter build apk --release --dart-define=FLUTTER_BUILD_NAME=0.5.10      # Requires android/key.properties
+flutter build macos --release --dart-define=FLUTTER_BUILD_NAME=0.5.10
+flutter build windows --release --dart-define=FLUTTER_BUILD_NAME=0.5.10
 ```
+
+Replace the sample `0.5.10` with the version from `pubspec.yaml`, excluding the
+build number after `+`. Native package metadata does not set this Dart define;
+automatic update checks need it. CI passes the release version in `scripts/build-release`.
 
 Android release builds require the upload keystore and `android/key.properties`; missing configuration fails the build. CI uses `KEYSTORE_B64` and `KEYSTORE_PROPERTIES`. A PR dry-run without signing secrets can build a debug APK, but that APK cannot serve as a production release.
 

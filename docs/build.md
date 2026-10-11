@@ -42,10 +42,14 @@ flutter test
 在对应平台执行 release 构建：
 
 ```shell
-flutter build apk --release      # 需要 android/key.properties
-flutter build macos --release
-flutter build windows --release
+flutter build apk --release --dart-define=FLUTTER_BUILD_NAME=0.5.10      # 需要 android/key.properties
+flutter build macos --release --dart-define=FLUTTER_BUILD_NAME=0.5.10
+flutter build windows --release --dart-define=FLUTTER_BUILD_NAME=0.5.10
 ```
+
+示例中的 `0.5.10` 应替换为 `pubspec.yaml` 的版本号（不含 `+` 后的构建号）。
+安装包版本与 Dart 环境变量分别设置；自动更新检查需要这个 Dart define，不能省略。
+CI 的 `scripts/build-release` 从发布版本传入该值。
 
 Android release 构建需要上传密钥库与 `android/key.properties`，缺少配置时构建会失败。CI 使用 `KEYSTORE_B64` 与 `KEYSTORE_PROPERTIES`；PR 的 dry-run 在没有签名机密时可构建 debug APK，但该包不能作为正式发布包。
 

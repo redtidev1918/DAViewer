@@ -3,6 +3,16 @@
 这里只写下载者需要知道的变化，一行一条。内部实现、协议与调试细节请见
 `CHANGELOG.md`。
 
+## 0.5.10
+
+- 个性化推荐先验证网页身份；已记录的通用回退信号会触发登录或重试入口，不再静默显示该批内容。
+- 修复发布包缺少应用内版本号导致自动更新检查跳过的问题。
+- 更新说明支持对应版本文件回退，自动检查覆盖启动、前台恢复与持续使用；失败不再误报已是最新版本。
+
+- Verify the web identity before requesting recommendations and offer recovery for recorded generic fallback responses.
+- Fix missing in-app release versions that skipped automatic update checks.
+- Read versioned notes on API failure and check on launch, resume and periodically; report check failures accurately.
+
 ## 0.5.9
 
 - 成年或需登录的作品按实际限制显示，不再误标为付费内容。

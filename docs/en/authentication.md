@@ -180,6 +180,30 @@ the **每日精选 / Daily** tab (official OAuth API, web-session independent,
 shown only on explicit user navigation). The product must not label these two
 sources as equivalent.
 
+Recommendations require a server-confirmed web identity from the last five
+minutes. Confirmed anonymity prompts sign-in. A network failure or challenge
+blocks loading and offers web sign-in without declaring the Cookie expired.
+
+A signed-in identity does not guarantee that recommendations are available.
+When the endpoint returns a recorded generic fallback signal, the app rejects
+that batch and offers sign-in or retry. Another home-page identity confirmation
+does not clear this notice; explicit sign-in recovery, a successful Cookie
+import or a successful feed retry does. Detection uses historical protocol
+evidence; similar-looking artwork does not by itself mean expiry.
+
+## Checking for app updates
+
+The app checks stable releases on launch, resume and periodically while in the
+foreground, caching successful results for five minutes. A new version appears
+in the Home update banner, which opens its notes and download link. Dismissing
+it suppresses the same version. Settings still offers a manual check and notes
+for the current release. Failed checks report failure instead of “up to date”.
+
+If an older build shows no banner, check manually in Settings or download from
+[Releases](https://github.com/redtidev1918/DAViewer/releases). Version 0.5.10
+fixes missing app version information that caused automatic checks to be
+skipped; installing the new build is required for that fix.
+
 ## Public website adapters
 
 A few detail-page features require undocumented public website data, such as
