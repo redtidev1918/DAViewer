@@ -76,3 +76,4 @@ session.json
 **/session.json
 *.session
 *.git-credentials
+session-*/

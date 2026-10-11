@@ -49,6 +49,38 @@ void main() {
     expect(forced, 'b');
   });
 
+  test('abandoned completion cannot cache or remove a replacement', () async {
+    final gate = RepositoryRequestGate<String>();
+    final old = Completer<String>();
+    final fresh = Completer<String>();
+    final first = gate.load('page', () => old.future);
+    gate.cancel('page');
+    final second = gate.load('page', () => fresh.future);
+    old.complete('obsolete');
+    expect(await first, 'obsolete');
+    var extraCalls = 0;
+    final third = gate.load('page', () async {
+      extraCalls++;
+      return 'duplicate';
+    });
+    expect(extraCalls, 0);
+    fresh.complete('current');
+    expect(await second, 'current');
+    expect(await third, 'current');
+    expect(await gate.load('page', () async => 'wrong'), 'current');
+  });
+
+  test('uncached loads share work but fetch again after completion', () async {
+    final gate = RepositoryRequestGate<String>();
+    var calls = 0;
+    Future<String> fetch() async => '${++calls}';
+    final first = gate.load('page', fetch, cache: false);
+    final shared = gate.load('page', fetch, cache: false);
+    expect(await first, '1');
+    expect(await shared, '1');
+    expect(await gate.load('page', fetch, cache: false), '2');
+  });
+
   test('failed result is not cached and may be retried', () async {
     var calls = 0;
     final gate = RepositoryRequestGate<String>();

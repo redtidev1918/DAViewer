@@ -160,6 +160,20 @@ final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
   DateTime? _backgroundedAt;
   bool _recoveryUiLogged = false;
 
+  Future<void> _refreshFeed() async {
+    final wasEmpty = ref.read(personalizedFeedProvider).items.isEmpty;
+    final status = ref.read(webSessionStatusProvider);
+    if (!status.isHealthy && !status.needsLogin) {
+      // An explicit retry must not stop at the automatic verification cooldown.
+      await ref.read(webSessionStatusProvider.notifier).check(force: true);
+    }
+    if (!mounted) return;
+    if (wasEmpty && ref.read(personalizedFeedProvider).items.isNotEmpty) {
+      return; // Verification recovery already loaded the initial page.
+    }
+    await ref.read(personalizedFeedProvider.notifier).refresh();
+  }
+
   @override
   bool get wantKeepAlive => true;
 
@@ -253,9 +267,7 @@ final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
               ),
               if (!webSessionDead)
                 TextButton(
-                  onPressed: () => unawaited(
-                    ref.read(personalizedFeedProvider.notifier).refresh(),
-                  ),
+                  onPressed: () => unawaited(_refreshFeed()),
                   child: Text(s.retry),
                 ),
             ],
@@ -283,7 +295,7 @@ final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
           : s.recommendedFeedLoadFailure,
       // Fresh confirmations reuse the lease; expiry first runs the shared
       // verification chain. A 200 feed response never confirms identity.
-      onRefresh: () => ref.read(personalizedFeedProvider.notifier).refresh(),
+      onRefresh: _refreshFeed,
       onLoadMore: () => ref.read(personalizedFeedProvider.notifier).loadMore(),
       onRetryLoadMore: () =>
           ref.read(personalizedFeedProvider.notifier).retryLoadMore(),

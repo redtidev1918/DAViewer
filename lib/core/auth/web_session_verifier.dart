@@ -52,18 +52,20 @@ final class WebSessionVerifier {
           '${cookieHeaderFingerprint(cookieHeader)}',
     );
     try {
-      final response = await _dio.get<String>(
-        _home.toString(),
-        options: Options(
-          responseType: ResponseType.plain,
-          headers: <String, dynamic>{
-            'Accept': 'text/html,application/xhtml+xml',
-            if (cookieHeader.isNotEmpty) 'Cookie': cookieHeader,
-            'User-Agent': webUserAgent,
-          },
-          validateStatus: (_) => true,
-        ),
-      );
+      final response = await _dio
+          .get<String>(
+            _home.toString(),
+            options: Options(
+              responseType: ResponseType.plain,
+              headers: <String, dynamic>{
+                'Accept': 'text/html,application/xhtml+xml',
+                if (cookieHeader.isNotEmpty) 'Cookie': cookieHeader,
+                'User-Agent': webUserAgent,
+              },
+              validateStatus: (_) => true,
+            ),
+          )
+          .timeout(const Duration(seconds: 10));
       final status = response.statusCode ?? 0;
       if (status != 200) {
         AppLogger.instance.info(

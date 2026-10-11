@@ -31,6 +31,26 @@ String _userInfo(String username) => Uri.encodeComponent(
 );
 
 void main() {
+  test(
+    'restore repairs missing auth cookies while preserving rotated values',
+    () {
+      final now = DateTime(2026, 10, 11);
+      final missing = missingSavedWebCookies(
+        saved: [
+          const PersistedWebCookie(name: 'userinfo', value: 'artist'),
+          const PersistedWebCookie(name: 'auth', value: 'saved'),
+          const PersistedWebCookie(name: 'csrf', value: 'old'),
+          PersistedWebCookie(name: 'expired', value: 'dead', expiresDate: now),
+        ],
+        current: const [
+          PersistedWebCookie(name: 'userinfo', value: 'artist'),
+          PersistedWebCookie(name: 'csrf', value: 'rotated'),
+        ],
+        now: now,
+      );
+      expect(missing.map((cookie) => cookie.name), ['auth']);
+    },
+  );
   group('WebSession.cookies', () {
     test('returns the deviantart cookies with their metadata', () async {
       final expires = DateTime.fromMillisecondsSinceEpoch(2000000000000);

@@ -235,6 +235,73 @@ void main() {
   });
 
   test(
+    'verification recovery automatically resumes a stopped initial feed',
+    () async {
+      final rfy = _RfyAdapter();
+      final recovered = Completer<void>();
+      rfy.onFetch = recovered.complete;
+      final container = feedContainer(rfy, _HomeProbeAdapter());
+      container
+          .read(webSessionStatusProvider.notifier)
+          .state = WebSessionStatus(
+        state: WebSessionStatusState.unverified,
+        cooldownUntil: DateTime.now().add(const Duration(minutes: 1)),
+      );
+      final feed = container.read(personalizedFeedProvider.notifier);
+      await feed.refresh();
+      expect(container.read(personalizedFeedProvider).items, isEmpty);
+      expect(rfy.calls, 0);
+      container
+          .read(webSessionStatusProvider.notifier)
+          .markHealthy(serverUsername: 'artist');
+      await recovered.future;
+      await feed.refresh();
+      expect(container.read(personalizedFeedProvider).items, hasLength(1));
+      expect(rfy.calls, 1);
+      container
+          .read(webSessionStatusProvider.notifier)
+          .markHealthy(serverUsername: 'artist');
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        rfy.calls,
+        1,
+        reason: 'healthy updates must not reload a valid list',
+      );
+    },
+  );
+
+  testWidgets('explicit retry verifies despite automatic cooldown', (
+    tester,
+  ) async {
+    final probe = _HomeProbeAdapter();
+    final rfy = _RfyAdapter();
+    final container = feedContainer(rfy, probe);
+    container.read(webSessionReadyProvider.notifier).state = true;
+    container.read(webSessionStatusProvider.notifier).state = WebSessionStatus(
+      state: WebSessionStatusState.unverified,
+      cooldownUntil: DateTime.now().add(const Duration(minutes: 1)),
+    );
+    await container.read(personalizedFeedProvider.notifier).refresh();
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: Scaffold(body: PersonalizedFeed())),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(probe.calls, 0);
+    await tester.runAsync(() async {
+      await tester.tap(find.byType(FilledButton).first);
+      await container.read(webSessionStatusProvider.notifier).check();
+      await container.read(personalizedFeedProvider.notifier).refresh();
+    });
+    await tester.pumpAndSettle();
+    expect(probe.calls, 1);
+    expect(rfy.calls, 1);
+    expect(container.read(personalizedFeedProvider).items, hasLength(1));
+  });
+
+  test(
     'a late generic result cannot replace a newer same-account login',
     () async {
       final gate = Completer<void>();

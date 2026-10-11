@@ -8,7 +8,6 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../runtime/runtime_provider.dart';
-import 'session_state.dart';
 import 'web_session_controller.dart';
 import 'web_session_platform.dart';
 
@@ -62,9 +61,6 @@ WebSessionProbeResult webSessionProbeResultFromPage({
   required String? pageUsername,
   required String csrf,
 }) {
-  if (csrf.isEmpty) {
-    return const WebSessionProbeResult.unavailable();
-  }
   if (pageUsername == null || pageUsername.isEmpty) {
     return WebSessionProbeResult.unavailable(csrf: csrf);
   }
@@ -77,9 +73,11 @@ WebSessionProbeResult webSessionProbeResultFromPage({
 /// Loads a public page in a hidden browser so website-only metadata adapters
 /// can obtain the anonymous CSRF/cookies expected by DeviantArt. It never asks
 /// the user to log in and is not part of App authentication.
-final webSessionRefresherProvider = Provider<WebSessionRefresher>(
-  (ref) => WebSessionRefresher(ref),
-);
+final webSessionRefresherProvider = Provider<WebSessionRefresher>((ref) {
+  final refresher = WebSessionRefresher(ref);
+  ref.onDispose(() => unawaited(refresher._dispose()));
+  return refresher;
+});
 
 /// The real-browser probe used to arbitrate session-state answers. Injectable
 /// so tests can stub the headless WebView without platform channels.
@@ -101,7 +99,7 @@ final class WebSessionRefresher {
   /// saw: a CSRF token plus whether the page rendered a signed-in username.
   /// Concurrent callers share the same operation, and the returned future does
   /// not complete until the page reports a result or the safety timeout fires.
-  Future<WebSessionProbeResult> refresh() async {
+  Future<WebSessionProbeResult> refresh() {
     final active = _completion;
     if (_running && active != null) {
       return active.future;
@@ -109,9 +107,20 @@ final class WebSessionRefresher {
     _running = true;
     final completion = Completer<WebSessionProbeResult>();
     _completion = completion;
+    // Include proxy setup and browser startup in the deadline. Neither may
+    // keep the shared probe occupied indefinitely.
+    _timeout = Timer(const Duration(seconds: 20), () {
+      unawaited(_dispose(null, completion));
+    });
+    unawaited(_startProbe(completion));
+    return completion.future;
+  }
+
+  Future<void> _startProbe(Completer<WebSessionProbeResult> completion) async {
     try {
       final runtime = _ref.read(runtimeProvider);
       final environment = await runtime.webViewProxyManager?.prepare();
+      if (!identical(_completion, completion) || !_ref.mounted) return;
       final headless = HeadlessInAppWebView(
         webViewEnvironment: environment,
         initialSize: const Size(480, 800),
@@ -123,35 +132,36 @@ final class WebSessionRefresher {
           url: WebUri('https://www.deviantart.com/'),
         ),
         onLoadStop: (controller, url) async {
+          if (!identical(_completion, completion)) return;
           if (url == null || url.host != 'www.deviantart.com') return;
-          final result = await _report(controller);
-          await _dispose(result);
+          final result = await _report(controller, completion);
+          await _dispose(result, completion);
         },
         onReceivedError: (controller, request, error) async {
-          await _dispose(const WebSessionProbeResult.unavailable());
+          // Images, fonts and other optional resources do not determine
+          // whether the main page can report the signed-in identity.
+          if (request.isForMainFrame != true) return;
+          await _dispose(const WebSessionProbeResult.unavailable(), completion);
         },
       );
       _headless = headless;
       await headless.run();
-      // Safety net in case navigation never completes.
-      if (_running) {
-        _timeout = Timer(const Duration(seconds: 20), () {
-          if (_running) unawaited(_dispose());
-        });
-      }
     } on Object catch (error, stack) {
       debugPrint('[web-session] headless refresh failed: $error');
       debugPrintStack(stackTrace: stack);
-      await _dispose();
+      await _dispose(null, completion);
     }
-    return completion.future;
   }
 
   Future<WebSessionProbeResult> _report(
     InAppWebViewController controller,
+    Completer<WebSessionProbeResult> completion,
   ) async {
     try {
       final raw = await controller.evaluateJavascript(source: _probeScript);
+      if (!identical(_completion, completion) || !_ref.mounted) {
+        return const WebSessionProbeResult.unavailable();
+      }
       if (raw is! String || raw.isEmpty) {
         return const WebSessionProbeResult.unavailable();
       }
@@ -167,8 +177,7 @@ final class WebSessionRefresher {
       );
       // Logging context only: the local identity must never impersonate the
       // page observation (see REG-010).
-      final localUsername =
-          (await _ref.read(webSessionProvider).readData())?.username ?? '';
+      final localUsername = _ref.read(webSessionControllerProvider).username;
       debugPrint(
         '[web-session] probe outcome=${result.outcome.name} '
         'csrf=${csrf.length} '
@@ -184,7 +193,21 @@ final class WebSessionRefresher {
       // for website adapters and returns its observation. It never writes an
       // identity or a session verdict (REG-010) — the verification layer
       // consumes the returned evidence instead.
-      await _ref.read(webSessionControllerProvider.notifier).updateCsrf(csrf);
+      if (csrf.isNotEmpty &&
+          identical(_completion, completion) &&
+          _ref.mounted) {
+        // Live CSRF updates before persistence; storage cannot delay identity.
+        unawaited(
+          _ref
+              .read(webSessionControllerProvider.notifier)
+              .updateCsrf(csrf)
+              .catchError((Object error) {
+                debugPrint(
+                  '[web-session] probe metadata save failed: ${error.runtimeType}',
+                );
+              }),
+        );
+      }
       return result;
     } on Object catch (error) {
       debugPrint('[web-session] headless report failed: $error');
@@ -192,23 +215,27 @@ final class WebSessionRefresher {
     }
   }
 
-  Future<void> _dispose([WebSessionProbeResult? result]) async {
+  Future<void> _dispose([
+    WebSessionProbeResult? result,
+    Completer<WebSessionProbeResult>? expected,
+  ]) async {
+    if (expected != null && !identical(_completion, expected)) return;
     _timeout?.cancel();
     _timeout = null;
     final headless = _headless;
     _headless = null;
+    final completion = _completion;
+    _completion = null;
+    _running = false;
+    if (completion != null && !completion.isCompleted) {
+      completion.complete(result ?? const WebSessionProbeResult.unavailable());
+    }
     if (headless != null) {
       try {
         await headless.dispose();
       } on Object {
         // Best effort.
       }
-    }
-    final completion = _completion;
-    _completion = null;
-    _running = false;
-    if (completion != null && !completion.isCompleted) {
-      completion.complete(result ?? const WebSessionProbeResult.unavailable());
     }
   }
 

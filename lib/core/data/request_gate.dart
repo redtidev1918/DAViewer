@@ -12,6 +12,7 @@ final class RepositoryRequestGate<T> {
     String key,
     Future<T> Function() loader, {
     bool force = false,
+    bool cache = true,
   }) {
     if (!force && _cache.containsKey(key)) {
       return Future<T>.value(_cache[key]!);
@@ -24,12 +25,16 @@ final class RepositoryRequestGate<T> {
     unawaited(() async {
       try {
         final value = await loader();
-        _cache[key] = value;
+        if (cache && identical(_inflight[key], completer)) {
+          _cache[key] = value;
+        }
         completer.complete(value);
       } on Object catch (error, stack) {
         completer.completeError(error, stack);
       } finally {
-        _inflight.remove(key);
+        if (identical(_inflight[key], completer)) {
+          _inflight.remove(key);
+        }
       }
     }());
     return completer.future;

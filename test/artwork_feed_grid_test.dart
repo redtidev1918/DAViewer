@@ -245,6 +245,41 @@ void main() {
     expect(retries, 1);
   });
 
+  testWidgets('refresh failure keeps cards and retries the first page', (
+    tester,
+  ) async {
+    var refreshes = 0;
+    var pages = 0;
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: ArtworkFeedGrid(
+              feed: ArtworkFeedState(
+                items: [artwork(1)],
+                nextCursor: 'next',
+                lastRefreshError: StateError('offline'),
+                phase: FeedRequestPhase.stopped,
+              ),
+              emptyMessage: 'Empty',
+              onRefresh: () async {
+                refreshes++;
+              },
+              onRetryLoadMore: () {
+                pages++;
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Art 1'), findsOneWidget);
+    await tester.tap(find.byType(FilledButton));
+    expect(refreshes, 1);
+    expect(pages, 0);
+  });
+
   testWidgets('in-flight pagination suppresses repeated bottom asks', (
     tester,
   ) async {

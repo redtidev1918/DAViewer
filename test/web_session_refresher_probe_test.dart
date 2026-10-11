@@ -36,12 +36,19 @@ void main() {
       }
     });
 
-    test('a page without CSRF is unavailable regardless of username', () {
+    test('rendered identity remains confirmed without CSRF', () {
       final result = webSessionProbeResultFromPage(
         pageUsername: 'artist',
         csrf: '',
       );
-      expect(result.outcome, WebSessionProbeOutcome.unavailable);
+      expect(result.outcome, WebSessionProbeOutcome.confirmed);
+    });
+    test('explicit anonymous identity requires login even without CSRF', () {
+      final result = webSessionProbeResultFromPage(
+        pageUsername: 'anonymous',
+        csrf: '',
+      );
+      expect(result.outcome, WebSessionProbeOutcome.anonymous);
     });
   });
 }

@@ -17,6 +17,27 @@ WebSessionEvidence evidence(
 
 void main() {
   group('resolveWebSessionVerdict matrix', () {
+    for (final signedIn in [false, true]) {
+      test(
+        'unavailable HTTP evidence escalates only a claimed session ($signedIn)',
+        () {
+          final decision = resolveWebSessionVerdict(
+            current: WebSessionStatusState.unknown,
+            evidence: evidence(
+              WebSessionEvidenceSource.bareProbe,
+              WebSessionProbeOutcome.unavailable,
+            ),
+            claimedUsername: signedIn ? 'artist' : '',
+            claimedSignedIn: signedIn,
+          );
+          expect(decision.escalateToRealBrowser, signedIn);
+          expect(
+            decision.nextState,
+            signedIn ? isNull : WebSessionStatusState.unavailable,
+          );
+        },
+      );
+    }
     test('bare confirmed matching claim is healthy', () {
       final decision = resolveWebSessionVerdict(
         current: WebSessionStatusState.unknown,

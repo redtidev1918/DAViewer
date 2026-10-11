@@ -84,6 +84,109 @@ void main() {
     expect(controller.state.items.map((a) => a.id), <String>['art-2', 'art-3']);
   });
 
+  test(
+    'manual refresh failure preserves items and the previous cursor',
+    () async {
+      var calls = 0;
+      final controller = ArtworkFeedController((request) async {
+        if (++calls == 2) throw StateError('offline');
+        return Page<Artwork>(
+          items: [artwork(calls)],
+          hasMore: true,
+          nextCursor: 'next',
+        );
+      }, autoLoad: false);
+      addTearDown(controller.dispose);
+      await controller.refresh();
+      await controller.refresh();
+      expect(controller.state.items.single.id, 'art-1');
+      expect(controller.state.nextCursor, 'next');
+      expect(controller.state.lastRefreshError, isA<StateError>());
+      expect(controller.state.isLoading, isFalse);
+      await controller.refresh();
+      expect(controller.state.items.single.id, 'art-3');
+      expect(controller.state.lastRefreshError, isNull);
+    },
+  );
+
+  for (final failOldPage in [false, true]) {
+    test('refresh supersedes old pagination (failure=$failOldPage)', () async {
+      final old = Completer<Page<Artwork>>();
+      var firstPages = 0;
+      final controller = ArtworkFeedController((request) async {
+        if (request.cursor != null) return old.future;
+        return Page<Artwork>(
+          items: [artwork(++firstPages)],
+          hasMore: true,
+          nextCursor: 'cursor-$firstPages',
+        );
+      }, autoLoad: false);
+      addTearDown(controller.dispose);
+      await controller.refresh();
+      final pagination = controller.loadMore();
+      await controller.refresh();
+      if (failOldPage) {
+        old.completeError(StateError('obsolete failure'));
+      } else {
+        old.complete(Page<Artwork>(items: [artwork(99)], hasMore: false));
+      }
+      await pagination;
+      expect(controller.state.items.single.id, 'art-2');
+      expect(controller.state.nextCursor, 'cursor-2');
+      expect(controller.state.error, isNull);
+      expect(controller.state.phase, FeedRequestPhase.idle);
+    });
+  }
+
+  test(
+    'overlapping pages deduplicate works and a repeated cursor stops',
+    () async {
+      final controller = ArtworkFeedController((request) async {
+        return Page<Artwork>(
+          items: request.cursor == null
+              ? [artwork(1), artwork(1)]
+              : [artwork(1), artwork(2)],
+          hasMore: true,
+          nextCursor: 'same',
+        );
+      }, autoLoad: false);
+      addTearDown(controller.dispose);
+      await controller.refresh();
+      await controller.loadMore();
+      expect(controller.state.items.map((item) => item.id), ['art-1', 'art-2']);
+      expect(controller.state.hasMore, isFalse);
+    },
+  );
+
+  test(
+    'a refreshed feed cannot join an old request for the same cursor',
+    () async {
+      final old = Completer<Page<Artwork>>();
+      var firstPages = 0;
+      var pageCalls = 0;
+      final controller = ArtworkFeedController((request) async {
+        if (request.cursor == null) {
+          return Page<Artwork>(
+            items: [artwork(++firstPages)],
+            hasMore: true,
+            nextCursor: 'same',
+          );
+        }
+        if (++pageCalls == 1) return old.future;
+        return Page<Artwork>(items: [artwork(3)], hasMore: false);
+      }, autoLoad: false);
+      addTearDown(controller.dispose);
+      await controller.refresh();
+      final oldPage = controller.loadMore();
+      await controller.refresh();
+      await controller.loadMore();
+      expect(pageCalls, 2);
+      old.complete(Page<Artwork>(items: [artwork(99)], hasMore: false));
+      await oldPage;
+      expect(controller.state.items.map((item) => item.id), ['art-2', 'art-3']);
+    },
+  );
+
   test('coalesces overlapping first-page refreshes', () async {
     var calls = 0;
     final gate = Completer<Page<Artwork>>();

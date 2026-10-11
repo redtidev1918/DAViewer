@@ -159,7 +159,8 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
       final showTrailing =
           widget.feed.isLoading ||
           (widget.feed.phase == FeedRequestPhase.stopped &&
-              widget.feed.error != null &&
+              (widget.feed.error != null ||
+                  widget.feed.lastRefreshError != null) &&
               widget.feed.items.isNotEmpty);
       body = MasonryGridView.count(
         controller: widget.scrollController,
@@ -179,15 +180,31 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
                 ),
               );
             }
-            final onRetry = widget.onRetryLoadMore ?? widget.onLoadMore;
+            final onRetry = widget.feed.lastRefreshError != null
+                ? widget.onRefresh
+                : widget.onRetryLoadMore ?? widget.onLoadMore;
             if (onRetry == null) return const SizedBox.shrink();
             return Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                child: FilledButton.tonalIcon(
-                  onPressed: onRetry,
-                  icon: const Icon(Icons.refresh),
-                  label: Text(strings(ref.watch(appLanguageProvider)).retry),
+                child: Column(
+                  children: [
+                    Text(
+                      widget.errorMessage ??
+                          friendlyErrorMessage(
+                            widget.feed.lastRefreshError ?? widget.feed.error!,
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    FilledButton.tonalIcon(
+                      onPressed: onRetry,
+                      icon: const Icon(Icons.refresh),
+                      label: Text(
+                        strings(ref.watch(appLanguageProvider)).retry,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             );

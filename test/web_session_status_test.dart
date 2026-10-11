@@ -339,7 +339,7 @@ void main() {
     );
 
     test(
-      'a WAF/network probe answer is unavailable, never anonymous',
+      'unavailable HTTP and browser answers are unverified, never anonymous',
       () async {
         final container = await _statusContainer('<html/>');
         addTearDown(container.dispose);
@@ -347,8 +347,29 @@ void main() {
         await container.read(webSessionStatusProvider.notifier).check();
 
         final status = container.read(webSessionStatusProvider);
-        expect(status.state, WebSessionStatusState.unavailable);
+        expect(status.state, WebSessionStatusState.unverified);
         expect(status.needsLogin, isFalse);
+      },
+    );
+
+    test(
+      'a challenged startup HTTP probe recovers through the real browser',
+      () async {
+        var browserCalls = 0;
+        final container = await _statusContainer(
+          '<html/>',
+          probe: () async {
+            browserCalls++;
+            return const WebSessionProbeResult.confirmed(
+              csrf: 'new-token',
+              username: 'artist',
+            );
+          },
+        );
+        addTearDown(container.dispose);
+        await container.read(webSessionStatusProvider.notifier).check();
+        expect(browserCalls, 1);
+        expect(container.read(webSessionStatusProvider).isHealthy, isTrue);
       },
     );
 

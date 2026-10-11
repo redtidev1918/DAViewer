@@ -112,9 +112,14 @@ WebSessionVerdictDecision resolveWebSessionVerdict({
                   WebSessionStatusState.anonymous,
                 );
         case WebSessionProbeOutcome.unavailable:
-          return const WebSessionVerdictDecision.transition(
-            WebSessionStatusState.unavailable,
-          );
+          // A WAF challenge or changed HTML cannot veto a previously signed-in
+          // browser session. Give the browser the same arbitration opportunity
+          // as a bare anonymous response.
+          return claimedSignedIn && claimed.isNotEmpty
+              ? const WebSessionVerdictDecision.escalate()
+              : const WebSessionVerdictDecision.transition(
+                  WebSessionStatusState.unavailable,
+                );
       }
 
     case WebSessionEvidenceSource.realBrowserProbe:

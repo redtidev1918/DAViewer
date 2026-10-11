@@ -90,6 +90,31 @@ bool isValidCookieSnapshot({
   return claimed.trim().toLowerCase() == username.trim().toLowerCase();
 }
 
+/// Repairs an incomplete live store without replacing cookies the browser has
+/// already rotated. Android can retain `userinfo` while losing auth cookies;
+/// the identity cookie alone does not establish a complete restored session.
+List<PersistedWebCookie> missingSavedWebCookies({
+  required List<PersistedWebCookie> saved,
+  required List<PersistedWebCookie> current,
+  required DateTime now,
+}) {
+  String domain(PersistedWebCookie cookie) =>
+      (cookie.domain ?? '').replaceFirst(RegExp(r'^\.'), '').toLowerCase();
+  return saved.where((cookie) {
+    if (cookie.expiresDate != null && !cookie.expiresDate!.isAfter(now)) {
+      return false;
+    }
+    return !current.any(
+      (live) =>
+          live.name == cookie.name &&
+          // Older Android WebViews omit domain/path metadata entirely.
+          (live.domain == null ||
+              cookie.domain == null ||
+              (domain(live) == domain(cookie) && live.path == cookie.path)),
+    );
+  }).toList();
+}
+
 final webSessionControllerProvider =
     StateNotifierProvider<WebSessionController, WebSessionState>(
       (ref) => WebSessionController(ref),
@@ -124,7 +149,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
       _restoreWebCookies(await _store.read());
 
   /// Re-injects the persisted deviantart.com cookies when the WebView store
-  /// currently has no signed-in `userinfo` cookie. Restoring requires a
+  /// is missing cookies from the saved session. Restoring requires a
   /// signed-in OAuth state; while the OAuth account profile is normally
   /// matched against the saved session's username (see
   /// [shouldRestoreSavedWebSession]), an account that is temporarily unknown —
@@ -162,15 +187,23 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
     }
     try {
       final current = await _ref.read(webSessionProvider).readData();
-      if (current?.username.isNotEmpty == true) {
-        return; // Web session already present.
+      final liveUsername = current?.username.trim() ?? '';
+      if (liveUsername.isNotEmpty &&
+          liveUsername.toLowerCase() != savedUsername.toLowerCase()) {
+        return; // Never mix cookies from two accounts.
       }
+      final toRestore = missingSavedWebCookies(
+        saved: cookies,
+        current: current?.cookies ?? const <PersistedWebCookie>[],
+        now: DateTime.now(),
+      );
+      if (toRestore.isEmpty) return;
       final cookieManager = _ref
           .read(runtimeProvider)
           .webViewProxyManager
           ?.cookieManager;
       if (cookieManager == null) return;
-      for (final cookie in cookies) {
+      for (final cookie in toRestore) {
         await _setCookie(cookieManager, cookie);
       }
       final restored = await _ref.read(webSessionProvider).readData();

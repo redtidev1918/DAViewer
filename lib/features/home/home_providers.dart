@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dakit_flutter/dakit_flutter.dart' hide WebSession;
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,7 +41,11 @@ final personalizedFeedProvider =
       ref.watch(
         webSessionControllerProvider.select(personalizedFeedSessionIdentity),
       );
+      var requestRevision = 0;
       final controller = ArtworkFeedController((request) async {
+        final revision = request.cursor == null
+            ? ++requestRevision
+            : requestRevision;
         AppLogger.instance.info(
           'home',
           'personalized feed fetch '
@@ -157,6 +163,7 @@ final personalizedFeedProvider =
         // generic results after expiry or a switch to a different account.
         final currentHeader = await webSession.cookieHeader();
         if (!ref.mounted ||
+            revision != requestRevision ||
             currentHeader != cookieHeader ||
             generation !=
                 ref.read(webSessionStatusProvider.notifier).generation ||
@@ -200,6 +207,13 @@ final personalizedFeedProvider =
           'personalized feed accepted items=${page.items.length} generation=$generation',
         );
         return page;
+      }, requestTimeout: const Duration(seconds: 60));
+      ref.listen(webSessionStatusProvider, (previous, next) {
+        if (previous?.isHealthy == false && next.isHealthy) {
+          // Verification can recover after the initial feed attempt stopped.
+          // Resume it once; a healthy-to-healthy update never reloads the list.
+          unawaited(controller.recoverInitialPage());
+        }
       });
       AppLogger.instance.info(
         'home',

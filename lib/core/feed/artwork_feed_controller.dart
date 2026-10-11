@@ -69,6 +69,12 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
   Future<void>? _activeFirstPageFetch;
   int _paginationFailures = 0;
   DateTime? _paginationBackoffUntil;
+  int _revision = 0;
+
+  List<Artwork> _uniqueItems(Iterable<Artwork> items) {
+    final seen = <String>{};
+    return items.where((item) => seen.add(item.id)).toList();
+  }
 
   bool get _inPaginationBackoff {
     final until = _paginationBackoffUntil;
@@ -89,11 +95,11 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
     _paginationBackoffUntil = _now().add(_paginationBackoff[index]);
   }
 
-  Future<Page<Artwork>> _fetchPage(PageRequest request, {bool force = false}) {
-    final key = '${request.cursor ?? 'first'}:${request.limit}';
+  Future<Page<Artwork>> _fetchPage(PageRequest request) {
+    final key = '$_revision:${request.cursor ?? 'first'}:${request.limit}';
     final gate = _requestGate;
     return gate
-        .load(key, () => _fetch(request), force: force)
+        .load(key, () => _fetch(request), cache: false)
         .timeout(
           requestTimeout,
           onTimeout: () {
@@ -112,13 +118,25 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
         );
   }
 
-  Future<void> refresh() => _runFirstPageFetch(silent: false);
+  Future<void> refresh() => _runFirstPageFetch();
 
-  Future<void> _runFirstPageFetch({required bool silent}) {
+  /// Resume a failed initial load after its session prerequisite recovers.
+  /// Existing lists and active requests must not be refreshed by this signal.
+  Future<void> recoverInitialPage() async {
+    if (!mounted ||
+        state.isLoading ||
+        state.items.isNotEmpty ||
+        state.error == null) {
+      return;
+    }
+    await refresh();
+  }
+
+  Future<void> _runFirstPageFetch() {
     final active = _activeFirstPageFetch;
     if (active != null) return active;
     late final Future<void> tracked;
-    tracked = _performFirstPageFetch(silent: silent).whenComplete(() {
+    tracked = _performFirstPageFetch().whenComplete(() {
       if (identical(_activeFirstPageFetch, tracked)) {
         _activeFirstPageFetch = null;
       }
@@ -127,8 +145,9 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
     return tracked;
   }
 
-  Future<void> _performFirstPageFetch({required bool silent}) async {
+  Future<void> _performFirstPageFetch() async {
     if (!mounted) return;
+    final revision = ++_revision;
     final hasItems = state.items.isNotEmpty;
     state = ArtworkFeedState(
       items: state.items,
@@ -137,20 +156,17 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
       phase: hasItems ? FeedRequestPhase.refreshing : FeedRequestPhase.loading,
     );
     try {
-      final page = await _fetchPage(
-        PageRequest(limit: pageSize),
-        force: hasItems,
-      );
-      if (!mounted) return;
+      final page = await _fetchPage(PageRequest(limit: pageSize));
+      if (!mounted || revision != _revision) return;
       _resetPaginationBackoff();
       state = ArtworkFeedState(
-        items: page.items,
+        items: _uniqueItems(page.items),
         nextCursor: page.nextCursor,
         phase: FeedRequestPhase.idle,
       );
     } catch (error) {
-      if (!mounted) return;
-      if (silent && state.items.isNotEmpty) {
+      if (!mounted || revision != _revision) return;
+      if (state.items.isNotEmpty) {
         state = ArtworkFeedState(
           items: state.items,
           nextCursor: state.nextCursor,
@@ -166,6 +182,7 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
   Future<void> loadMore() async {
     if (!mounted || state.isLoading || !state.hasMore) return;
     if (_inPaginationBackoff) return;
+    final revision = _revision;
     final cursor = state.nextCursor;
     state = ArtworkFeedState(
       items: state.items,
@@ -177,15 +194,15 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
       final page = await _fetchPage(
         PageRequest(cursor: cursor, limit: pageSize),
       );
-      if (!mounted) return;
+      if (!mounted || revision != _revision) return;
       _resetPaginationBackoff();
       state = ArtworkFeedState(
-        items: <Artwork>[...state.items, ...page.items],
-        nextCursor: page.nextCursor,
+        items: _uniqueItems(<Artwork>[...state.items, ...page.items]),
+        nextCursor: page.nextCursor == cursor ? null : page.nextCursor,
         phase: FeedRequestPhase.idle,
       );
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _revision) return;
       _enterPaginationBackoff();
       state = ArtworkFeedState(
         items: state.items,
@@ -208,6 +225,6 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
   /// updates in place without a spinner flicker (e.g. when the app resumes).
   Future<void> refreshSilently() async {
     if (!mounted || state.isLoading) return;
-    await _runFirstPageFetch(silent: true);
+    await _runFirstPageFetch();
   }
 }

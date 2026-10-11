@@ -304,19 +304,20 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
           generation: generation,
         ),
       );
+      var confirmedCookies = cookies;
       if (decision.escalateToRealBrowser) {
         final after = await webSession.snapshot(
-          source: 'check-after-anonymous',
+          source: 'check-after-unconfirmed',
         );
         AppLogger.instance.warning(
           'auth',
-          'web session probe unconfirmed (anonymous): '
+          'web session probe unconfirmed (${verification.state.name}): '
               'claimed=$claimedUsername '
               'cookieCount=${cookieHeaderCount(cookieHeader)} '
               'cookieFingerprint=${cookieHeaderFingerprint(cookieHeader)} '
               '${after.logLine()}',
         );
-        // A bare anonymous answer never decides logged-out by itself: collect
+        // A bare unconfirmed answer never decides logged-out by itself: collect
         // real-browser evidence and apply it as a separate observation.
         final probe = await _ref.read(webSessionProbeProvider)();
         if (!_isCurrent(generation)) return;
@@ -328,6 +329,12 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
             generation: generation,
           ),
         );
+        if (decision.nextState == WebSessionStatusState.healthy) {
+          // The browser may rotate auth cookies during navigation. Persist its
+          // current set rather than the stale pre-navigation HTTP snapshot.
+          confirmedCookies = await webSession.cookies();
+          if (!_isCurrent(generation)) return;
+        }
       }
       if (decision.nextState == WebSessionStatusState.healthy) {
         // Persist only a server-confirmed live cookie set. An unconfirmed
@@ -336,9 +343,16 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         // `userinfo` cookie while the auth cookies are mid-rotation, and
         // re-persisting that set would make the next cold start restore dead
         // credentials (forced re-login).
-        await _ref
-            .read(webSessionControllerProvider.notifier)
-            .ensurePersistentSnapshot(capturedCookies: cookies);
+        try {
+          await _ref
+              .read(webSessionControllerProvider.notifier)
+              .ensurePersistentSnapshot(capturedCookies: confirmedCookies);
+        } on Object catch (error) {
+          AppLogger.instance.warning(
+            'auth',
+            'confirmed session snapshot save failed errorType=${error.runtimeType}',
+          );
+        }
       }
     } on Object {
       if (_isCurrent(generation)) _setUnavailable(source: 'check-error');
