@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.13](https://github.com/redtidev1918/DAViewer/compare/v0.5.12...v0.5.13) (2026-10-11)
+
+
+### Bug Fixes
+
+* recover headless web-session probe, first-page ownership and feed cache ([2c4b365](https://github.com/redtidev1918/DAViewer/commit/2c4b365973a695a0c96c0e16d2c47c67390443eb))
+* recover headless web-session probe, first-page ownership and feed cache ([#92](https://github.com/redtidev1918/DAViewer/issues/92)) ([bad6c63](https://github.com/redtidev1918/DAViewer/commit/bad6c63fcb3a03f9dc2afc842d9c4dd96ae3a14d))
+
 ## [0.5.12](https://github.com/redtidev1918/DAViewer/compare/v0.5.11...v0.5.12) (2026-10-11)
 
 
