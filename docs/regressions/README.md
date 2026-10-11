@@ -31,6 +31,7 @@ machine cannot produce the required evidence.
 | R21  | literature deviations render text instead of blank detail/broken previews | Verified | test/literature_deviation_test.dart covers the text card, body fetch for a /art/ literature deviation, and no body request for image works. flutter analyze is clean; the full suite (312 tests) passes. See 012. |
 
 | R22 | mature related previews preserve restriction reasons and use canonical media; expired web sessions expose recovery | Partial | `artwork_access_state_test.dart`, `artwork_media_hydration_test.dart`, `web_session_status_test.dart`, and `artwork_detail_navigation_test.dart` cover combined restrictions, unknown causes, source boundaries, stale results, web fallback, card updates, verification, and recovery. The full suite passes 337 tests; the reported live artwork still needs account/device confirmation. See [013](013-mature-related-preview.md). |
+| R23 | one trigger layer decides when to verify the web session; no page judges it alone | Partial | `web_session_coordinator_test.dart` covers the three response signals, the exclusions, periodic and resume triggers, `shouldVerify` gating, pause/dispose, trigger isolation, and provider attach/detach on the shared Dio. Real-device timing of the periodic check, WAF suppression, and background timer freezing are still unobserved. See [014](014-web-session-trigger-coverage.md). |
 
 ## Evidence still required before calling the architecture closed
 

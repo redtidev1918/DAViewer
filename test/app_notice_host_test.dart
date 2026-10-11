@@ -188,4 +188,51 @@ void main() {
     final noticeRect = tester.getRect(noticeText);
     expect(noticeRect.bottom, lessThanOrEqualTo(navbarRect.top));
   });
+
+  testWidgets('NoticeOverlay keeps the host visible on a pushed route', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: (_, _) => null,
+        child: MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => Center(
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (context) => const NoticeOverlay(
+                        child: Scaffold(
+                          body: Center(child: Text('Pushed page')),
+                        ),
+                      ),
+                    ),
+                  ),
+                  child: const Text('open'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pushed page'), findsOneWidget);
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(AppNoticeHost)),
+    );
+    container.read(webSessionStatusProvider.notifier).markLocked();
+    await tester.pump();
+
+    // The session banner appears on the pushed page, not only on the shell.
+    expect(
+      find.textContaining('Max challenge attempts exceeded'),
+      findsOneWidget,
+    );
+  });
 }

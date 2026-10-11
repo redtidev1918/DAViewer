@@ -116,7 +116,10 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
 
   /// Bypass the healthy cache when a content response is suspicious, while
   /// coalescing restricted cards and respecting challenge/network cooldowns.
-  Future<void> recheckAfterContentRestriction() async {
+  Future<void> recheckAfterContentRestriction() =>
+      recheckAfterWebSignal('content-restriction');
+
+  Future<void> recheckAfterWebSignal(String source) async {
     if (state.isLocked || state.inCooldown || state.needsLogin) return;
     final active = _activeCheck;
     if (active != null) return active;
@@ -127,6 +130,10 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       return;
     }
     _lastRestrictionCheck = now;
+    AppLogger.instance.info(
+      'auth',
+      'web verification requested source=$source',
+    );
     await check(force: true);
   }
 

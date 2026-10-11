@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/l10n/app_strings.dart';
 import '../core/theme/theme_mode_provider.dart';
+import '../core/auth/web_session_coordinator.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
 
@@ -24,11 +25,35 @@ final class AppScrollBehavior extends MaterialScrollBehavior {
   };
 }
 
-final class DAViewerApp extends ConsumerWidget {
+final class DAViewerApp extends ConsumerStatefulWidget {
   const DAViewerApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DAViewerApp> createState() => _DAViewerAppState();
+}
+
+final class _DAViewerAppState extends ConsumerState<DAViewerApp> {
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    final coordinator = ref.read(webSessionCoordinatorProvider);
+    _lifecycle = AppLifecycleListener(
+      onResume: coordinator.resume,
+      onPause: coordinator.pause,
+      onHide: coordinator.pause,
+    );
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     final language = ref.watch(appLanguageProvider);
     final themeMode = ref.watch(themeModeProvider);

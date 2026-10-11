@@ -8,6 +8,7 @@ import '../core/auth/auth_state.dart';
 import '../core/auth/web_session_status.dart';
 import '../core/l10n/app_strings.dart';
 import '../shared/route_observer.dart';
+import '../shared/widgets/app_notice_host.dart';
 import '../features/artist/artist_screen.dart';
 import '../features/artist/folder_screen.dart';
 import '../features/artwork/artwork_detail_screen.dart';
@@ -47,8 +48,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/artwork/:id', pageBuilder: artworkDetailPage),
       GoRoute(
         path: '/artist/:username',
-        builder: (context, state) =>
-            ArtistScreen(username: state.pathParameters['username']!),
+        builder: (context, state) => NoticeOverlay(
+          child: ArtistScreen(username: state.pathParameters['username']!),
+        ),
       ),
       GoRoute(
         path: '/artist/:username/folder/:folderId',
@@ -59,46 +61,54 @@ final routerProvider = Provider<GoRouter>((ref) {
               listen: false,
             ).read(appLanguageProvider),
           );
-          return FolderScreen(
-            username: state.pathParameters['username']!,
-            folderId: state.pathParameters['folderId']!,
-            folderName: state.uri.queryParameters['name'] ?? s.folder,
-            kind: state.uri.queryParameters['kind'] == 'collection'
-                ? FolderKind.collection
-                : FolderKind.gallery,
+          return NoticeOverlay(
+            child: FolderScreen(
+              username: state.pathParameters['username']!,
+              folderId: state.pathParameters['folderId']!,
+              folderName: state.uri.queryParameters['name'] ?? s.folder,
+              kind: state.uri.queryParameters['kind'] == 'collection'
+                  ? FolderKind.collection
+                  : FolderKind.gallery,
+            ),
           );
         },
       ),
       GoRoute(
         path: '/settings',
-        builder: (context, state) => const SettingsScreen(),
+        builder: (context, state) =>
+            const NoticeOverlay(child: SettingsScreen()),
         routes: <RouteBase>[
           GoRoute(
             path: 'proxy',
-            builder: (context, state) => const ProxySettingsScreen(),
+            builder: (context, state) =>
+                const NoticeOverlay(child: ProxySettingsScreen()),
           ),
           GoRoute(
             path: 'diagnostics',
-            builder: (context, state) => const DiagnosticsScreen(),
+            builder: (context, state) =>
+                const NoticeOverlay(child: DiagnosticsScreen()),
           ),
         ],
       ),
       GoRoute(
         path: '/watching',
-        builder: (context, state) => const WatchingScreen(),
+        builder: (context, state) =>
+            const NoticeOverlay(child: WatchingScreen()),
       ),
       GoRoute(
         path: '/notifications',
-        builder: (context, state) => const NotificationsScreen(),
+        builder: (context, state) =>
+            const NoticeOverlay(child: NotificationsScreen()),
       ),
       GoRoute(
         path: '/history',
-        builder: (context, state) => const HistoryScreen(),
+        builder: (context, state) =>
+            const NoticeOverlay(child: HistoryScreen()),
       ),
       GoRoute(
         path: '/tag/:tag',
         builder: (context, state) =>
-            TagScreen(tag: state.pathParameters['tag']!),
+            NoticeOverlay(child: TagScreen(tag: state.pathParameters['tag']!)),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>

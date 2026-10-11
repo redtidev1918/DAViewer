@@ -7,6 +7,7 @@
 - 开发
   - [架构说明](/architecture.md)
   - [作品访问状态](/architecture/artwork-access.md)
+  - [网页会话与提醒](/architecture/web-session-and-notices.md)
   - [Web 适配器契约](/web_adapter.md)
   - [构建说明](/build.md)
   - [发布门禁](/release-gate.md)

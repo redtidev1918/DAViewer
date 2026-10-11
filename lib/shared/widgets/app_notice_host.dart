@@ -7,7 +7,7 @@ import '../../core/diagnostics/app_logger.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/notice/app_notices.dart';
 
-/// Renders the current notice as an overlay at the top of the shell, so it
+/// Renders the current notice as an overlay at the bottom of the page, so it
 /// never pushes or shifts the page layout. Pages never show their own
 /// persistent banners; they only update state providers this host watches.
 final class AppNoticeHost extends ConsumerStatefulWidget {
@@ -15,6 +15,28 @@ final class AppNoticeHost extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<AppNoticeHost> createState() => _AppNoticeHostState();
+}
+
+/// Mounts [child] together with [AppNoticeHost].
+///
+/// The host must live inside the navigator: it needs the ambient [Overlay] for
+/// its tooltip and the router to open the login page. A route that pushes on
+/// top of [AppShell] therefore hides the shell host, so pushed routes wrap
+/// themselves in this widget instead of mounting the host above the router.
+final class NoticeOverlay extends StatelessWidget {
+  const NoticeOverlay({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: <Widget>[
+        child,
+        const Positioned(bottom: 0, left: 0, right: 0, child: AppNoticeHost()),
+      ],
+    );
+  }
 }
 
 final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
@@ -62,7 +84,7 @@ final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
         top: false,
         child: effective == null
             ? const SizedBox.shrink()
-            : _NoticeOverlay(
+            : _NoticeCard(
                 notice: effective,
                 strings: s,
                 onDismiss: () => _dismiss(effective, sessionNotice),
@@ -101,8 +123,8 @@ final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
   }
 }
 
-final class _NoticeOverlay extends StatelessWidget {
-  const _NoticeOverlay({
+final class _NoticeCard extends StatelessWidget {
+  const _NoticeCard({
     required this.notice,
     required this.strings,
     required this.onDismiss,
