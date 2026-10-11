@@ -26,6 +26,7 @@
 ```text
 core/auth/web_session_status.dart      状态机 + TTL + 退避
 core/auth/web_session_coordinator.dart 触发点：响应信号、周期、前后台切换
+core/auth/media_session_signal.dart    媒体桥：非共享 Dio 栈的 401/403 上报
 core/notice/app_notices.dart           统一通知模型
 shared/widgets/app_notice_host.dart    提醒 overlay；传入 child 时覆盖整个路由
 app/app.dart                           AppLifecycleListener 驱动 pause/resume，并包裹 router
@@ -45,6 +46,9 @@ features/home/...                      只消费状态，不直接打服务端�
 | `web-login-redirect` | 请求最终落到 `/users/login` | 服务器把请求送回登录页 |
 | `web-mature-loggedout` | 响应 JSON 中嵌套的 `blockReasons`/`block_reasons` 含 `mature_loggedout` | 成年内容因未登录被降级 |
 | `content-restriction` | 作品访问解析判定受限 | 媒体层发现的限制 |
+| `media-image-403` / `media-preview-403` / `media-fullscreen-403` | 图片错误回调（`CachedNetworkImage`、`Image.network`） | 图片栈的 401/403 |
+| `media-video-403` | 视频播放器初始化失败 | 播放器错误文本含 401/403 |
+| `media-transfer-403` | 后台下载失败 | 下载失败码含 401/403 |
 | `periodic` | 每 1 分钟 | Cookie 已死但接口仍返回 200 的兜底 |
 | `app-resume` | 前台恢复 | 回到前台立即重新确认，绕过健康缓存 |
 
@@ -56,10 +60,16 @@ features/home/...                      只消费状态，不直接打服务端�
 走 `check()`，沿用 5 分钟健康缓存与退避，前台恢复与响应信号一样强制复核。任何触发
 异常都被记录后吞掉，不会打断业务请求。
 
-仍然无法触发的情况：不经过共享 Dio 的流量。图片／视频由
-`CachedNetworkImage`、`Image.network`、`VideoPlayerController` 各自建立连接，
-`background_downloader` 的下载不携带网页 Cookie，内嵌 WebView（登录页与挑战刷新）
-也不在 Dio 上。它们只能在后续网页请求、周期检查或前台恢复时被发现。
+不经过共享 Dio 的媒体栈由 `MediaSessionSignal` 桥接：图片错误回调、
+视频播放器失败与后台下载失败里“看起来像 401/403”的错误（缓存管理器的
+`HttpExceptionWithStatus`，或错误文本中含 401/403 的平台异常）被上报到同一条
+验证链。被拉黑的成熟/付费主机地址只是信号——验证链会在服务端复核后才判定
+Cookie 失效，真正付费的作品永远不会触发登录提醒。桥同样遵守闸门：未声明登录、
+`needsLogin`、`locked` 或退避期内一律静默；没有 `ProviderScope` 祖先的组件
+（例如脱离 App 的错误组件）静默丢弃，不抛异常。
+
+仍然无法触发的情况只剩内嵌 WebView（登录页与挑战刷新）自身的流量；媒体请求
+已能通过桥即时触发，不再依赖后续网页请求、周期检查或前台恢复兜底。
 
 ## 状态
 
