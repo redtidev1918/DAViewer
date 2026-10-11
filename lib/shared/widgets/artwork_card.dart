@@ -15,6 +15,7 @@ import '../../features/artwork/artwork_access_controller.dart';
 import '../../features/artwork/artwork_access_presentation.dart';
 import '../../features/artwork/artwork_store.dart';
 import '../../features/artwork/favourite_actions.dart';
+import 'artwork_favourite_button.dart';
 
 /// A clamped aspect ratio (width / height) for an artwork's display image,
 /// used by masonry layouts to size cards at the image's natural shape.
@@ -206,30 +207,38 @@ final class ArtworkCard extends ConsumerWidget {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-              child: Column(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Text(
-                    artwork.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      height: 1.2,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Text(
+                          artwork.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            height: 1.2,
+                          ),
+                        ),
+                        if (artwork.author.username.isNotEmpty) ...<Widget>[
+                          const SizedBox(height: 2),
+                          Text(
+                            '@${artwork.author.username}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  if (artwork.author.username.isNotEmpty) ...<Widget>[
-                    const SizedBox(height: 2),
-                    Text(
-                      '@${artwork.author.username}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
+                  ArtworkFavouriteButton(artwork: artwork),
                 ],
               ),
             ),

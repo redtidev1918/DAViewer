@@ -14,7 +14,11 @@ DAViewer is not an official DeviantArt app and has no affiliation or partnership
 
 **Language / 语言:** [中文](README.md) · English
 
+Tap the heart on an artwork card to favourite it directly. The detail page also shows a labeled favourite button. Buttons show progress while saving, and successful changes refresh the favourites feed.
+
 ## Screenshots
+
+These are real device captures from an older version. Card layout and tab labels differ from the current app; replacement captures are pending.
 
 <p align="center">
   <img src="docs/screenshots/home_feed.jpg" width="30%" alt="Home feed" />

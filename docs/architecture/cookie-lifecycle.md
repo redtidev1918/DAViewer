@@ -4,10 +4,12 @@
 
 - **Live cookie store**: the platform WebView `CookieManager` for
   `https://www.deviantart.com/`. This is the session DeviantArt actually sees.
-- **Persistent snapshot**: `web_session.json` in application support. It is a
-  plaintext JSON recovery copy for app updates and WebView-store loss, never the
-  authoritative runtime state. Only OAuth tokens use platform secure storage, so
-  this file must be treated as a sign-in credential.
+- **Persistent snapshot**: a separate platform secure-storage entry, used to
+  recover after app updates and WebView-store loss. It is never the authoritative
+  runtime state. Legacy `web_session.json` is migrated under the mutation queue:
+  write and verify the secured copy before deleting plaintext. Storage errors
+  preserve existing credentials, block writes and allow a later retry; no new
+  plaintext snapshot is written.
 
 ## Allowed writes
 

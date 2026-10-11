@@ -3,6 +3,36 @@ import 'package:daviewer/core/diagnostics/report_builder.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('redacts IPv6 without losing timestamps or app versions', () {
+    final result = LogRedactor.redact(
+      '12:34:56 v0.5.10 [::1]:7890 2001:db8::123',
+    );
+    expect(result, contains('12:34:56 v0.5.10'));
+    expect(result, isNot(contains('::1')));
+    expect(result, isNot(contains('2001:db8')));
+  });
+  test('redacts identity, proxy IPs and user directory names', () {
+    final redacted = LogRedactor.redactAll(
+      'account loaded: Artist\nclaimed=Other server=Third username=Fourth\n'
+      r'proxy 192.168.1.12:7890 file C:\Users\Private Name\app.log'
+      '\n/Users/Someone/app.log /home/Person/app.log',
+      accountNames: ['Artist'],
+    );
+    for (final private in [
+      'Artist',
+      'Other',
+      'Third',
+      'Fourth',
+      '192.168.1.12',
+      'Private Name',
+      'Someone',
+      'Person',
+    ]) {
+      expect(redacted, isNot(contains(private)));
+    }
+    expect(redacted, contains('app.log'));
+    expect(redacted, contains(':7890'));
+  });
   test('redacts token query parameters', () {
     final line =
         'https://example.test/auth?token=SECRET123&foo=bar&csrf_token=CSRF';

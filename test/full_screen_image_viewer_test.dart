@@ -11,6 +11,50 @@ void main() {
     'YAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
   );
 
+  for (final multiPage in [false, true]) {
+    testWidgets('pinch starts at 1x (multiPage=$multiPage)', (tester) async {
+      var navigations = 0;
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: FullScreenImageViewer(
+              imageProvider: MemoryImage(bytes),
+              additionalMedia: multiPage ? [MemoryImage(bytes)] : const [],
+              onNextArtwork: () => navigations++,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      final first = await tester.startGesture(
+        const Offset(350, 300),
+        pointer: 1,
+      );
+      final second = await tester.startGesture(
+        const Offset(450, 300),
+        pointer: 2,
+      );
+      await tester.pump();
+      await first.moveTo(const Offset(300, 300));
+      await second.moveTo(const Offset(500, 300));
+      await tester.pump();
+      expect(find.byType(InteractiveViewer), findsOneWidget);
+      final controller = tester
+          .widget<InteractiveViewer>(find.byType(InteractiveViewer))
+          .transformationController!;
+      expect(controller.value.getMaxScaleOnAxis(), closeTo(2, 0.01));
+      await first.up();
+      await second.up();
+      await tester.pump();
+      expect(navigations, 0);
+      await tester.tap(find.byIcon(Icons.zoom_out_map));
+      await tester.pump();
+      expect(find.byIcon(Icons.zoom_in), findsOneWidget);
+      expect(find.byType(InteractiveViewer), findsNothing);
+      await tester.pump(const Duration(milliseconds: 350));
+    });
+  }
+
   testWidgets('zoom action switches to an interactive pan-enabled viewer', (
     tester,
   ) async {

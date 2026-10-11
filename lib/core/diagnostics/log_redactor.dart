@@ -1,3 +1,5 @@
+import 'dart:io';
+
 /// Removes credentials, tokens, and personally identifying fragments from a
 /// diagnostic line before it is offered to the user for a bug report. This is a
 /// conservative, best-effort redactor: it targets the obvious secrets and lets
@@ -17,9 +19,22 @@ final class LogRedactor {
     RegExp(r'(Authorization:\s*).*', caseSensitive: false),
     // Email addresses.
     RegExp(r'[\w.+-]+@[\w-]+\.[\w.-]+'),
+    RegExp(
+      r'\b((?:\w*username|claimed|server)=)[^\s,;]+',
+      caseSensitive: false,
+    ),
+    RegExp(r'(account loaded:\s*)[^\s,;]+', caseSensitive: false),
+    RegExp(r'\b(?:\d{1,3}\.){3}\d{1,3}\b'),
+    RegExp(
+      r'(?:[A-Za-z]:[\\/]Users[\\/]|/Users/|/home/)[^\\/\r\n]+',
+      caseSensitive: false,
+    ),
   ];
 
-  static String redact(String line) {
+  static String redact(
+    String line, {
+    Iterable<String> accountNames = const [],
+  }) {
     var result = line;
     for (final pattern in _patterns) {
       result = result.replaceAllMapped(
@@ -28,9 +43,32 @@ final class LogRedactor {
             '${match.groupCount > 0 ? match.group(1) ?? '' : ''}[redacted]',
       );
     }
+    result = result.replaceAllMapped(
+      RegExp(
+        r'(?<![\w:])(?:[0-9a-f]*:){2,}[0-9a-f:.]*(?![\w:])',
+        caseSensitive: false,
+      ),
+      (match) => InternetAddress.tryParse(match[0]!) != null
+          ? '[redacted]'
+          : match[0]!,
+    );
+    for (final name in accountNames.where((name) => name.trim().isNotEmpty)) {
+      result = result.replaceAll(
+        RegExp(
+          '(?<![\\w-])${RegExp.escape(name)}(?![\\w-])',
+          caseSensitive: false,
+        ),
+        '[redacted]',
+      );
+    }
     return result;
   }
 
-  static String redactAll(String text) =>
-      text.split('\n').map(redact).join('\n');
+  static String redactAll(
+    String text, {
+    Iterable<String> accountNames = const [],
+  }) => text
+      .split('\n')
+      .map((line) => redact(line, accountNames: accountNames))
+      .join('\n');
 }

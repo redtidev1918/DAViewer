@@ -63,11 +63,12 @@ those are the providers' pages and are not bypassed by the app.
   start when the platform WebView store lost them (e.g. across an app update),
   so the personalized feed survives without another sign-in.
 
-The web-session cookie snapshot is written as **plaintext JSON** to
-`web_session.json` in the application support directory; only OAuth tokens use
-platform secure storage (`DAViewer Account`). Treat that file as a sign-in
-credential: do not copy it to an untrusted location or expose it in screenshots
-or logs. The app never uploads it.
+The web-session cookies, CSRF token and account name use platform secure storage,
+separately from OAuth tokens. On upgrade, the old `web_session.json` is migrated:
+write the secured copy and verify it by reading it back before deleting the old
+file. Storage errors preserve existing credentials for retry; the app never
+falls back to writing plaintext. Until migration succeeds, treat the old file
+as a sign-in credential and do not copy or publish it.
 
 One embedded login establishes both sessions. The WebView reports the web
 session (CSRF token and the `userinfo` cookie) only after the OAuth callback has

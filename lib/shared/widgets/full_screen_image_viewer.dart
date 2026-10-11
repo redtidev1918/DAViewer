@@ -45,6 +45,12 @@ final class _FullScreenImageViewerState
   TapDownDetails? _doubleTap;
   bool _zoomed = false;
   double _horizontalDrag = 0;
+  final Map<int, Offset> _pointers = <int, Offset>{};
+  double? _pinchDistance;
+  Offset? _pinchAnchor;
+  Matrix4? _pinchMatrix;
+  bool _pinching = false;
+  bool _suppressArtworkSwipe = false;
   late final PageController _pageController;
   final ArtworkEdgeSwipeTracker _edgeSwipe = ArtworkEdgeSwipeTracker();
 
@@ -103,6 +109,44 @@ final class _FullScreenImageViewerState
     if (zoomed != _zoomed && mounted) setState(() => _zoomed = zoomed);
   }
 
+  void _pointerDown(PointerDownEvent event) {
+    if (_pointers.isEmpty) _suppressArtworkSwipe = false;
+    _pointers[event.pointer] = event.localPosition;
+    if (_pointers.length == 2 && !_zoomed) {
+      final points = _pointers.values.toList();
+      _pinchDistance = (points[0] - points[1]).distance;
+      _pinchAnchor = (points[0] + points[1]) / 2;
+      _pinchMatrix = _transformation.value.clone();
+      _horizontalDrag = 0;
+      _edgeSwipe.reset();
+      _suppressArtworkSwipe = true;
+      setState(() => _pinching = true);
+    }
+  }
+
+  void _pointerMove(PointerMoveEvent event) {
+    _pointers[event.pointer] = event.localPosition;
+    if (!_pinching || _pointers.length != 2 || _pinchDistance == 0) return;
+    final points = _pointers.values.toList();
+    final scale = ((points[0] - points[1]).distance / _pinchDistance!).clamp(
+      1.0,
+      8.0,
+    );
+    final anchor = _pinchAnchor!;
+    final matrix = _pinchMatrix!.clone()
+      ..translateByDouble(anchor.dx, anchor.dy, 0, 1)
+      ..scaleByDouble(scale, scale, 1, 1)
+      ..translateByDouble(-anchor.dx, -anchor.dy, 0, 1);
+    _transformation.value = matrix;
+  }
+
+  void _pointerUp(PointerEvent event) {
+    _pointers.remove(event.pointer);
+    if (_pointers.isEmpty && _pinching) {
+      setState(() => _pinching = false);
+    }
+  }
+
   void _toggleZoom() {
     if (_zoomed) {
       _transformation.value = Matrix4.identity();
@@ -131,7 +175,7 @@ final class _FullScreenImageViewerState
           'hasPrev=${widget.onPreviousArtwork != null}, '
           'hasNext=${widget.onNextArtwork != null}',
     );
-    if (_zoomed) return;
+    if (_zoomed || _suppressArtworkSwipe) return;
     final velocity = details.primaryVelocity ?? 0;
     final threshold = (MediaQuery.sizeOf(context).width * 0.16).clamp(
       56.0,
@@ -188,7 +232,8 @@ final class _FullScreenImageViewerState
         minScale: 1,
         maxScale: 8,
         boundaryMargin: const EdgeInsets.all(80),
-        panEnabled: true,
+        panEnabled: !_pinching,
+        scaleEnabled: !_pinching,
         child: SizedBox.expand(
           child: Image(image: _providerAt(_page), fit: BoxFit.contain),
         ),
@@ -197,6 +242,10 @@ final class _FullScreenImageViewerState
     if (_isMultiPage) {
       return NotificationListener<ScrollNotification>(
         onNotification: (notification) {
+          if (_suppressArtworkSwipe) {
+            _edgeSwipe.reset();
+            return false;
+          }
           if (notification is ScrollStartNotification) {
             if (notification.dragDetails == null) {
               _edgeSwipe.reset();
@@ -225,6 +274,7 @@ final class _FullScreenImageViewerState
           return false;
         },
         child: PageView.builder(
+          physics: _pinching ? const NeverScrollableScrollPhysics() : null,
           controller: _pageController,
           itemCount: _pageCount,
           onPageChanged: (index) {
@@ -248,6 +298,7 @@ final class _FullScreenImageViewerState
     final s = strings(ref.watch(appLanguageProvider));
     final canSwipeArtwork =
         !_zoomed &&
+        !_pinching &&
         !_isMultiPage &&
         (widget.onPreviousArtwork != null || widget.onNextArtwork != null);
     final canNavigatePrevious =
@@ -303,53 +354,59 @@ final class _FullScreenImageViewerState
               ],
             )
           : null,
-      body: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: _toggleControls,
-        onLongPress: widget.onImageLongPress == null
-            ? null
-            : () => widget.onImageLongPress!(_page),
-        onDoubleTapDown: (details) => _doubleTap = details,
-        onDoubleTap: _toggleZoom,
-        onHorizontalDragStart: canSwipeArtwork
-            ? (_) {
-                AppLogger.instance.debug(
-                  'fullscreen-swipe',
-                  'drag start (onPrev=${widget.onPreviousArtwork != null}, onNext=${widget.onNextArtwork != null})',
-                );
-                _horizontalDrag = 0;
-              }
-            : null,
-        onHorizontalDragUpdate: canSwipeArtwork
-            ? (details) => _horizontalDrag += details.delta.dx
-            : null,
-        onHorizontalDragCancel: canSwipeArtwork
-            ? () => _horizontalDrag = 0
-            : null,
-        onHorizontalDragEnd: canSwipeArtwork ? _finishHorizontalDrag : null,
-        // 未缩放时不挂 InteractiveViewer：它的手势识别器即使在
-        // panEnabled=false 时也会参与竞技场并抢走水平拖动，
-        // 导致全屏查看器里的左右滑动切换作品永远不触发。
-        // 缩放后仍需要 InteractiveViewer 来支持平移与边界控制。
-        child: Stack(
-          children: <Widget>[
-            Positioned.fill(child: _buildBody(image)),
-            // 显式翻页按钮：不依赖手势系统，始终可见可点击。
-            if (_controlsVisible && canNavigatePrevious)
-              _NavArrowButton(
-                icon: Icons.chevron_left,
-                tooltip: s.previousArtwork,
-                alignment: Alignment.centerLeft,
-                onTap: _navigatePrevious,
-              ),
-            if (_controlsVisible && canNavigateNext)
-              _NavArrowButton(
-                icon: Icons.chevron_right,
-                tooltip: s.nextArtwork,
-                alignment: Alignment.centerRight,
-                onTap: _navigateNext,
-              ),
-          ],
+      body: Listener(
+        onPointerDown: _pointerDown,
+        onPointerMove: _pointerMove,
+        onPointerUp: _pointerUp,
+        onPointerCancel: _pointerUp,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _toggleControls,
+          onLongPress: widget.onImageLongPress == null
+              ? null
+              : () => widget.onImageLongPress!(_page),
+          onDoubleTapDown: (details) => _doubleTap = details,
+          onDoubleTap: _toggleZoom,
+          onHorizontalDragStart: canSwipeArtwork
+              ? (_) {
+                  AppLogger.instance.debug(
+                    'fullscreen-swipe',
+                    'drag start (onPrev=${widget.onPreviousArtwork != null}, onNext=${widget.onNextArtwork != null})',
+                  );
+                  _horizontalDrag = 0;
+                }
+              : null,
+          onHorizontalDragUpdate: canSwipeArtwork
+              ? (details) => _horizontalDrag += details.delta.dx
+              : null,
+          onHorizontalDragCancel: canSwipeArtwork
+              ? () => _horizontalDrag = 0
+              : null,
+          onHorizontalDragEnd: canSwipeArtwork ? _finishHorizontalDrag : null,
+          // 未缩放时不挂 InteractiveViewer：它的手势识别器即使在
+          // panEnabled=false 时也会参与竞技场并抢走水平拖动，
+          // 导致全屏查看器里的左右滑动切换作品永远不触发。
+          // 缩放后仍需要 InteractiveViewer 来支持平移与边界控制。
+          child: Stack(
+            children: <Widget>[
+              Positioned.fill(child: _buildBody(image)),
+              // 显式翻页按钮：不依赖手势系统，始终可见可点击。
+              if (_controlsVisible && canNavigatePrevious)
+                _NavArrowButton(
+                  icon: Icons.chevron_left,
+                  tooltip: s.previousArtwork,
+                  alignment: Alignment.centerLeft,
+                  onTap: _navigatePrevious,
+                ),
+              if (_controlsVisible && canNavigateNext)
+                _NavArrowButton(
+                  icon: Icons.chevron_right,
+                  tooltip: s.nextArtwork,
+                  alignment: Alignment.centerRight,
+                  onTap: _navigateNext,
+                ),
+            ],
+          ),
         ),
       ),
     );

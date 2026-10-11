@@ -4,23 +4,29 @@ import 'dart:io';
 import 'package:daviewer/core/data/web_session.dart';
 import 'package:daviewer/core/auth/web_session_store.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 void main() {
   late Directory directory;
   late WebSessionStore store;
+  late _MemoryStorage storage;
 
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('web_session_store');
-    store = WebSessionStore(directoryFactory: () async => directory);
+    storage = _MemoryStorage();
+    store = WebSessionStore(
+      directoryFactory: () async => directory,
+      storage: storage,
+    );
   });
 
   tearDown(() async {
     await directory.delete(recursive: true);
   });
 
-  Future<Map<String, Object?>> read() async => jsonDecode(
-    await File('${directory.path}/web_session.json').readAsString(),
-  ) as Map<String, Object?>;
+  Future<Map<String, Object?>> read() async =>
+      jsonDecode((await storage.read(key: WebSessionStore.storageKey))!)
+          as Map<String, Object?>;
 
   List<PersistedWebCookie> cookies(Map<String, String> values) =>
       <PersistedWebCookie>[
@@ -147,7 +153,62 @@ void main() {
     final saved = await store.read();
     final migrated = saved['cookies'] as List<Object?>;
     expect(migrated, hasLength(2));
+    expect(File('${directory.path}/web_session.json').existsSync(), isFalse);
+    expect(await read(), containsPair('username', 'Artist'));
   });
+
+  test('failed migration preserves the old file and retries safely', () async {
+    final file = File('${directory.path}/web_session.json');
+    final legacy = jsonEncode({'csrf': 'secret', 'username': 'Artist'});
+    await file.writeAsString(legacy);
+    storage.failWrites = true;
+    expect(await store.read(), isEmpty);
+    expect(await file.readAsString(), legacy);
+    await expectLater(store.update(csrf: 'new'), throwsStateError);
+    expect(await file.readAsString(), legacy);
+    storage.failWrites = false;
+    expect(await store.read(), containsPair('csrf', 'secret'));
+    expect(await file.exists(), isFalse);
+  });
+
+  test('migration removes an abandoned plaintext temporary snapshot', () async {
+    final file = File('${directory.path}/web_session.json');
+    final temporary = File('${file.path}.tmp');
+    await file.writeAsString('{"csrf":"saved"}');
+    await temporary.writeAsString('{"csrf":"abandoned secret"}');
+    expect(await store.read(), containsPair('csrf', 'saved'));
+    expect(await file.exists(), isFalse);
+    expect(await temporary.exists(), isFalse);
+  });
+
+  test(
+    'new snapshots never create a plaintext file and survive restart',
+    () async {
+      await store.update(
+        csrf: 'secret',
+        cookies: cookies({'userinfo': 'private'}),
+      );
+      expect(File('${directory.path}/web_session.json').existsSync(), isFalse);
+      final restarted = WebSessionStore(
+        directoryFactory: () async => directory,
+        storage: storage,
+      );
+      expect(await restarted.read(), containsPair('csrf', 'secret'));
+    },
+  );
+
+  test(
+    'corrupt secure storage does not overwrite a recoverable legacy file',
+    () async {
+      storage.value = '{broken';
+      final file = File('${directory.path}/web_session.json');
+      await file.writeAsString('{"csrf":"recoverable"}');
+      expect(await store.read(), isEmpty);
+      await expectLater(store.update(csrf: 'new'), throwsFormatException);
+      expect(storage.value, '{broken');
+      expect(await file.exists(), isTrue);
+    },
+  );
 
   test('clear removes only the persisted snapshot', () async {
     await store.update(
@@ -159,5 +220,46 @@ void main() {
     await store.clear(reason: 'explicit_logout');
 
     expect(File('${directory.path}/web_session.json').existsSync(), isFalse);
+    expect(storage.value, isNull);
   });
+}
+
+class _MemoryStorage extends FlutterSecureStorage {
+  String? value;
+  bool failWrites = false;
+  @override
+  Future<String?> read({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WindowsOptions? wOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+  }) async => value;
+  @override
+  Future<void> write({
+    required String key,
+    required String? value,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WindowsOptions? wOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+  }) async {
+    if (failWrites) throw StateError('locked secure storage');
+    this.value = value;
+  }
+
+  @override
+  Future<void> delete({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WindowsOptions? wOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+  }) async => value = null;
 }

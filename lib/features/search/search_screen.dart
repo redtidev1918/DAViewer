@@ -412,7 +412,7 @@ final class _SearchHistorySection extends ConsumerWidget {
             runSpacing: 4,
             children: <Widget>[
               for (final item in history)
-                ActionChip(
+                InputChip(
                   avatar: Icon(
                     Icons.history,
                     size: 16,
@@ -420,6 +420,9 @@ final class _SearchHistorySection extends ConsumerWidget {
                   ),
                   label: Text(item),
                   onPressed: () => onSelect(item),
+                  deleteButtonTooltipMessage: s.deleteAction,
+                  onDeleted: () =>
+                      ref.read(searchHistoryProvider.notifier).remove(item),
                 ),
             ],
           ),
