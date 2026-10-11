@@ -486,7 +486,9 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
                     scale: _heartScale,
                     child: Icon(
                       _favourite ? Icons.favorite : Icons.favorite_border,
-                      color: _favourite ? Colors.red : null,
+                      color: _favourite
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
           ),
@@ -599,14 +601,18 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
               ref.invalidate(artworkDetailProvider(artwork.id));
             },
           ),
-          ArtworkDateSection(
-            publishedAt: dates.publishedAt ?? artwork.publishedAt,
-            updatedAt: dates.updatedAt,
-            s: s,
-          ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: ArtworkFavouriteButton(artwork: artwork, showLabel: true),
+          Row(
+            children: [
+              Expanded(
+                child: ArtworkDateSection(
+                  publishedAt: dates.publishedAt ?? artwork.publishedAt,
+                  updatedAt: dates.updatedAt,
+                  s: s,
+                ),
+              ),
+              const SizedBox(width: 8),
+              ArtworkFavouriteButton(artwork: artwork, showLabel: true),
+            ],
           ),
           const Divider(),
           ArtworkDescriptionSection(

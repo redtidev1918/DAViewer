@@ -63,7 +63,7 @@ void main() {
         isNull,
       );
       expect(
-        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        tester.widget<TextButton>(find.byType(TextButton)).onPressed,
         isNull,
       );
       pending.complete(true);

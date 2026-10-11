@@ -208,7 +208,7 @@ final class ArtworkCard extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
                     child: Column(

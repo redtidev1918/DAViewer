@@ -26,14 +26,22 @@ final class ArtworkFavouriteButton extends ConsumerWidget {
     final busy = ref.watch(favouriteBusyProvider(artwork.id));
     final s = strings(ref.watch(appLanguageProvider));
     final mutate = ref.read(favouriteActionsProvider);
+    final scheme = Theme.of(context).colorScheme;
+    final foreground = current.isFavourited
+        ? scheme.primary
+        : scheme.onSurfaceVariant;
     final icon = busy
-        ? const SizedBox.square(
-            dimension: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
+        ? SizedBox.square(
+            dimension: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              color: foreground,
+            ),
           )
         : Icon(
             current.isFavourited ? Icons.favorite : Icons.favorite_border,
-            color: current.isFavourited ? Colors.red : null,
+            size: 20,
+            color: foreground,
           );
     Future<void> toggle() async {
       // Sparse cards may be rendered before a feed has seeded the shared store.
@@ -74,14 +82,28 @@ final class ArtworkFavouriteButton extends ConsumerWidget {
       child: Tooltip(
         message: current.isFavourited ? s.unfavourite : s.favourite,
         child: showLabel
-            ? FilledButton.tonalIcon(
+            ? TextButton.icon(
+                style: TextButton.styleFrom(
+                  foregroundColor: foreground,
+                  minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  textStyle: Theme.of(context).textTheme.labelMedium,
+                ),
                 onPressed: busy ? null : toggle,
                 icon: icon,
                 label: Text(
                   current.isFavourited ? s.favouritedToast : s.favourite,
                 ),
               )
-            : IconButton(onPressed: busy ? null : toggle, icon: icon),
+            : IconButton(
+                style: IconButton.styleFrom(
+                  foregroundColor: foreground,
+                  minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.all(12),
+                ),
+                onPressed: busy ? null : toggle,
+                icon: icon,
+              ),
       ),
     );
   }
