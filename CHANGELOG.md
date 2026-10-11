@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.12](https://github.com/redtidev1918/DAViewer/compare/v0.5.11...v0.5.12) (2026-10-11)
+
+
+### Bug Fixes
+
+* stabilize personalized feed refresh and session recovery ([5463c70](https://github.com/redtidev1918/DAViewer/commit/5463c70bd42c17c7aaf802c66f9c00f8c9bedb6f))
+
 ## [0.5.11](https://github.com/redtidev1918/DAViewer/compare/v0.5.10...v0.5.11) (2026-10-11)
 
 
