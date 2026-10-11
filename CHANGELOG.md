@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.10](https://github.com/redtidev1918/DAViewer/compare/v0.5.9...v0.5.10) (2026-10-11)
+
+
+### Bug Fixes
+
+* require verified web session before personalized feed requests ([60bbe68](https://github.com/redtidev1918/DAViewer/commit/60bbe68cbf6b47e57fb5391a550d70464d24f583))
+* restore release version detection and update notes fallback ([80f41c3](https://github.com/redtidev1918/DAViewer/commit/80f41c3fd48672b305e598de14f00d044ca6d553))
+* track recommendation degradation separately from web identity ([e9a3ffd](https://github.com/redtidev1918/DAViewer/commit/e9a3ffdec847ed5a15671b247a024def3eac6a3d))
+* use an app-owned version define in release builds ([004da38](https://github.com/redtidev1918/DAViewer/commit/004da380ee10fa18b8b7be0a3dc59f73976e8f0a))
+
 ## [0.5.9](https://github.com/redtidev1918/DAViewer/compare/v0.5.8...v0.5.9) (2026-10-11)
 
 
