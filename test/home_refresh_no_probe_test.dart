@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dakit_flutter/dakit_flutter.dart' hide WebSession;
@@ -415,6 +416,12 @@ void main() {
     (tester) async {
       final rfyAdapter = _RfyAdapter();
       final probeAdapter = _HomeProbeAdapter();
+      final cacheDirectory = Directory.systemTemp.createTempSync(
+        'daviewer-feed-cache-',
+      );
+      addTearDown(() {
+        cacheDirectory.deleteSync(recursive: true);
+      });
       final runtime = AppRuntime(
         clientId: 'test-client',
         oauth: null,
@@ -433,6 +440,7 @@ void main() {
           webSessionControllerProvider.overrideWith(
             (ref) => WebSessionController(ref),
           ),
+          feedCacheDirectoryProvider.overrideWithValue(cacheDirectory),
           webSessionVerifierProvider.overrideWithValue(
             WebSessionVerifier(Dio()..httpClientAdapter = probeAdapter),
           ),
@@ -481,6 +489,68 @@ void main() {
       expect(rfyAdapter.calls, 2);
       expect(rfyAdapter.cursors, <String>['initial', 'initial']);
       expect(probeAdapter.calls, 0);
+    },
+  );
+
+  testWidgets(
+    'a missing cache directory never delays or blocks the first recommendation page',
+    (tester) async {
+      final rfyAdapter = _RfyAdapter();
+      final probeAdapter = _HomeProbeAdapter();
+      // No feedCacheDirectoryProvider override: the cache path is genuinely
+      // unavailable, as on a platform without a support directory (and in
+      // widget tests). The live page must still load, and the disposal below
+      // fails the test if any timer outlives the widget tree.
+      final container = ProviderContainer(
+        retry: (_, _) => null,
+        overrides: <Override>[
+          runtimeProvider.overrideWithValue(
+            AppRuntime(
+              clientId: 'test-client',
+              oauth: null,
+              transport: null,
+              transfers: _sharedTransfers,
+              dio: Dio()..httpClientAdapter = rfyAdapter,
+            ),
+          ),
+          webSessionReadyProvider.overrideWith((ref) => true),
+          webSessionProvider.overrideWithValue(
+            WebSession(_FakeCookieManager.new),
+          ),
+          webSessionControllerProvider.overrideWith(
+            (ref) => WebSessionController(ref),
+          ),
+          webSessionVerifierProvider.overrideWithValue(
+            WebSessionVerifier(Dio()..httpClientAdapter = probeAdapter),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      container
+          .read(webSessionControllerProvider.notifier)
+          .state = const WebSessionState(
+        csrf: 'token',
+        isLoggedIn: true,
+        username: 'artist',
+      );
+      container
+          .read(webSessionStatusProvider.notifier)
+          .markHealthy(serverUsername: 'artist');
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: Scaffold(body: PersonalizedFeed())),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Cache storage is a preview, never a prerequisite: one live fetch, and
+      // the grid holds real recommendations rather than an endless skeleton.
+      expect(rfyAdapter.calls, 1);
+      expect(container.read(personalizedFeedProvider).items, isNotEmpty);
+      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+      await tester.pumpAndSettle();
     },
   );
 

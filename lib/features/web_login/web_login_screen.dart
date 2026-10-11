@@ -19,7 +19,6 @@ import '../../core/diagnostics/app_logger.dart';
 import '../../core/diagnostics/error_text.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/runtime/runtime_provider.dart';
-import '../home/home_providers.dart';
 import '../artwork/artwork_detail_providers.dart';
 
 /// Hosts the embedded DeviantArt WebView.
@@ -168,7 +167,11 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
           ref
               .read(webSessionStatusProvider.notifier)
               .markHealthy(serverUsername: username);
-          ref.invalidate(personalizedFeedProvider);
+          // Never invalidate personalizedFeedProvider here: the feed already
+          // recovers through the healthy-transition listener in home_providers
+          // (recoverInitialPage), and an account switch recreates the provider
+          // via the session-identity select. An invalidate would wipe the
+          // freshly recovered list and re-run the initial fetch a second time.
           if (firstConfirmation) {
             ref.read(artworkSessionRecoveryProvider)();
           }

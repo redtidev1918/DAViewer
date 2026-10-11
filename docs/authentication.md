@@ -73,9 +73,25 @@ Secure/HttpOnly），而不是折叠成 `name→value` 表：同名的 `.deviant
 （`@publicSession.user.username`），本地存在 Cookie 不等于会话有效。裸 HTTP
 首页探测可能被 WAF 干扰，但 `rfy/deviations` 成功**同样不是**健康证据：匿名
 Cookie 也能拿到 HTTP 200 的通用内容。匿名探测结果由真实 headless WebView
-（与登录相同的 Cookie 栈）仲裁：确认同一账号 → healthy；真实浏览器也匿名 →
+(与登录相同的 Cookie 栈）仲裁：确认同一账号 → healthy；真实浏览器也匿名 →
 anonymous 并提示重新登录；真实浏览器无法作答（挑战/网络）→ 保持 unverified，
 绝不静默降级。
+
+headless 探测以**导航收敛**为准，而不是某一次加载结束（见
+[REG-018](regressions/018-headless-webview-second-navigation.md)）：挑战页的首次
+`onLoadStop` 只累计「结论不成立」，不写 verdict；等待挑战通过后的 JavaScript
+跳转再次 `onLoadStop` 才采样。达到停止上限（3 次）仍无可判定页面时返回
+unavailable（→ unverified），**绝不返回 anonymous**。
+
+个性化推荐的首屏请求有明确所有权（见
+[REG-019](regressions/019-first-page-request-ownership.md)）：验证恢复与显式重试
+属于同一事务，只发一次请求；`refresh()` 在当前页仍属于同一会话上下文
+（CSRF + Cookie 指纹）时是幂等的，上下文轮换（Cookie/CSRF 变化）则必须重新取；
+用户手势（下拉刷新、重载）走 `forceRefresh()`，总是重新请求。登录确认**不再**
+`invalidate` 推荐 Provider——恢复由健康转变监听与会话身份 select 接管。
+推荐缓存只是冷启动预览（见
+[REG-020](regressions/020-personalized-feed-cache.md)）：按账号隔离、带版本与原子写，
+缓存不可用或失败都不得阻塞或破坏实时推荐请求。
 
 职责边界（见 [REG-011](regressions/011-session-boundary-refactor.md)）：只有验证层能产生 verdict；Cookie 存储、
 后台探测（只轮转 CSRF）、feed 成功/失败、UI 都没有写权限。所有 verdict

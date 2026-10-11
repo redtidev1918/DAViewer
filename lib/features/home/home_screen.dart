@@ -171,7 +171,13 @@ final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
     if (wasEmpty && ref.read(personalizedFeedProvider).items.isNotEmpty) {
       return; // Verification recovery already loaded the initial page.
     }
-    await ref.read(personalizedFeedProvider.notifier).refresh();
+    if (ref.read(personalizedFeedProvider).isLoading) {
+      return; // Verification recovery already owns this request.
+    }
+    // An explicit user gesture (retry button, pull-to-refresh) must fetch even
+    // though the current generation already has its first page: it is asking
+    // for fresh content, not for the recovery the idempotent refresh() represents.
+    await ref.read(personalizedFeedProvider.notifier).forceRefresh();
   }
 
   @override

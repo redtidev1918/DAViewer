@@ -444,4 +444,90 @@ void main() {
     expect(controller.state.phase, FeedRequestPhase.stopped);
     expect(controller.state.lastRefreshError, isA<StateError>());
   });
+
+  group('first-page ownership (session context)', () {
+    test(
+      'a repeat refresh in the same session context never refetches',
+      () async {
+        var calls = 0;
+        var context = 'csrf-a|cookie-a';
+        final controller = ArtworkFeedController(
+          (request) async {
+            calls += 1;
+            return Page<Artwork>(items: <Artwork>[artwork(1)], hasMore: false);
+          },
+          autoLoad: false,
+          sessionContextKey: () async => context,
+        );
+
+        await controller.refresh();
+        expect(calls, 1);
+
+        // The healthy-transition recovery and an explicit retry are one
+        // transaction: owning the page twice must not double the request.
+        await controller.refresh();
+        expect(calls, 1);
+      },
+    );
+
+    test('a rotated session context refetches the first page', () async {
+      var calls = 0;
+      var context = 'csrf-a|cookie-a';
+      final controller = ArtworkFeedController(
+        (request) async {
+          calls += 1;
+          return Page<Artwork>(items: <Artwork>[artwork(1)], hasMore: false);
+        },
+        autoLoad: false,
+        sessionContextKey: () async => context,
+      );
+
+      await controller.refresh();
+      expect(calls, 1);
+
+      context = 'csrf-b|cookie-b';
+      await controller.refresh();
+      expect(calls, 2);
+      expect(controller.state.items, hasLength(1));
+    });
+
+    test('forceRefresh always fetches for an explicit user gesture', () async {
+      var calls = 0;
+      final controller = ArtworkFeedController(
+        (request) async {
+          calls += 1;
+          return Page<Artwork>(items: <Artwork>[artwork(1)], hasMore: false);
+        },
+        autoLoad: false,
+        sessionContextKey: () async => 'csrf-a|cookie-a',
+      );
+
+      await controller.refresh();
+      await controller.forceRefresh();
+      expect(calls, 2);
+    });
+
+    test('a failed first page releases ownership so retry refetches', () async {
+      var calls = 0;
+      var fail = true;
+      final controller = ArtworkFeedController(
+        (request) async {
+          calls += 1;
+          if (fail) throw StateError('boom');
+          return Page<Artwork>(items: <Artwork>[artwork(1)], hasMore: false);
+        },
+        autoLoad: false,
+        sessionContextKey: () async => 'csrf-a|cookie-a',
+      );
+
+      await controller.refresh();
+      expect(calls, 1);
+      expect(controller.state.error, isA<StateError>());
+
+      fail = false;
+      await controller.refresh();
+      expect(calls, 2);
+      expect(controller.state.items, hasLength(1));
+    });
+  });
 }
