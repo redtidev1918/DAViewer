@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/auth/media_session_signal.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../features/artwork/artwork_navigation.dart';
 import '../../core/diagnostics/app_logger.dart';
@@ -263,19 +264,22 @@ final class _FullScreenImageViewerState
           child: CircularProgressIndicator(color: Colors.white),
         );
       },
-      errorBuilder: (context, error, stackTrace) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            const Icon(Icons.broken_image, color: Colors.white, size: 48),
-            const SizedBox(height: 12),
-            Text(
-              s.imageLoadFailed,
-              style: const TextStyle(color: Colors.white),
-            ),
-          ],
-        ),
-      ),
+      errorBuilder: (context, error, stackTrace) {
+        MediaSessionSignal.report(context, error, 'media-fullscreen-403');
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Icon(Icons.broken_image, color: Colors.white, size: 48),
+              const SizedBox(height: 12),
+              Text(
+                s.imageLoadFailed,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ],
+          ),
+        );
+      },
     );
     final heroTag = widget.heroTag;
     if (heroTag != null) image = Hero(tag: heroTag, child: image);

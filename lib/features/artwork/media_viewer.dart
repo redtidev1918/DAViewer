@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../app/theme/app_theme.dart';
+import '../../core/auth/media_session_signal.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../shared/route_observer.dart';
 import '../../shared/widgets/full_screen_image_viewer.dart';
@@ -394,22 +395,33 @@ final class _TappableImage extends StatelessWidget {
               fit: BoxFit.cover,
               placeholder: (context, url) =>
                   const ColoredBox(color: AppTheme.placeholderColor),
-              errorWidget: (context, url, error) =>
-                  const ColoredBox(color: AppTheme.placeholderColor),
-            ),
-          ),
-          errorWidget: (context, url, error) => AspectRatio(
-            aspectRatio: 1,
-            child: _MediaMessage(
-              icon: Icons.broken_image_outlined,
-              message: strings(
-                ProviderScope.containerOf(
+              errorWidget: (context, url, error) {
+                MediaSessionSignal.report(
                   context,
-                  listen: false,
-                ).read(appLanguageProvider),
-              ).imageLoadFailed,
+                  error,
+                  'media-preview-403',
+                );
+                return const ColoredBox(
+                  color: AppTheme.placeholderColor,
+                );
+              },
             ),
           ),
+          errorWidget: (context, url, error) {
+            MediaSessionSignal.report(context, error, 'media-image-403');
+            return AspectRatio(
+              aspectRatio: 1,
+              child: _MediaMessage(
+                icon: Icons.broken_image_outlined,
+                message: strings(
+                  ProviderScope.containerOf(
+                    context,
+                    listen: false,
+                  ).read(appLanguageProvider),
+                ).imageLoadFailed,
+              ),
+            );
+          },
         ),
       ),
     );
@@ -477,18 +489,21 @@ final class _AnimatedImage extends StatelessWidget {
               ),
             ),
           ),
-          errorWidget: (context, url, error) => AspectRatio(
-            aspectRatio: 1,
-            child: _MediaMessage(
-              icon: Icons.broken_image_outlined,
-              message: strings(
-                ProviderScope.containerOf(
-                  context,
-                  listen: false,
-                ).read(appLanguageProvider),
-              ).imageLoadFailed,
-            ),
-          ),
+          errorWidget: (context, url, error) {
+            MediaSessionSignal.report(context, error, 'media-image-403');
+            return AspectRatio(
+              aspectRatio: 1,
+              child: _MediaMessage(
+                icon: Icons.broken_image_outlined,
+                message: strings(
+                  ProviderScope.containerOf(
+                    context,
+                    listen: false,
+                  ).read(appLanguageProvider),
+                ).imageLoadFailed,
+              ),
+            );
+          },
         ),
       ),
     );
@@ -578,7 +593,10 @@ final class _VideoPlayerState extends State<_VideoPlayer>
       }
       _controller = null;
       await controller.dispose();
-      if (mounted) setState(() => _error = error);
+      if (mounted) {
+        MediaSessionSignal.report(context, error, 'media-video-403');
+        setState(() => _error = error);
+      }
     }
   }
 

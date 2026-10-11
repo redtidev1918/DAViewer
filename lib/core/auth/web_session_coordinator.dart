@@ -10,9 +10,24 @@ import 'web_session_status.dart';
 
 final webSessionCoordinatorProvider = Provider<WebSessionCoordinator>((ref) {
   final status = ref.read(webSessionStatusProvider.notifier);
+  final dio = ref.read(runtimeProvider).dio;
+  if (dio == null) {
+    // Production builds always obtain the runtime from AppRuntime.create(),
+    // which wires the shared Dio. A null Dio only happens with the synchronous
+    // AppRuntime.fromEnvironment() test constructor: log instead of silently
+    // losing every web-session signal.
+    AppLogger.instance.warning(
+      'auth',
+      'web session coordinator attached without a Dio; web signals disabled',
+    );
+  }
   final coordinator = WebSessionCoordinator(
-    dio: ref.read(runtimeProvider).dio,
+    dio: dio,
     shouldVerify: () =>
+        // Deliberate gate: a device that never logged in must not receive a
+        // "refresh your Cookie" prompt for ordinary public traffic. The cost is
+        // a narrow edge case — local logged-in flag lost while the server
+        // session is still alive; signing in again is the intended recovery.
         ref.mounted &&
         ref.read(webSessionControllerProvider).isLoggedIn == true &&
         !ref.read(webSessionStatusProvider).needsLogin,

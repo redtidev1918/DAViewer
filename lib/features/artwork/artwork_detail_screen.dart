@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/diagnostics/error_text.dart';
 import '../../core/history/visit_history_store.dart';
+import '../../core/auth/media_session_signal.dart';
 import '../../core/auth/web_session_refresher.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/runtime/runtime_provider.dart';
@@ -253,6 +254,7 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
       await _trackTransfer(manager, snapshot);
     } on Object catch (error) {
       if (mounted) {
+        MediaSessionSignal.report(context, error, 'media-transfer-403');
         final s = strings(ref.read(appLanguageProvider));
         final reason = immediateDownloadFailureReason(s, error);
         ScaffoldMessenger.of(context)
@@ -318,6 +320,11 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
     _reportedTransferFailure = signature;
     final s = strings(ref.read(appLanguageProvider));
     final reason = transferFailureReason(s, snapshot);
+    MediaSessionSignal.report(
+      context,
+      '${snapshot.failureCode ?? ''} ${snapshot.failureMessage ?? ''}',
+      'media-transfer-403',
+    );
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(s.downloadFailed(reason))));
   }

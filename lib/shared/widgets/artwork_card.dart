@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/theme/app_theme.dart';
+import '../../core/auth/media_session_signal.dart';
 import '../../core/diagnostics/error_text.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/sharing/app_share.dart';
@@ -113,10 +114,17 @@ final class ArtworkCard extends ConsumerWidget {
                         memCacheWidth: 480,
                         placeholder: (context, url) =>
                             const ColoredBox(color: AppTheme.placeholderColor),
-                        errorWidget: (context, url, error) => const ColoredBox(
-                          color: AppTheme.placeholderColor,
-                          child: Icon(Icons.broken_image_outlined),
-                        ),
+                        errorWidget: (context, url, error) {
+                          MediaSessionSignal.report(
+                            context,
+                            error,
+                            'media-image-403',
+                          );
+                          return const ColoredBox(
+                            color: AppTheme.placeholderColor,
+                            child: Icon(Icons.broken_image_outlined),
+                          );
+                        },
                       ),
                     )
                   else if (media.isEmpty)
