@@ -33,7 +33,19 @@ machine cannot produce the required evidence.
 | R22 | mature related previews preserve restriction reasons and use canonical media; expired web sessions expose recovery | Partial | `artwork_access_state_test.dart`, `artwork_media_hydration_test.dart`, `web_session_status_test.dart`, and `artwork_detail_navigation_test.dart` cover combined restrictions, unknown causes, source boundaries, stale results, web fallback, card updates, verification, and recovery. The full suite passes 337 tests; the reported live artwork still needs account/device confirmation. See [013](013-mature-related-preview.md). |
 | R23 | one trigger layer decides when to verify the web session; no page judges it alone | Partial | `web_session_coordinator_test.dart` covers the three response signals, the exclusions, periodic and resume triggers, `shouldVerify` gating, pause/dispose, trigger isolation, and provider attach/detach on the shared Dio. Real-device timing of the periodic check, WAF suppression, and background timer freezing are still unobserved. See [014](014-web-session-trigger-coverage.md). |
 
+| R24 | headless WebView waits for the post-challenge navigation before judging identity | Verified | `web_session_refresher_probe_test.dart` (unresolved first stop → no verdict; second navigation confirms; stop limit yields unavailable, never anonymous) and `home_refresh_no_probe_test.dart`. Full suite passes 410 tests. See [018](018-headless-webview-second-navigation.md). |
+| R25 | a first page has one owner: recovery and an explicit retry are one transaction, a user gesture always refetches | Verified | `home_refresh_no_probe_test.dart` (explicit retry → 1 rfy request; pull-to-refresh → exactly one more), `home_pagination_no_auth_damage_test.dart`, and `artwork_feed_controller_test.dart` `first-page ownership (session context)`: same-context repeat refresh is a no-op, rotated CSRF/Cookie refetches, `forceRefresh()` always fetches, failure releases ownership. See [019](019-first-page-request-ownership.md). |
+| R26 | recommendation cache is a preview, never a prerequisite, and never leaves a pending timer | Verified | `home_refresh_no_probe_test.dart` mounts `PersonalizedFeed` with no cache directory and still gets one live request plus real items with no residual timer; cache-backed widget tests inject a temp directory; hydration never marks the first page as fetched, so a cold start always requests live data. See [020](020-personalized-feed-cache.md). |
+
 ## Evidence still required before calling the architecture closed
+
+Headless probe and cache: see [REG-018](018-headless-webview-second-navigation.md),
+[REG-019](019-first-page-request-ownership.md), [REG-020](020-personalized-feed-cache.md).
+Automated coverage includes the challenge-page stop sequence, request ownership
+(recovery vs retry vs pull-to-refresh), and cache-off cold start. Device evidence
+still required: a real logged-in cold start showing exactly one `rfy/deviations`
+first-page request, the challenge→navigation timeline in the headless probe log,
+and the cache preview appearing before the first live response.
 
 Update detection and notes: see [REG-015](015-update-notes-and-detection.md).
 Automated coverage includes release build arguments, API fallback, restart,

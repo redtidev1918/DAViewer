@@ -127,6 +127,25 @@ the real headless WebView (the same Cookie stack as login): same account →
 healthy; the real browser also anonymous → anonymous and a re-login prompt;
 real-browser probe failure → stays unverified, never a silent downgrade.
 
+The headless probe judges **navigation convergence**, not a single load stop
+(see [REG-018](../regressions/018-headless-webview-second-navigation.md)): the
+challenge page's first `onLoadStop` only counts as "inconclusive" and writes no
+verdict; the page is sampled when the post-challenge JavaScript navigation
+stops again. If the stop limit (3) is reached without a decidable page the probe
+reports unavailable (→ unverified) and **never** anonymous.
+
+The personalized feed's first page has one owner (see
+[REG-019](../regressions/019-first-page-request-ownership.md)): verification
+recovery and an explicit retry are one transaction and issue one request;
+`refresh()` is idempotent while the loaded page still belongs to the live
+session context (CSRF + Cookie fingerprint), and a rotated context refetches.
+User gestures (pull-to-refresh, reload) use `forceRefresh()` and always refetch.
+Login confirmation **no longer** invalidates the feed provider — recovery is
+owned by the healthy-transition listener and the session-identity select. The
+recommendation cache is a cold-start preview only (see
+[REG-020](../regressions/020-personalized-feed-cache.md)): per-account, versioned,
+atomically written, and never allowed to block or break the live request.
+
 Ownership boundary (see [REG-011](../regressions/011-session-boundary-refactor.md)): only the verification layer may
 produce a verdict; cookie storage, background probes (CSRF rotation only),
 feed success/failure, and UI have no write access. Every verdict change goes

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dakit_flutter/dakit_flutter.dart' hide WebSession;
@@ -126,6 +127,12 @@ ProviderContainer _container({
     dio: Dio()..httpClientAdapter = adapter,
   );
   var probeCall = 0;
+  final cacheDirectory = Directory.systemTemp.createTempSync(
+    'daviewer-feed-cache-',
+  );
+  addTearDown(() {
+    cacheDirectory.deleteSync(recursive: true);
+  });
   final container = ProviderContainer(
     retry: (_, _) => null,
     overrides: <Override>[
@@ -135,6 +142,7 @@ ProviderContainer _container({
       webSessionControllerProvider.overrideWith(
         (ref) => WebSessionController(ref),
       ),
+      feedCacheDirectoryProvider.overrideWithValue(cacheDirectory),
       webSessionProbeProvider.overrideWithValue(() async {
         final results = probeResults();
         return results[probeCall.clamp(0, results.length - 1)];

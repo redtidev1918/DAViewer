@@ -131,6 +131,9 @@ final class AppStrings {
   String get recommendedFeedLoadFailure => _lang == AppLanguage.zh
       ? '推荐内容暂时无法加载。请下拉刷新，或在设置中检查网络代理。'
       : 'Recommendations could not load. Pull to refresh or check the proxy in Settings.';
+  String feedLastUpdated(String time) => _lang == AppLanguage.zh
+      ? '上次更新 $time（当前为缓存内容）'
+      : 'Last updated $time (cached content)';
   String get webSessionBanner => _lang == AppLanguage.zh
       ? 'DeviantArt 网页登录已失效或缺失。请在应用内重新登录，恢复个性化推荐和网页作品内容。'
       : 'Your DeviantArt web sign-in has expired or is missing. Sign in again inside the app to restore personalized recommendations and website content.';

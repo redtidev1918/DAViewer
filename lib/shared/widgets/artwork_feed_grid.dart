@@ -184,6 +184,7 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
                 ? widget.onRefresh
                 : widget.onRetryLoadMore ?? widget.onLoadMore;
             if (onRetry == null) return const SizedBox.shrink();
+            final savedAt = widget.feed.lastSuccessfulRefreshAt;
             return Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -196,6 +197,16 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
                           ),
                       textAlign: TextAlign.center,
                     ),
+                    if (savedAt != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          strings(ref.watch(appLanguageProvider))
+                              .feedLastUpdated(_formatSavedAt(savedAt)),
+                          style: Theme.of(context).textTheme.bodySmall,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                     const SizedBox(height: 8),
                     FilledButton.tonalIcon(
                       onPressed: onRetry,
@@ -253,4 +264,14 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
       ),
     );
   }
+}
+
+String _twoDigits(int value) => value.toString().padLeft(2, '0');
+
+/// Local `yyyy-MM-dd HH:mm` label for the cached-content age note; the app
+/// deliberately has no intl dependency, and this format is identical in the
+/// supported languages.
+String _formatSavedAt(DateTime time) {
+  return '${time.year}-${_twoDigits(time.month)}-${_twoDigits(time.day)} '
+      '${_twoDigits(time.hour)}:${_twoDigits(time.minute)}';
 }
