@@ -36,8 +36,10 @@ DAViewer 只有一个用户身份：官方 DeviantArt OAuth 会话。应用既�
 
 ## 会话角色
 
-- **OAuth 会话**（安全存储）驱动官方 API：每日作品、搜索、作品查询、收藏、关注与下载。
-- **网页会话**（WebView 的 Cookie 加 CSRF token 与登录态，本地持久化并在启动时恢复）驱动仅网页可用的适配器：个性化 `rfy/deviations` 信息流与合集内容。已登录 Cookie 会快照进应用自身存储，并在冷启动时平台 WebView 存储丢失（例如跨界应用更新）后重新注入，从而不必重新登录也能保住个性化信息流。
+- **OAuth 会话**（安全存储）驱动官方 API：每日作品、作品查询、收藏、关注与下载，以及搜索结果中的用户列表。
+- **网页会话**（WebView 的 Cookie 加 CSRF token 与登录态，本地持久化并在启动时恢复）驱动仅网页可用的适配器：个性化 `rfy/deviations` 信息流、合集内容，以及搜索结果中的作品列表（优先网页端点 `_puppy/dabrowse/search/deviations`，官方 `browse/home?q=` 作为回退）。已登录 Cookie 会快照进应用自身存储，并在冷启动时平台 WebView 存储丢失（例如跨界应用更新）后重新注入，从而不必重新登录也能保住个性化信息流。
+
+网页会话的 Cookie 快照以**明文 JSON** 写在应用支持目录下的 `web_session.json`；只有 OAuth token 走系统安全存储（`DAViewer Account`）。因此这个文件等同于登录凭据：不要把它复制到不受信任的位置，也不要在截图或日志中暴露。应用不会把它上传到任何地方。
 
 一次内嵌登录同时建立两种会话。WebView 只在 OAuth 回调回到 DeviantArt 首页之后才上报网页会话（CSRF token 与 `userinfo` Cookie），因此应用不会把匿名登录页的未登录状态记录为网页会话。
 
@@ -132,7 +134,7 @@ token 与恢复存储使用 `DAViewer Account` Keychain 服务；更早的 ad-ho
 ## 检查应用更新
 
 应用启动、回到前台及前台持续使用时会检查正式 Release；成功结果缓存五分钟。
-有新版时首页显示更新条，点开可查看说明并下载。关闭后不再提醒同一版本，设置中的
+有新版时首页显示更新条，点开会在浏览器中打开 Releases 页面，由用户自行下载安装——应用只做检查，不会自动下载或安装更新。关闭后不再提醒同一版本，设置中的
 「检查更新」仍可使用，并可查看当前版本说明。获取失败会明确显示检查失败。
 
 如果旧版未显示更新条，请通过设置手动检查，或打开 [Releases](https://github.com/redtidev1918/DAViewer/releases)

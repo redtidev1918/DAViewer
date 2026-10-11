@@ -52,13 +52,22 @@ those are the providers' pages and are not bypassed by the app.
 ## Session roles
 
 - **OAuth session** (secure storage) powers the official API: daily
-  deviations, search, artwork lookup, favourites, watch, and downloads.
+  deviations, artwork lookup, favourites, watch, and downloads, plus the user
+  list in search results.
 - **Web session** (the WebView's cookies plus the CSRF token and login state,
   persisted locally and restored at startup) powers the website-only adapters:
-  the personalized `rfy/deviations` feed and collection contents. The signed-in
+  the personalized `rfy/deviations` feed, collection contents, and the artwork
+  list in search results (website endpoint `_puppy/dabrowse/search/deviations`
+  first, official `browse/home?q=` as fallback). The signed-in
   cookies are snapshotted into the app's own storage and re-injected on a cold
   start when the platform WebView store lost them (e.g. across an app update),
   so the personalized feed survives without another sign-in.
+
+The web-session cookie snapshot is written as **plaintext JSON** to
+`web_session.json` in the application support directory; only OAuth tokens use
+platform secure storage (`DAViewer Account`). Treat that file as a sign-in
+credential: do not copy it to an untrusted location or expose it in screenshots
+or logs. The app never uploads it.
 
 One embedded login establishes both sessions. The WebView reports the web
 session (CSRF token and the `userinfo` cookie) only after the OAuth callback has
@@ -195,7 +204,9 @@ evidence; similar-looking artwork does not by itself mean expiry.
 
 The app checks stable releases on launch, resume and periodically while in the
 foreground, caching successful results for five minutes. A new version appears
-in the Home update banner, which opens its notes and download link. Dismissing
+in the Home update banner, which opens the release page in the browser so the
+user can download and install it — the app only checks, it never downloads or
+installs an update itself. Dismissing
 it suppresses the same version. Settings still offers a manual check and notes
 for the current release. Failed checks report failure instead of “up to date”.
 
