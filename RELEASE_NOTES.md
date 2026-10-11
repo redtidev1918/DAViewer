@@ -3,6 +3,17 @@
 这里只写下载者需要知道的变化，一行一条。内部实现、协议与调试细节请见
 `CHANGELOG.md`。
 
+## 0.5.9
+
+- 成年或需登录的作品按实际限制显示，不再误标为付费内容。
+- 网页、图片、视频和下载的访问失败会触发会话复核；确认 Cookie 失效后提供登录入口。
+- 会话复核覆盖持续使用和前台恢复，网络故障与挑战页面不会被直接判定为登出。
+- 关闭会话提醒后跨页面保持关闭，确认登录恢复后，后续失效可再次提醒。
+
+- Show mature and login-gated artwork restrictions without mislabeling them as paid content.
+- Recheck the session after web and media access failures, periodically and on resume; prompt after confirmed expiry.
+- Share notice dismissal across pages and reset it after confirmed recovery.
+
 ## 0.5.3
 
 - 修复推荐页滑到底后无法继续加载：翻页不再取决于底部两张预览图是否对齐，贴底即加载下一页。

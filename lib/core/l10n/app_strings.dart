@@ -196,6 +196,9 @@ final class AppStrings {
   String get checkUpdates =>
       _lang == AppLanguage.zh ? '检查更新' : 'Check for updates';
   String get upToDate => _lang == AppLanguage.zh ? '已是最新版本' : 'Up to date';
+  String get updateCheckFailed => _lang == AppLanguage.zh
+      ? '检查更新失败，请检查网络后重试。'
+      : 'Could not check for updates. Check your connection and try again.';
   String newVersionAvailable(String version) => _lang == AppLanguage.zh
       ? '发现新版本 $version'
       : 'New version $version available';

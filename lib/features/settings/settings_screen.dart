@@ -409,7 +409,7 @@ Future<void> _checkUpdates(
     if (!context.mounted) return;
     if (info == null) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(s.upToDate)));
+          .showSnackBar(SnackBar(content: Text(s.updateCheckFailed)));
       return;
     }
     // Only compare when both sides are plain semver; a `development` build has
@@ -425,11 +425,13 @@ Future<void> _checkUpdates(
         ),
         content: SingleChildScrollView(
           child: Text(
-            newer
-                ? (info.notes ?? s.noUpdateNotes)
-                : currentIsVersion
-                ? '${s.upToDate}（$appVersion）'
-                : s.newVersionAvailable('v${info.version}'),
+            [
+              if (!newer)
+                currentIsVersion
+                    ? '${s.upToDate}（$appVersion）'
+                    : s.newVersionAvailable('v${info.version}'),
+              info.notes ?? s.noUpdateNotes,
+            ].join('\n\n'),
           ),
         ),
         actions: <Widget>[
@@ -453,7 +455,7 @@ Future<void> _checkUpdates(
   } on Object {
     if (context.mounted) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(s.upToDate)));
+          .showSnackBar(SnackBar(content: Text(s.updateCheckFailed)));
     }
   }
 }

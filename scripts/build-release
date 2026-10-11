@@ -8,11 +8,11 @@ case "$RUNNER_OS" in
     if [ -n "${KEYSTORE_B64:-}" ] && [ -n "${KEYSTORE_PROPERTIES:-}" ]; then
       echo "$KEYSTORE_B64" | base64 --decode > android/app/upload-keystore.p12
       printf '%s' "$KEYSTORE_PROPERTIES" > android/key.properties
-      flutter build apk --release
+      flutter build apk --release --dart-define="FLUTTER_BUILD_NAME=$RELEASE_VERSION"
       cp build/app/outputs/flutter-apk/app-release.apk "dist/release/DAViewer-v$RELEASE_VERSION.apk"
     elif [ "${DRY_RUN:-false}" = true ]; then
       echo "Signing secret unavailable in pull request; building an unsigned dry-run APK."
-      flutter build apk --debug
+      flutter build apk --debug --dart-define="FLUTTER_BUILD_NAME=$RELEASE_VERSION"
       cp build/app/outputs/flutter-apk/app-debug.apk "dist/release/DAViewer-v$RELEASE_VERSION.apk"
     else
       echo "KEYSTORE_B64/KEYSTORE_PROPERTIES are required for release APK builds" >&2
@@ -20,12 +20,12 @@ case "$RUNNER_OS" in
     fi
     ;;
   macOS)
-    flutter build macos --release
+    flutter build macos --release --dart-define="FLUTTER_BUILD_NAME=$RELEASE_VERSION"
     (cd build/macos/Build/Products/Release && zip -r -y "DAViewer-v$RELEASE_VERSION-macos-unsigned-preview.zip" DAViewer.app)
     cp "build/macos/Build/Products/Release/DAViewer-v$RELEASE_VERSION-macos-unsigned-preview.zip" dist/release/
     ;;
   Windows)
-    flutter build windows --release
+    flutter build windows --release --dart-define="FLUTTER_BUILD_NAME=$RELEASE_VERSION"
     powershell -Command "Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath 'dist/release/DAViewer-v$RELEASE_VERSION-windows.zip'"
     ;;
 esac

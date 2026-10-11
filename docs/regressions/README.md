@@ -35,6 +35,11 @@ machine cannot produce the required evidence.
 
 ## Evidence still required before calling the architecture closed
 
+Update detection and notes: see [REG-015](015-update-notes-and-detection.md).
+Automated coverage includes release build arguments, API fallback, restart,
+concurrent checks, failure preservation and persisted dismissal. Real installer
+version display and lifecycle timing still need device verification.
+
 - Mac run: record actual collections/all request count and caller around the
   favourites/home flows.
 - Mac run: capture webview login screen/controller/load challenge counts;

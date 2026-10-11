@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:daviewer/core/updates/update_checker.dart';
@@ -43,6 +44,58 @@ final class _UpdateAdapter implements HttpClientAdapter {
 }
 
 void main() {
+  test('each release build passes its version to Dart update detection', () {
+    final commands = File('scripts/build-release')
+        .readAsLinesSync()
+        .where((line) => line.trim().startsWith('flutter build '))
+        .toList();
+    expect(commands.length, 4);
+    for (final command in commands) {
+      expect(
+        command,
+        contains('--dart-define="FLUTTER_BUILD_NAME=\$RELEASE_VERSION"'),
+        reason: 'Native package metadata does not define Dart appVersion',
+      );
+    }
+  });
+
+  test('versioned notes remain available when the API is blocked', () async {
+    final dio = Dio()
+      ..httpClientAdapter = _UpdateAdapter(<String, Map<String, Object?>>{
+        'api.github.com/repos/redtidev1918/DAViewer/releases/latest': {
+          'status': 403,
+        },
+        'github.com/redtidev1918/DAViewer/releases/latest': {
+          'contentType': 'application/json',
+          'body': jsonEncode({'tag_name': 'v0.5.9'}),
+        },
+        'raw.githubusercontent.com/redtidev1918/DAViewer/v0.5.9/.github/release-notes/0.5.9.md':
+            {
+              'body': '# 0.5.9\n\n## 本次更新\n\n- 修复 Cookie 提醒。\n\n## 下载\n\n下载表',
+              'contentType': 'text/plain',
+            },
+      });
+    final info = await fetchLatestReleaseInfo(dio: dio);
+    expect(info?.version, '0.5.9');
+    expect(info?.notes, contains('修复 Cookie 提醒'));
+    expect(info?.notes, isNot(contains('下载表')));
+  });
+
+  test('API version with no body can use notes even if HTML fails', () async {
+    final dio = Dio()
+      ..httpClientAdapter = _UpdateAdapter(<String, Map<String, Object?>>{
+        'api.github.com/repos/redtidev1918/DAViewer/releases/latest': {
+          'contentType': 'application/json',
+          'body': jsonEncode({'tag_name': 'v0.5.9'}),
+        },
+        'github.com/redtidev1918/DAViewer/releases/latest': {'status': 503},
+        'raw.githubusercontent.com/redtidev1918/DAViewer/v0.5.9/.github/release-notes/0.5.9.md':
+            {'body': '# 0.5.9\n\n- 版本说明。', 'contentType': 'text/plain'},
+      });
+    final info = await fetchLatestReleaseInfo(dio: dio);
+    expect(info?.notes, contains('版本说明'));
+  });
+
   test('compareVersions orders semantic versions', () {
     expect(compareVersions('0.2.145', '0.2.144'), greaterThan(0));
     expect(compareVersions('0.2.144', '0.2.145'), lessThan(0));

@@ -8,12 +8,14 @@ import '../runtime/runtime_provider.dart';
 import '../settings/app_preferences.dart';
 
 /// The running app version, taken from the Flutter build name at compile time.
-/// The release workflow derives it from `pubspec.yaml`; debug runs report
+/// The release script passes it explicitly as a Dart define; debug runs report
 /// `development`.
 const String appVersion = String.fromEnvironment(
   'FLUTTER_BUILD_NAME',
   defaultValue: 'development',
 );
+
+final runningAppVersionProvider = Provider<String>((ref) => appVersion);
 
 /// The public GitHub release used to detect newer builds. No authentication and
 /// no user data are involved; this is the same URL a browser would fetch.
@@ -52,7 +54,7 @@ final class UpdateCheckState {
   /// The newest published release version (without the leading `v`).
   final String? latestVersion;
 
-  /// The release notes (the matching `RELEASE_NOTES.md` section) for
+  /// The release notes from the Release body or matching versioned notes for
   /// [latestVersion], shown to the user so they know what changed.
   final String? notes;
 
@@ -144,6 +146,19 @@ Future<UpdateInfo> releaseInfoFromRawNotes({
   required Dio dio,
   required String version,
 }) async {
+  // The release workflow publishes this versioned file. The legacy aggregate
+  // is retained only for older releases that predate per-version notes.
+  try {
+    final response = await dio.get<String>(
+      'https://raw.githubusercontent.com/redtidev1918/DAViewer/'
+      'v$version/.github/release-notes/$version.md',
+      options: Options(responseType: ResponseType.plain),
+    );
+    final notes = extractUserReleaseNotes(response.data ?? '');
+    if (notes != null) return UpdateInfo(version: version, notes: notes);
+  } on Object {
+    // Older tags may not contain a versioned notes file.
+  }
   try {
     final response = await dio.get<String>(
       _releaseNotesRawUrl,
@@ -184,7 +199,8 @@ Future<UpdateInfo?> fetchLatestReleaseInfo({required Dio dio}) async {
     final data = response.data;
     if (data is Map) {
       final info = parseLatestRelease(data);
-      if (info != null) return info;
+      if (info?.notes != null) return info;
+      versionOnly = info;
     }
     final version = versionFromReleaseUri(response.realUri);
     if (version != null) {
@@ -196,7 +212,8 @@ Future<UpdateInfo?> fetchLatestReleaseInfo({required Dio dio}) async {
   } on Object {
     // No HTML route either.
   }
-  if (versionOnly == null) return apiInfo;
+  versionOnly ??= apiInfo;
+  if (versionOnly == null) return null;
 
   return releaseInfoFromRawNotes(dio: dio, version: versionOnly.version);
 }
@@ -206,7 +223,7 @@ final updateCheckControllerProvider =
       (ref) => UpdateCheckController(ref),
     );
 
-/// Checks for a newer release at most once per day, silently. The result is
+/// Checks for a newer release at most once per five minutes, silently. The result is
 /// surfaced as a dismissible banner, never a modal, and a version the user has
 /// dismissed is never shown again. Every failure stays silent.
 final class UpdateCheckController extends StateNotifier<UpdateCheckState> {
@@ -215,37 +232,59 @@ final class UpdateCheckController extends StateNotifier<UpdateCheckState> {
   }
 
   final Ref _ref;
+  DateTime? _lastSuccess;
+  Future<void>? _activeCheck;
 
-  Future<void> check() async {
-    if (state.checking) return;
-    final lastCheck = await AppPreferences.loadLastUpdateCheck();
-    final now = DateTime.now().millisecondsSinceEpoch;
-    // Throttle to once per hour (generous against GitHub's 60 req/hr rate
-    // limit). A *failed* check does not record the time, so the next launch
-    // or resume retries immediately instead of being suppressed for an hour.
-    if (lastCheck != null &&
-        now - lastCheck < const Duration(hours: 1).inMilliseconds) {
-      return;
+  Future<void> check({bool force = false}) {
+    final active = _activeCheck;
+    if (active != null) return active;
+    final last = _lastSuccess;
+    if (!force &&
+        last != null &&
+        DateTime.now().difference(last) < const Duration(minutes: 5)) {
+      return Future<void>.value();
     }
-    state = const UpdateCheckState(checking: true);
+    late final Future<void> tracked;
+    tracked = _performCheck().whenComplete(() {
+      if (identical(_activeCheck, tracked)) _activeCheck = null;
+    });
+    _activeCheck = tracked;
+    return tracked;
+  }
+
+  Future<void> _performCheck() async {
+    // Avoid writing provider state from its constructor's synchronous build.
+    await Future<void>.value();
+    if (!_ref.mounted) return;
+    final currentVersion = _ref.read(runningAppVersionProvider);
+    if (!isSemver(currentVersion)) return;
+    final previous = state;
+    state = UpdateCheckState(
+      checking: true,
+      latestVersion: previous.latestVersion,
+      notes: previous.notes,
+    );
     try {
       final dio = _ref.read(runtimeProvider).dio;
       if (dio == null) {
-        state = const UpdateCheckState();
+        state = previous;
         return;
       }
       final info = await fetchLatestReleaseInfo(dio: dio);
-      if (info == null || !isSemver(appVersion)) {
-        state = const UpdateCheckState();
+      if (!_ref.mounted) return;
+      if (info == null) {
+        state = previous;
         return;
       }
-      // Only a successful check counts against the throttle window.
-      await AppPreferences.saveLastUpdateCheck(now);
-      if (compareVersions(info.version, appVersion) <= 0) {
+      // Cache only within this process: a persisted timestamp without a
+      // persisted result used to hide updates after restarting the app.
+      _lastSuccess = DateTime.now();
+      if (compareVersions(info.version, currentVersion) <= 0) {
         state = const UpdateCheckState();
         return;
       }
       final dismissed = await AppPreferences.loadDismissedUpdateVersion();
+      if (!_ref.mounted) return;
       if (dismissed == info.version) {
         state = const UpdateCheckState();
         return;
@@ -253,7 +292,7 @@ final class UpdateCheckController extends StateNotifier<UpdateCheckState> {
       state = UpdateCheckState(latestVersion: info.version, notes: info.notes);
     } on Object {
       // The update check must never surface an error to the user.
-      state = const UpdateCheckState();
+      if (_ref.mounted) state = previous;
     }
   }
 
