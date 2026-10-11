@@ -88,7 +88,7 @@ Provider/解析器名称与原始异常信息属于诊断数据。用户可见�
 
 ## 发布契约
 
-- release-please 管理版本，核对 `pubspec.yaml` 与 `.release-please-manifest.json`。Flutter 通过 `FLUTTER_BUILD_NAME` 暴露应用版本。
+- release-please 管理版本，核对 `pubspec.yaml` 与 `.release-please-manifest.json`。发布脚本通过 Dart define `DAVIEWER_VERSION` 传入应用内版本；安装包版本单独由 Flutter 设置。
 - 当前 manifest 版本必须有 `.github/release-notes/<版本>.md` 中文正文，包含「本次更新」；CI 检查该文件。
 - CI 执行 analyze、格式检查、测试，并构建 Android、macOS 与 Windows。
 - Android 发版需要上传密钥库。macOS 当前构建脚本直接打包 Flutter release 产物，没有稳定预览证书导入或公证步骤，保留 `macos-unsigned-preview` 标记。工具链和发布参数见 [构建与发布](build.md)。

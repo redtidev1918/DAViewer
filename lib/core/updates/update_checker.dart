@@ -11,7 +11,7 @@ import '../settings/app_preferences.dart';
 /// The release script passes it explicitly as a Dart define; debug runs report
 /// `development`.
 const String appVersion = String.fromEnvironment(
-  'FLUTTER_BUILD_NAME',
+  'DAVIEWER_VERSION',
   defaultValue: 'development',
 );
 

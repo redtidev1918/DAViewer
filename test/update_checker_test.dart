@@ -53,7 +53,7 @@ void main() {
     for (final command in commands) {
       expect(
         command,
-        contains('--dart-define="FLUTTER_BUILD_NAME=\$RELEASE_VERSION"'),
+        contains('--dart-define="DAVIEWER_VERSION=\$RELEASE_VERSION"'),
         reason: 'Native package metadata does not define Dart appVersion',
       );
     }

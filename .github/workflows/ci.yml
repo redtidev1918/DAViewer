@@ -36,7 +36,11 @@ jobs:
           exit 1
       - run: flutter analyze
       - run: dart format --output=none --set-exit-if-changed lib test
-      - run: flutter test
+      - name: Test with the release version define
+        shell: bash
+        run: |
+          release_version=$(python3 -c 'import json; print(json.load(open(".release-please-manifest.json"))["."])')
+          flutter test --dart-define="DAVIEWER_VERSION=$release_version"
       - name: Chinese release notes for current manifest version
         shell: bash
         run: |

@@ -185,7 +185,8 @@ must stay reachable from the login screen.
 ## Release contract
 
 - release-please manages versions; check `pubspec.yaml` against
-  `.release-please-manifest.json`. Flutter exposes the app version as `FLUTTER_BUILD_NAME`.
+  `.release-please-manifest.json`. The release script passes the in-app version
+  through the Dart define `DAVIEWER_VERSION`; Flutter sets native package metadata separately.
 - The current manifest version must have Chinese notes in
   `.github/release-notes/<version>.md` with a 本次更新 section; CI checks the file.
 - CI analyzes, checks formatting, tests, and builds Android, macOS, and Windows.

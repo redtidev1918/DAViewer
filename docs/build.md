@@ -42,9 +42,9 @@ flutter test
 在对应平台执行 release 构建：
 
 ```shell
-flutter build apk --release --dart-define=FLUTTER_BUILD_NAME=0.5.10      # 需要 android/key.properties
-flutter build macos --release --dart-define=FLUTTER_BUILD_NAME=0.5.10
-flutter build windows --release --dart-define=FLUTTER_BUILD_NAME=0.5.10
+flutter build apk --release --dart-define=DAVIEWER_VERSION=0.5.10      # 需要 android/key.properties
+flutter build macos --release --dart-define=DAVIEWER_VERSION=0.5.10
+flutter build windows --release --dart-define=DAVIEWER_VERSION=0.5.10
 ```
 
 示例中的 `0.5.10` 应替换为 `pubspec.yaml` 的版本号（不含 `+` 后的构建号）。

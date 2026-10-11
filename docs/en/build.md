@@ -42,9 +42,9 @@ flutter test
 Run release builds on the corresponding platform:
 
 ```shell
-flutter build apk --release --dart-define=FLUTTER_BUILD_NAME=0.5.10      # Requires android/key.properties
-flutter build macos --release --dart-define=FLUTTER_BUILD_NAME=0.5.10
-flutter build windows --release --dart-define=FLUTTER_BUILD_NAME=0.5.10
+flutter build apk --release --dart-define=DAVIEWER_VERSION=0.5.10      # Requires android/key.properties
+flutter build macos --release --dart-define=DAVIEWER_VERSION=0.5.10
+flutter build windows --release --dart-define=DAVIEWER_VERSION=0.5.10
 ```
 
 Replace the sample `0.5.10` with the version from `pubspec.yaml`, excluding the
