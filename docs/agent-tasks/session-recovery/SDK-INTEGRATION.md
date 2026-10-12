@@ -102,6 +102,15 @@ rfy-4 discard cause. External WAF/authenticated retained-account evidence is abs
 
 ## Gates and next actions
 
+Final P0 follow-up after 1d8ba3b: Web observation deadline now releases the OAuth
+success synchronization overlay, preserves valid account/Cookie, rejects late reads
+and allows refresh to verify/close with one RFY. Normal waiting for OAuth is not
+misreported as a Web failure. Full app suite **487 PASS**, analyze PASS, full-source
+format/diff PASS. SDK final suite **251 PASS** (including examples), new docs-only
+d4d7b3 CI native builds PASS. Local Windows 96eec26 signed-out startup/bridge smoke
+PASS by process/runtime logs; no UI/full-service acceptance is claimed. Source
+revision defines now cover all three release platforms. Replacement builds pending.
+
 1. Finish copied app P0 fixes and tests, rerun full suite/analyze/format, commit
    integration source excluding path lock/overrides. Preserve external main edits.
 2. Review both public API diffs; verify SDK PR CI and joint three-platform candidate

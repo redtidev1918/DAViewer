@@ -40,6 +40,8 @@ final class _LifecyclePlatform extends InAppWebViewPlatform {
   final launches = <Uri>[];
   bool failAuthorize = false;
   bool failHome = false;
+  Completer<void>? evidenceGate;
+  bool evidenceReadStarted = false;
 
   bool activateOnce(Key? key) {
     final id = key?.toString() ?? '<none>';
@@ -228,6 +230,11 @@ final class _LifecycleController extends PlatformInAppWebViewController {
     ContentWorld? contentWorld,
   }) async {
     if (source.contains('JSON.stringify')) {
+      final gate = platform.evidenceGate;
+      if (gate != null) {
+        platform.evidenceReadStarted = true;
+        await gate.future;
+      }
       return jsonEncode({
         'origin': 'https://www.deviantart.com',
         'csrf': 'synthetic-csrf',
@@ -439,6 +446,19 @@ void registerLogoutLoginTest(String failure) {
           'code': 'synthetic-code',
         },
       );
+      if (failure == 'web_unconfirmed') {
+        // The browser observation budget may expire while the user is still
+        // entering credentials. That is not failed post-OAuth verification.
+        await tester.pump(const Duration(seconds: 21));
+        final s = strings(container.read(appLanguageProvider));
+        expect(auth.state.oauthSignedIn, isFalse);
+        expect(find.text(s.recommendedSessionUnverified), findsNothing);
+        expect(
+          find.text('${s.loginSuccess} ${s.recommendedSessionUnverified}'),
+          findsNothing,
+        );
+        expect(find.text(s.syncingAfterLogin), findsNothing);
+      }
       if (failure == 'web_first') {
         cookies.values.addAll({
           'userinfo': '{"username":"artist"}',
@@ -479,6 +499,50 @@ void registerLogoutLoginTest(String failure) {
       expect(auth.state.account?.username, 'artist');
       expect(auth.state.oauthSignedIn, isTrue);
       await tester.pump();
+      if (failure == 'web_unconfirmed') {
+        final s = strings(container.read(appLanguageProvider));
+        expect(find.text(s.syncingAfterLogin), findsOneWidget);
+        final pendingEvidence = Completer<void>();
+        platform.evidenceGate = pendingEvidence;
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pump();
+        expect(platform.evidenceReadStarted, isTrue);
+        await tester.pump(const Duration(seconds: 21));
+        expect(find.text(s.syncingAfterLogin), findsNothing);
+        expect(
+          find.text('${s.loginSuccess} ${s.recommendedSessionUnverified}'),
+          findsOneWidget,
+        );
+        expect(auth.state.oauthSignedIn, isTrue);
+        expect(tokens.value, isNotNull);
+        expect(adapter.rfyCalls, 0);
+        expect(cookies.values, isEmpty);
+        // A native read completing after the observation window is stale.
+        // It must not close the login route or initiate RFY. Keep the new
+        // Cookies intact; only a fresh document observation can accept them.
+        cookies.values.addAll({
+          'userinfo': '{"username":"artist"}',
+          'auth': 'synthetic-cookie',
+        });
+        platform.username = 'artist';
+        pendingEvidence.complete();
+        await tester.pump(const Duration(milliseconds: 10));
+        expect(find.byType(WebLoginScreen), findsOneWidget);
+        expect(
+          container.read(webSessionStatusProvider).state,
+          isNot(WebSessionStatusState.healthy),
+        );
+        expect(adapter.rfyCalls, 0);
+        expect(cookies.values['auth'], 'synthetic-cookie');
+        final refresh = find.descendant(
+          of: find.byType(AppBar),
+          matching: find.byIcon(Icons.refresh),
+        );
+        await tester.tap(refresh);
+        await tester.pump();
+        expect(platform.reloadCalls, 1);
+        expect(endpoint.exchanges, 1);
+      }
       if (failure == 'home') {
         await tester.pump(const Duration(milliseconds: 350));
         expect(

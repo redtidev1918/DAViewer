@@ -28,12 +28,12 @@ case "$RUNNER_OS" in
     fi
     ;;
   macOS)
-    flutter build macos --release --dart-define="DAVIEWER_VERSION=$RELEASE_VERSION"
+    flutter build macos --release --dart-define="DAVIEWER_VERSION=$RELEASE_VERSION" --dart-define="DAVIEWER_REVISION=${DAVIEWER_SOURCE_SHA:-${GITHUB_SHA:-local}}"
     (cd build/macos/Build/Products/Release && zip -r -y "DAViewer-v$RELEASE_VERSION-macos-unsigned-preview.zip" DAViewer.app)
     cp "build/macos/Build/Products/Release/DAViewer-v$RELEASE_VERSION-macos-unsigned-preview.zip" dist/release/
     ;;
   Windows)
-    flutter build windows --release --dart-define="DAVIEWER_VERSION=$RELEASE_VERSION"
+    flutter build windows --release --dart-define="DAVIEWER_VERSION=$RELEASE_VERSION" --dart-define="DAVIEWER_REVISION=${DAVIEWER_SOURCE_SHA:-${GITHUB_SHA:-local}}"
     powershell -Command "Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath 'dist/release/DAViewer-v$RELEASE_VERSION-windows.zip'"
     ;;
 esac

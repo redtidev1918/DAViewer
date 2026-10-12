@@ -54,6 +54,7 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
   bool _loading = true;
   bool _closeAfterReport = false;
   bool _serverConfirmedWebSession = false;
+  bool _webVerificationDeadlineExceeded = false;
   bool _challengeBlocked = false;
   int _reportSeq = 0;
   int _navSeq = 0;
@@ -421,6 +422,8 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
           // document once the OAuth identity is known instead of waiting for
           // a navigation or changed evidence that may never occur.
           final observer = _sessionObserver;
+          _webVerificationDeadlineExceeded = false;
+          _reportSeq++;
           observer?.navigationStarted();
           if (observer?.isDisposed == true) {
             observer?.restart();
@@ -487,6 +490,13 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                 ),
               if (_failedNavigation != null)
                 _LoginErrorBanner(message: s.loginBrowserOpenFailed),
+              if (_webVerificationDeadlineExceeded &&
+                  auth.oauthSignedIn &&
+                  auth.account != null)
+                _LoginErrorBanner(
+                  message:
+                      '${s.loginSuccess} ${s.recommendedSessionUnverified}',
+                ),
               if (auth.error != null)
                 _LoginErrorBanner(
                   message: friendlyLoginErrorMessage(auth.error!, s),
@@ -562,6 +572,18 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                                   'webview',
                                   'browser recoveryId=${_sessionStatus.recoveryId} host=visible completed reason=deadline',
                                 );
+                                if (!mounted || _serverConfirmedWebSession) {
+                                  return;
+                                }
+                                // Fence reports already awaiting a native read.
+                                // OAuth success remains valid, but the missing
+                                // Web identity is a recoverable verification
+                                // failure, not an endless success overlay.
+                                _reportSeq++;
+                                setState(() {
+                                  _closeAfterReport = false;
+                                  _webVerificationDeadlineExceeded = true;
+                                });
                               },
                             )..start();
                             final pending = _pendingAuthUri;
@@ -591,6 +613,11 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                             }
                             _reportSeq++;
                             _sessionObserver?.navigationStarted(loading: true);
+                            if (_sessionObserver?.isDisposed == true &&
+                                !_serverConfirmedWebSession) {
+                              _webVerificationDeadlineExceeded = false;
+                              _sessionObserver?.restart();
+                            }
                             _navSeq += 1;
                             AppLogger.instance.info(
                               'webview',
@@ -618,6 +645,12 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                               unawaited(_detectChallenge(controller));
                               if (_sessionObserver?.isDisposed == true &&
                                   !_serverConfirmedWebSession) {
+                                if (mounted) {
+                                  setState(
+                                    () => _webVerificationDeadlineExceeded =
+                                        false,
+                                  );
+                                }
                                 _sessionObserver?.restart();
                               } else {
                                 unawaited(_sessionObserver?.sample());
@@ -632,6 +665,12 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                             _sessionObserver?.navigationStarted();
                             if (_sessionObserver?.isDisposed == true &&
                                 !_serverConfirmedWebSession) {
+                              if (mounted) {
+                                setState(
+                                  () =>
+                                      _webVerificationDeadlineExceeded = false,
+                                );
+                              }
                               _sessionObserver?.restart();
                             } else {
                               unawaited(_sessionObserver?.sample());

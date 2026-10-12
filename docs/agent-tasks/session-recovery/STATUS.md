@@ -53,6 +53,22 @@ Code/Release/Android/Original Incident verification must remain separate.
 
 ### 2026-10-12 joint SDK integration (active; supersedes next-action list below)
 
+Final failure-path review after 1d8ba3b: OAuth success followed by missing Web
+identity could leave the success overlay forever after observer deadline. Now
+deadline releases the overlay with a precise OAuth-success/Web-unverified message,
+fences late native reads, preserves OAuth/Cookie, and permits refresh verification.
+No error is shown while OAuth login is still normally pending. Account arrival
+or real navigation restarts bounded evidence observation; confirmed refresh
+automatically closes and triggers exactly one RFY. New widget regression exercises
+deadline, late valid evidence rejection, no data removal, and refresh recovery.
+Full suite **487 PASS**, analyze PASS, all 211 lib/test files format PASS, diff PASS.
+SDK complete suite **251 PASS**; docs-only SDK d4d7b3 CI passes all native builds.
+Windows 96eec26 artifact ZIP digest verified; host process startup logged ready=true,
+usable login route and native WebView dispatch with live listener (known signed-out
+state). This earlier Windows build logged buildRevision=local; build script now
+embeds exact source SHA on Windows/macOS as well as Android. New candidate builds
+must be checked on the following commit. No live OAuth/device acceptance is claimed.
+
 Latest checkpoint: integration branch `codex/daviewer-sdk-integration`, previous
 HEAD `96eec26032b1e5fd1aad33fb380af659e90a92a5`; the next commit contains the
 redaction follow-up. Exact SDK pin is now `feec94f09c1f6b12628a099fe374e6ebafb3e9df`.

@@ -5,6 +5,9 @@ on:
     paths:
       - 'lib/**'
       - 'test/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - 'scripts/build-release'
       - 'scripts/configure-sdk-integration.py'
       - '.github/workflows/sdk-integration.yml'
   workflow_dispatch:
