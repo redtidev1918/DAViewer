@@ -9,6 +9,7 @@ on:
       - 'pubspec.lock'
       - 'scripts/build-release'
       - 'scripts/configure-sdk-integration.py'
+      - 'scripts/verify-desktop-startup.py'
       - '.github/workflows/sdk-integration.yml'
   workflow_dispatch:
 
@@ -106,7 +107,23 @@ jobs:
           fi
           bash scripts/build-release
           cp sdk-integration-provenance.json dist/release/
+      - name: Verify desktop candidate startup
+        if: runner.os == 'Windows' || runner.os == 'macOS'
+        shell: bash
+        env:
+          EXPECTED_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            executable="$(cygpath -w "$PWD/build/windows/x64/runner/Release/daviewer.exe")"
+          else
+            # PRODUCT_NAME in Runner/Configs/AppInfo.xcconfig is DAViewer.
+            executable="$PWD/build/macos/Build/Products/Release/DAViewer.app/Contents/MacOS/DAViewer"
+          fi
+          python scripts/verify-desktop-startup.py --executable "$executable" \
+            --expected-revision "$EXPECTED_REVISION" \
+            --summary "dist/release/startup-smoke-$RUNNER_OS.json"
       - uses: actions/upload-artifact@v7
+        if: always()
         with:
           name: sdk-integration-${{ runner.os }}-${{ github.event.pull_request.head.sha || github.sha }}
           path: dist/release/*

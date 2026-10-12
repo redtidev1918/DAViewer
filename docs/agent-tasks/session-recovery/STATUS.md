@@ -53,6 +53,27 @@ Code/Release/Android/Original Incident verification must remain separate.
 
 ### 2026-10-12 joint SDK integration (active; supersedes next-action list below)
 
+Follow-up native audit: joint CI 38218485367 on app 1d8ba3b / SDK feec94f passed
+quality and all three native builds. Desktop CI now also runs each owned Release
+binary with a 30s startup/revision/route gate and uploads only an allowlisted JSON
+summary. Script tested on Windows 96eec26: PASS, 1.552s (expected revision local);
+exit/timeout/private-log negative checks PASS. Await new exact-SHA runtime CI.
+Android active wrong-state synthetic callback: SDK rejected with state_mismatch,
+but Flutter's built-in deep-link router simultaneously redirected /callback -> /
+and disposed login reason=route_removed, hiding the useful error. APK 643f3c1
+evidence is private under D:\Android\setup\joint-643-active-negative-callback.*.
+Android host now disables flutter_deeplinking_enabled so DAKit's app_links source
+owns callback delivery. Official configuration reference:
+https://docs.flutter.dev/release/breaking-changes/deep-links-flag-change.
+This proves competing route handling; successful live token exchange remains
+unverified. Native negative-path recheck is required in replacement APK.
+SDK public-session race separately reproduced: issued save A / logout / save B /
+late A -> obsolete clear deleted B. The same DAViewer coordinator normally blocks
+B while A is active, so do not label this the phone root cause. Upstream is fixing
+complete storage transaction serialization and bounded caller errors while keeping
+the actual native I/O tail fenced. Timeouts alone must not delete valid credentials.
+Do not merge SDK #42 or publish until new source and joint tests pass.
+
 Final failure-path review after 1d8ba3b: OAuth success followed by missing Web
 identity could leave the success overlay forever after observer deadline. Now
 deadline releases the overlay with a precise OAuth-success/Web-unverified message,
