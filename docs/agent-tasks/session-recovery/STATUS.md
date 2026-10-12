@@ -17,7 +17,7 @@ Code/Release/Android/Original Incident verification must remain separate.
 - Baseline main/HEAD before new commits: `3432842a97fbc1e2b4fb6a7e9fe1060d1d72b100`.
 - Latest implementation commit: `2e1069df7f49c0aa58fd2bfbb9b5d49a2d1d76e4`.
 - Diagnostics milestone: `3c468a0d5cce6fd22c866eacf97d2746a6fea6c8`.
-- Last pushed memory checkpoint: `12aaeac79534914327e9969dea7342e9819b5601`.
+- Last pushed memory checkpoint before this update: `9b3b2a1`.
   This document's next commit follows it; use `git log -1` for current HEAD.
 - All current implementation and task files are committed on the repair branch.
   `.gitattributes` preserves the attachment's original CRLF without whitespace
@@ -37,6 +37,8 @@ Code/Release/Android/Original Incident verification must remain separate.
   snapshot on remote branch `codex/backup-local-edits-before-update-2026-10-12`
   as well, including the stash's untracked-file parent. Never merge that old
   snapshot wholesale into main/current repair branch.
+  Remote backup push succeeded; exact snapshot commit:
+  `b536d81cc0d6b403d1ef032461d97dd4ab5f76a3`.
 - Original full task attachment remains readable:
   `C:\Users\12629\.codex\attachments\3a366fa0-7ba9-435a-99fa-078e774d52a1\已粘贴的文本.txt`.
   SPEC.md is a verbatim copy; verify SHA256 against the source if available.
@@ -168,6 +170,8 @@ Require an identical candidate certificate before retained-data cover-upgrade.
 - CI analyze/test PASS on 9eb7a61:
   https://github.com/redtidev1918/DAViewer/actions/runs/38193540169.
 - Branch contract PASS: run 38193540533.
+- Documentation head 48bf98b also analyze/test PASS (run 38193995381) and
+  branch-contract PASS (38193995965). Latest later changes are documentation only.
 - Release plan run 38193540559 succeeded, but build/finalize were SKIPPED because
   v0.5.13 is already healthy. No candidate APK was produced by that run.
 - Forced dry-run candidate build dispatched on exact head 12aaeac:
@@ -190,19 +194,23 @@ Require an identical candidate certificate before retained-data cover-upgrade.
 
 ## Last success and next concrete actions
 
-Last success: implementation and complete task memory pushed; draft PR #96 and
-runner analyze/test PASS. Baseline APK installed and launch accepted on emulator.
+Last success: original stash fully audited and pushed as an exact remote Git
+backup (including untracked cache parent); new implementation and durable task
+memory independently pushed. Draft PR #96 and runner analyze/test PASS.
 
-1. Commit/push this checkpoint and English UA documentation correction.
-2. Inspect run 38193886127 and its signed APK artifacts; reviewed reusable
+1. Inspect run 38193886127 and its signed APK artifacts; reviewed reusable
    workflow guards publication with !dry_run and checks out the caller branch.
    Do not move published tags or mistake skipped jobs for a build.
-3. Record candidate SHA256, signing certificate and buildRevision.
-4. `D:\Android\Sdk\platform-tools\adb.exe devices -l`; check boot, install
-   baseline/candidate only on the intended emulator, launch app and smoke test.
-5. Download candidate APK from runner, record SHA256/certificate/buildRevision,
+2. Download candidate APK from runner, record SHA256/certificate/buildRevision,
    deliver usable path to user for retained-data phone acceptance.
-6. Update acceptance matrix and proceed under release gates once evidence arrives.
+3. `D:\Android\Sdk\platform-tools\adb.exe devices -l`; check boot, install
+   candidate on emulator-5554 preserving baseline data, launch app and smoke test.
+4. Review remaining native concurrency risks: a CookieManager write already
+   issued before logout can complete after epoch changes; sampler navigation
+   invalidates old reads but does not pause reads of an old document before
+   commit; recovery-completed logs need captured recoveryId for overlapping
+   transactions. These are audit items, not device-confirmed incident causes.
+5. Update acceptance matrix and proceed under release gates once evidence arrives.
 
 PowerShell Flutter invocations need this PATH prefix in this execution host:
 `$env:PATH = 'C:\Windows\System32;C:\Windows;C:\Program Files\Git\cmd;D:\flutter-sdk\bin;' + $env:PATH`
