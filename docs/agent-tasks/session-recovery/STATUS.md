@@ -17,7 +17,7 @@ Code/Release/Android/Original Incident verification must remain separate.
 - Baseline main/HEAD before new commits: `3432842a97fbc1e2b4fb6a7e9fe1060d1d72b100`.
 - Latest implementation commit: `2e1069df7f49c0aa58fd2bfbb9b5d49a2d1d76e4`.
 - Diagnostics milestone: `3c468a0d5cce6fd22c866eacf97d2746a6fea6c8`.
-- Last pushed memory checkpoint before this update: `9b3b2a1`.
+- Last pushed memory checkpoint before this update: `cec0c049f5e2b235b6df20ff4a24299e7a99a6ca`.
   This document's next commit follows it; use `git log -1` for current HEAD.
 - All current implementation and task files are committed on the repair branch.
   `.gitattributes` preserves the attachment's original CRLF without whitespace
@@ -149,6 +149,10 @@ Observed baseline UI still on splash; process alive, connectivity HTTP 200,
 startup log reports explicit logout and anonymous local state. Do not count this
 as successful baseline smoke or retained-account incident evidence. Investigate
 candidate startup after installing its APK. Emulator has no confirmed login.
+After candidate download, emulator-5554 was no longer present. Candidate ADB
+install/start therefore FAILED with device not found, not an APK install error.
+Do not assert whether the host exited due to graphics or manual closure without
+evidence. Emulator integration remains PENDING; SDK/AVD installation is complete.
 
 New SDK tools 23 route sdkmanager to Android CLI and split semicolon package
 paths incorrectly via the wrapper. Successfully install images using:
@@ -176,9 +180,20 @@ Require an identical candidate certificate before retained-data cover-upgrade.
   v0.5.13 is already healthy. No candidate APK was produced by that run.
 - Forced dry-run candidate build dispatched on exact head 12aaeac:
   https://github.com/redtidev1918/DAViewer/actions/runs/38193886127.
-  In progress; dry_run=true, force=true, repair=true, version=0.5.13. This is the
+  PASS: all three OS builds and finalize succeeded. dry_run=true, force=true,
+  repair=true, version=0.5.13. This is the
   implementation candidate; subsequent documentation commits do not change it.
-- Release: v0.5.13 untouched; candidate/formal new release PENDING.
+  Ubuntu log confirms assembleRelease/app-release.apk, not debug fallback.
+- Signed candidate downloaded and copied to:
+  `D:\Android\setup\DAViewer-v0.5.13-session-recovery-12aaeac.apk`.
+  APK SHA256: `a129fdae80c8c57765a1e9ca77a619491fd8db21e847c2ab2a64e0f2aef9de3f`.
+  apksigner verify PASS; certificate SHA256 equals baseline recorded above.
+  aapt: app.daviewer, versionName=0.5.13, versionCode=225 (same as baseline),
+  compileSdk=36. Filename and build revision identify this candidate; do not
+  confuse it with the published v0.5.13 APK. Same signer/code allows Android
+  cover-upgrade without uninstall/data clearing; phone test remains necessary.
+  Actions artifact 11723175164 (release-assets-0.5.13-0), seven-day retention.
+- Release: v0.5.13 untouched; signed candidate build verified; formal new release PENDING.
 - Code Verified: local PASS (446); runner analyze/test PASS.
 - Release Verified: PENDING.
 - Android Verified: PENDING; emulator bootstrap only.
@@ -194,23 +209,27 @@ Require an identical candidate certificate before retained-data cover-upgrade.
 
 ## Last success and next concrete actions
 
-Last success: original stash fully audited and pushed as an exact remote Git
-backup (including untracked cache parent); new implementation and durable task
-memory independently pushed. Draft PR #96 and runner analyze/test PASS.
+Last success: candidate release APK downloaded; signature matches production,
+version/package verified and SHA256 recorded. Remote stash backup and task
+memory remain intact. Emulator install attempt blocked by absent device.
 
-1. Inspect run 38193886127 and its signed APK artifacts; reviewed reusable
-   workflow guards publication with !dry_run and checks out the caller branch.
-   Do not move published tags or mistake skipped jobs for a build.
-2. Download candidate APK from runner, record SHA256/certificate/buildRevision,
-   deliver usable path to user for retained-data phone acceptance.
-3. `D:\Android\Sdk\platform-tools\adb.exe devices -l`; check boot, install
+1. Deliver verified local candidate path to user for retained-data phone upgrade
+   and ten cold starts; export the cross-launch diagnostic archive afterward.
+2. `D:\Android\Sdk\platform-tools\adb.exe devices -l`; check boot, install
    candidate on emulator-5554 preserving baseline data, launch app and smoke test.
-4. Review remaining native concurrency risks: a CookieManager write already
+3. Review remaining native concurrency risks: a CookieManager write already
    issued before logout can complete after epoch changes; sampler navigation
    invalidates old reads but does not pause reads of an old document before
    commit; recovery-completed logs need captured recoveryId for overlapping
    transactions. These are audit items, not device-confirmed incident causes.
-5. Update acceptance matrix and proceed under release gates once evidence arrives.
+4. Update acceptance matrix and proceed under release gates once evidence arrives.
+
+Network check: download processes had HTTP_PROXY/HTTPS_PROXY/ALL_PROXY unset,
+Windows ProxyEnable=0. Local ziyoumaoCore listens on 127.0.0.1:7892; explicit HTTP
+proxy request to GitHub API returned 200. For subsequent shell GitHub commands:
+`$env:HTTPS_PROXY='http://127.0.0.1:7892'; $env:HTTP_PROXY=$env:HTTPS_PROXY`.
+This is a process-only setting, not a global Windows change. Do not replace
+authenticated signed Actions artifacts with an untrusted mirror/package source.
 
 PowerShell Flutter invocations need this PATH prefix in this execution host:
 `$env:PATH = 'C:\Windows\System32;C:\Windows;C:\Program Files\Git\cmd;D:\flutter-sdk\bin;' + $env:PATH`
