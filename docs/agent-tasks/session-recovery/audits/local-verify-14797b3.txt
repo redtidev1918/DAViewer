@@ -1,0 +1,22 @@
+=== local verification of 14797b3 working tree ===
+started: 2026-10-12T12:19:29.1818029+08:00
+HEAD: 14797b3aaccab0d9a33624cde2c85a568327edd7
+
+--- dart format (expect 0 changes) ---
+Formatted 208 files (0 changed) in 0.70 seconds.
+format exit code: 0
+
+--- flutter analyze --no-pub ---
+Analyzing DAViewer...                                           
+No issues found! (ran in 5.3s)
+analyze exit code: 0
+
+--- flutter test (expect 473 pass) ---
+2026-10-12T12:20:02.919519 [INFO] [webview] load stop: https://www.deviantart.com[redacted]
+2026-10-12T12:20:02.919519 [WARNING] [webview] challenge page detected
+2026-10-12T12:20:02.919519 [INFO] [auth] web session state: unverified -> locked source=web-login-challenge generation=2 recoveryId=recovery-1 accountEpoch=0 claimed=[redacted] server=[redacted]
+2026-10-12T12:20:02.920519 [INFO] [webview] browser recoveryId=recovery-1 host=visible classification=challenge identitySource=page_global csrfPresent=true
+2026-10-12T12:20:02.959909 [INFO] [webview] login screen disposed reason=route_removed
+00:20 +473: All tests passed!
+test exit code: 0
+finished: 2026-10-12T12:20:03.2839708+08:00

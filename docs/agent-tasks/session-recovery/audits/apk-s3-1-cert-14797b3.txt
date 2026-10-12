@@ -1,0 +1,19 @@
+=== s3 item 1/4: signing certificate ===
+time: 2026-10-12T13:16:15.1392938+08:00
+command: apksigner.bat verify --print-certs <candidate-apk>
+candidate: D:\Android\setup\candidate-14797b3\release\DAViewer-v0.5.13.apk
+--- raw output (candidate) ---
+Signer #1 certificate DN: C=CN, O=redtidev1918, CN=DAViewer
+Signer #1 certificate SHA-256 digest: 686474b39fd91d20c1db3ce5bf6216ed8ab05ec7638f904251e0d108a34e7141
+Signer #1 certificate SHA-1 digest: 9b104c08b142560b704bb31fb9eace2f83eac63a
+Signer #1 certificate MD5 digest: cf36434428906e094f48dfafd4cafa7b
+exit code: 0
+command: apksigner.bat verify --print-certs <baseline-apk>
+baseline: D:\Android\setup\DAViewer-v0.5.13.apk
+--- raw output (baseline production v0.5.13) ---
+Signer #1 certificate DN: C=CN, O=redtidev1918, CN=DAViewer
+Signer #1 certificate SHA-256 digest: 686474b39fd91d20c1db3ce5bf6216ed8ab05ec7638f904251e0d108a34e7141
+Signer #1 certificate SHA-1 digest: 9b104c08b142560b704bb31fb9eace2f83eac63a
+Signer #1 certificate MD5 digest: cf36434428906e094f48dfafd4cafa7b
+exit code: 0
+expected cert SHA256: 686474b39fd91d20c1db3ce5bf6216ed8ab05ec7638f904251e0d108a34e7141
