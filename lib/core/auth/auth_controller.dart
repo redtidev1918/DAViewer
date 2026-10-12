@@ -379,23 +379,24 @@ final class AuthController extends StateNotifier<AuthState> {
             'logout: web session clear failed errorType=${error.runtimeType}',
           );
         });
+    // Start the SDK composite logout now: its token generation fence must not
+    // wait for preferences, Cookie I/O, or pending PKCE storage cleanup.
+    final oauthCleanup = _logoutOAuthBestEffort(runtime);
     await AppPreferences.saveOAuthSessionKnown(false);
-    // Durable user intent and Web/RFY ownership fencing come before a native
-    // pending-store deletion, which can remain unresolved on a broken plugin.
-    await _cancelPendingBestEffort(runtime, 'logout');
     await webClear;
+    await oauthCleanup;
+  }
+
+  Future<void> _logoutOAuthBestEffort(AppRuntime runtime) async {
     if (runtime.isConfigured && runtime.oauth != null) {
       try {
         _log.info('auth', 'logout: revoking oauth session');
         await runtime.oauth!.logout(revoke: true);
       } on Object catch (error, stack) {
         _log.warning('auth', 'logout: revocation failed', error, stack);
-        // Clear the session directly so the next authorize starts clean.
-        try {
-          await runtime.oauth!.session.logout(revoke: false);
-        } on Object catch (error2, stack2) {
-          _log.warning('auth', 'logout: token clear failed', error2, stack2);
-        }
+        // The SDK has already scheduled generation-safe cleanup in finally.
+        // A second logout here could erase a newer authorization that began
+        // after this operation's bounded native-storage failure.
       }
     }
   }

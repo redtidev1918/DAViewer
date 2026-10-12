@@ -9,6 +9,15 @@ request ownership, cache and diagnostics. No protocol logic moves just for purit
 
 ## Source and ownership
 
+Latest pin: `2590cbec59e0193d231addc73b3373cbe2b9b88e`, SDK CI 38240753370 PASS
+with 262 tests and native examples. Public TokenStore late-write/new-account race
+is fixed by full transaction serialization and bounded callers; native I/O remains
+ordered after caller timeout. Same-generation valid late credentials are retained.
+DAViewer removes its redundant pending-cleanup wait and second logout fallback;
+SDK token fencing now starts synchronously before any app logout await. App
+regression verifies delayed old cleanup failure cannot clear a later authorization.
+Full joint app suite 488 PASS, analyze PASS. Replacement CI/build verification pending.
+
 Latest additive implementation: SDK `feec94f09c1f6b12628a099fe374e6ebafb3e9df`
 adds public protocol text redaction for raw/nested percent-encoded OAuth secrets.
 DAViewer previous HEAD `96eec26032b1e5fd1aad33fb380af659e90a92a5` is followed by

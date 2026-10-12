@@ -53,6 +53,19 @@ Code/Release/Android/Original Incident verification must remain separate.
 
 ### 2026-10-12 joint SDK integration (active; supersedes next-action list below)
 
+19:40 CST release continuation: SDK `2590cbec59e0193d231addc73b3373cbe2b9b88e`
+is pushed; CI 38240753370 passes **262 tests**, analyze and all native examples.
+It serializes full TokenStore transactions, bounds storage callers while retaining
+the actual I/O queue, preserves valid same-generation late writes, and fences
+token generation before pending PKCE cleanup. DAViewer now starts this composite
+logout before its first await and removes duplicate SDK cleanup/retry that could
+clear a later authorization. New delayed-failure/new-authorization regression PASS.
+App exact SDK pin/lock updated; full **488 tests PASS**, analyze PASS. Earlier
+3d7d2d7 CI 38240761940 passes three builds and Windows/macOS startup smoke, but
+uses older SDK feec94f. New exact-source joint CI still required before publication.
+User requested push/release/deployment/documentation. Preserve original-device
+verification as PENDING; do not claim these automated runs prove live OAuth/RFY.
+
 Follow-up native audit: joint CI 38218485367 on app 1d8ba3b / SDK feec94f passed
 quality and all three native builds. Desktop CI now also runs each owned Release
 binary with a 30s startup/revision/route gate and uploads only an allowlisted JSON

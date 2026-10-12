@@ -117,11 +117,22 @@ class _Pending extends Fake implements PendingAuthorizationStore {
 
 class _Tokens extends Fake implements TokenStore {
   int clears = 0;
+  AuthTokens? value;
+  bool failNextClear = false;
+  final clearing = Completer<void>();
   @override
-  Future<AuthTokens?> read() async => null;
+  Future<AuthTokens?> read() async => value;
+  @override
+  Future<void> write(AuthTokens tokens) async => value = tokens;
   @override
   Future<void> clear() async {
     clears++;
+    if (!clearing.isCompleted) clearing.complete();
+    if (failNextClear) {
+      failNextClear = false;
+      throw StateError('synthetic native cleanup failure');
+    }
+    value = null;
   }
 }
 
@@ -233,23 +244,48 @@ void main() {
     expect(storage.values, isEmpty);
   });
 
+  test('logout fences Web immediately and persists intent despite hanging PKCE cleanup', () async {
+    final gate = Completer<void>();
+    pending.clearGate = gate.future;
+    final auth = container.read(authControllerProvider.notifier);
+    auth.state = const AuthState(status: AuthStatus.signedIn);
+    final loggingOut = auth.logout();
+    await pending.clearing.future;
+    expect(auth.state.status, AuthStatus.signedOut);
+    expect(controller.state.isLoggedIn, isFalse);
+    await loggingOut.timeout(const Duration(seconds: 4));
+    expect(
+      await AppPreferences.loadOAuthSessionEvidence(),
+      OAuthSessionEvidence.signedOut,
+    );
+    expect(tokens.clears, 1);
+    gate.complete();
+  });
+
   test(
-    'logout fences Web and persists intent before hanging PKCE cleanup',
+    'late logout failure does not clear a newer SDK authorization',
     () async {
       final gate = Completer<void>();
       pending.clearGate = gate.future;
+      tokens.failNextClear = true;
       final auth = container.read(authControllerProvider.notifier);
+      final session = container.read(runtimeProvider).oauth!.session;
       auth.state = const AuthState(status: AuthStatus.signedIn);
+      final generation = session.generation;
       final loggingOut = auth.logout();
-      await pending.clearing.future;
-      expect(auth.state.status, AuthStatus.signedOut);
-      expect(controller.state.isLoggedIn, isFalse);
-      expect(
-        await AppPreferences.loadOAuthSessionEvidence(),
-        OAuthSessionEvidence.signedOut,
+      expect(session.generation, generation + 1);
+      await tokens.clearing.future;
+      await Future<void>.delayed(Duration.zero);
+      await session.save(
+        AuthTokens(
+          accessToken: 'synthetic-new-account-token',
+          tokenType: 'Bearer',
+          expiresAt: DateTime.now().toUtc().add(const Duration(hours: 1)),
+        ),
       );
       await loggingOut.timeout(const Duration(seconds: 4));
       expect(tokens.clears, 1);
+      expect(tokens.value?.accessToken, 'synthetic-new-account-token');
       gate.complete();
     },
   );
