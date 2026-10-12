@@ -138,6 +138,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
   int _identityEpoch = 0;
   int get identityEpoch => _identityEpoch;
   Future<void> _nativeCookieTail = Future<void>.value();
+  int _cookieOperationSequence = 0;
   Future<void> get cookieMutations => _nativeCookieTail;
   bool _isCurrentIdentity(int epoch) =>
       mounted && _ref.mounted && epoch == _identityEpoch;
@@ -146,7 +147,25 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
       _ref.read(runtimeProvider).webViewProxyManager?.cookieManager;
 
   Future<T> _withNativeCookies<T>(Future<T> Function() operation) {
-    final next = _nativeCookieTail.then((_) => operation());
+    final id = ++_cookieOperationSequence;
+    AppLogger.instance.info(
+      'web-session',
+      'cookie operation=$id event=queued epoch=$_identityEpoch',
+    );
+    final next = _nativeCookieTail.then((_) async {
+      AppLogger.instance.info(
+        'web-session',
+        'cookie operation=$id event=started epoch=$_identityEpoch',
+      );
+      try {
+        return await operation();
+      } finally {
+        AppLogger.instance.info(
+          'web-session',
+          'cookie operation=$id event=settled epoch=$_identityEpoch',
+        );
+      }
+    });
     _nativeCookieTail = next.then((_) {}, onError: (Object _) {});
     return next;
   }
@@ -214,7 +233,15 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
     // loss restores the snapshot instead of racing the account load, seeing
     // no account yet, and skipping the re-injection entirely — which is
     // exactly the update scenario this restore exists for.
+    AppLogger.instance.info(
+      'web-session',
+      'restore event=await_account epoch=$epoch',
+    );
     await _ref.read(authControllerProvider.notifier).accountLoad;
+    AppLogger.instance.info(
+      'web-session',
+      'restore event=account_settled epoch=$epoch',
+    );
     if (!mounted || !_ref.mounted || epoch != _identityEpoch) return;
     final auth = _ref.read(authControllerProvider);
     if (!shouldRestoreSavedWebSession(

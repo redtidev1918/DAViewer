@@ -8,6 +8,57 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
+    'failed file open does not poison callbacks, flush or disposal',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'daviewer-logger-',
+      );
+      const channel = MethodChannel('plugins.flutter.io/path_provider');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (_) async => directory.path);
+      // Opening a directory as a file fails asynchronously in the real IOSink.
+      await Directory('${directory.path}/logs/unwritable.log')
+          .create(recursive: true);
+      addTearDown(() async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+        await directory.delete(recursive: true);
+      });
+      final logger = await AppLogger.initialize(fileName: 'unwritable.log');
+      logger.info('oauthLaunch', 'authorize dispatched');
+      await logger.flush();
+      logger.info('oauthCallback', 'callback consumed');
+      await logger.flush();
+      await logger.dispose();
+      expect(AppLogger.isInitialized, isFalse);
+    },
+  );
+
+  test('concurrent disposal drains writes and allows a new logger', () async {
+    final directory = await Directory.systemTemp.createTemp('daviewer-logger-');
+    const channel = MethodChannel('plugins.flutter.io/path_provider');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (_) async => directory.path);
+    addTearDown(() async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+      await directory.delete(recursive: true);
+    });
+    final logger = await AppLogger.initialize(fileName: 'closing.log');
+    logger.info('oauthCallback', 'queued before close');
+    await Future.wait([logger.dispose(), logger.dispose()]);
+    logger.info('oauthCallback', 'late callback after close');
+    await logger.flush();
+    final text = await File('${directory.path}/logs/closing.log')
+        .readAsString();
+    expect(text, contains('queued before close'));
+    expect(text, isNot(contains('late callback after close')));
+    final replacement = await AppLogger.initialize(fileName: 'replacement.log');
+    expect(replacement, isNot(same(logger)));
+    await replacement.dispose();
+  });
+
+  test(
     'logging during an in-flight flush never aborts a login callback',
     () async {
       final directory = await Directory.systemTemp.createTemp(

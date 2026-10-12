@@ -62,6 +62,8 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
   late final AuthController _authController;
   bool _cookiesReady = false;
   String _closeReason = 'route_removed';
+  Future<void> Function()? _failedNavigation;
+  int _navigationOperation = 0;
 
   WebViewOAuthBridge? get _bridge =>
       ref.read(runtimeProvider).webViewOAuthBridge;
@@ -127,7 +129,56 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
       return;
     }
     _navSource = 'oauth_bridge';
-    controller.loadUrl(urlRequest: URLRequest(url: WebUri(uri.toString())));
+    unawaited(
+      _navigate(
+        () => controller.loadUrl(
+          urlRequest: URLRequest(url: WebUri(uri.toString())),
+        ),
+        source: 'oauth_authorize',
+      ),
+    );
+  }
+
+  Future<void> _navigate(
+    Future<void> Function() action, {
+    required String source,
+  }) async {
+    final operation = ++_navigationOperation;
+    try {
+      await action();
+      if (mounted && operation == _navigationOperation) {
+        setState(() => _failedNavigation = null);
+      }
+    } on Object catch (error) {
+      AppLogger.instance.warning(
+        'webview',
+        'navigation failed source=$source errorType=${error.runtimeType}',
+      );
+      if (mounted && operation == _navigationOperation) {
+        setState(() {
+          _failedNavigation = action;
+          _closeAfterReport = false;
+        });
+      }
+    }
+  }
+
+  void _refresh() {
+    AppLogger.instance.info('webview', 'manual refresh requested');
+    _navSource = 'manual_refresh';
+    final retry = _failedNavigation;
+    final controller = _controller;
+    if (retry != null) {
+      unawaited(_navigate(retry, source: 'manual_retry'));
+    } else if (controller != null) {
+      unawaited(_navigate(controller.reload, source: 'manual_refresh'));
+    }
+    final auth = ref.read(authControllerProvider);
+    if (auth.oauthSignedIn && auth.account == null) {
+      unawaited(_authController.reloadAccount());
+    } else if (!auth.oauthSignedIn && auth.error != null && !auth.isLoggingIn) {
+      unawaited(_authController.retryLogin());
+    }
   }
 
   /// Reads the web session (CSRF + login state + username) from the WebView
@@ -254,8 +305,11 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
       } else {
         _maybeClose();
       }
-    } on Object {
-      // Best effort; the page may not expose the state during navigation.
+    } on Object catch (error) {
+      AppLogger.instance.warning(
+        'webview',
+        'session report failed errorType=${error.runtimeType} stale=${!mounted || seq != _reportSeq}',
+      );
     }
   }
 
@@ -322,7 +376,9 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
           next.account != null &&
           mounted &&
           !_closeAfterReport) {
-        _closeAfterReport = true;
+        // A failed home navigation must keep the browser error/retry visible,
+        // even if account loading completes after the native failure.
+        _closeAfterReport = _failedNavigation == null;
         if (_serverConfirmedWebSession) {
           _closeAfterReport = false;
           WidgetsBinding.instance.addPostFrameCallback(
@@ -342,14 +398,7 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
         actions: <Widget>[
           IconButton(
             tooltip: s.refresh,
-            onPressed: () {
-              AppLogger.instance.info('webview', 'manual refresh requested');
-              _navSource = 'manual_refresh';
-              _controller?.reload();
-              if (auth.oauthSignedIn && auth.account == null) {
-                unawaited(_authController.reloadAccount());
-              }
-            },
+            onPressed: _refresh,
             icon: const Icon(Icons.refresh),
           ),
           // Settings, proxy, diagnostics, updates, and About must stay
@@ -391,8 +440,10 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                 _LoginChallengeBanner(
                   message: s.webLoginChallengeExceeded,
                   refreshLabel: s.refresh,
-                  onRefresh: () => _controller?.reload(),
+                  onRefresh: _refresh,
                 ),
+              if (_failedNavigation != null)
+                _LoginErrorBanner(message: s.loginBrowserOpenFailed),
               if (auth.error != null)
                 _LoginErrorBanner(
                   message: friendlyLoginErrorMessage(auth.error!, s),
@@ -477,11 +528,7 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                                 'oauthBridge',
                                 'authorize loading pending=true path=${pending.path}',
                               );
-                              controller.loadUrl(
-                                urlRequest: URLRequest(
-                                  url: WebUri(pending.toString()),
-                                ),
-                              );
+                              _loadAuthRequest(pending);
                             }
                           },
                           shouldOverrideUrlLoading:
@@ -496,10 +543,13 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                                   // reports the real web session (CSRF + login state). Do NOT read
                                   // the session here — the callback page has no __INITIAL_STATE__.
                                   unawaited(
-                                    controller.loadUrl(
-                                      urlRequest: URLRequest(
-                                        url: WebUri(_homeUri.toString()),
+                                    _navigate(
+                                      () => controller.loadUrl(
+                                        urlRequest: URLRequest(
+                                          url: WebUri(_homeUri.toString()),
+                                        ),
                                       ),
+                                      source: 'oauth_callback_home',
                                     ),
                                   );
                                   return NavigationActionPolicy.CANCEL;

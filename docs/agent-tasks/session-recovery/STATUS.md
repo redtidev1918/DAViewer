@@ -15,14 +15,16 @@ Code/Release/Android/Original Incident verification must remain separate.
 - Workspace: `D:\Code\DAViewer`.
 - Branch: `codex/android-session-recovery` (independent from main).
 - Baseline main/HEAD before new commits: `3432842a97fbc1e2b4fb6a7e9fe1060d1d72b100`.
-- Latest implementation commit: `3d62b45a0466fdf817b7d6a1bdccc47edb6385a6`.
+- Previous delivered implementation: `3d62b45a0466fdf817b7d6a1bdccc47edb6385a6` (phone FAIL).
+- New startup/source checkpoint follows `f8a53bb0194e1d79b1069c28a0a0a7de654a4bbe`;
+  use `git log -1` for the exact new HEAD. Full verification/build below.
   Previous architecture milestone: `2e1069df7f49c0aa58fd2bfbb9b5d49a2d1d76e4`.
 - Diagnostics milestone: `3c468a0d5cce6fd22c866eacf97d2746a6fea6c8`.
 - Last pushed implementation/memory checkpoint before this update: `3d62b45a0466fdf817b7d6a1bdccc47edb6385a6`.
 - Latest pushed tool checkpoint: `6dfb442cc6023646f2e754f67f2b8748e4b068dd`.
   This document's next commit follows it; use `git log -1` for current HEAD.
-- Implementation is committed/pushed; acceptance guide, ADB/summary tools and
-  their tests are being saved in the following documentation/tool checkpoint.
+- Previous implementation, acceptance guide, ADB/summary tools and tests are
+  committed/pushed. New startup follow-up changes are being verified/saved.
   `.gitattributes` preserves the attachment's original CRLF without whitespace
   false positives. SPEC verbatim SHA256:
   `1b2ed96c28c3712e5c8f6ad5a0045995ffc5db0f529e75d714f732f2fdf7e824`.
@@ -48,93 +50,48 @@ Code/Release/Android/Original Incident verification must remain separate.
 
 ## Current phase
 
-### 2026-10-12 phone failure / active engineering checkpoint
+### 2026-10-12 active startup regression checkpoint
 
-- Candidate **12aaeac login-after-explicit-logout acceptance: FAIL**. Evidence is
-  the user's local attachment `ac48dc7a-dfbd-4748-9cda-575813f77b95/已粘贴的文本.txt`,
-  10:37:17–10:38:36. Do not commit its raw account identifiers/logs.
-- Retained-account original cold-start acceptance: **PENDING**. The supplied
-  timeline includes explicit logout at 10:37:27 and cannot close that incident.
-- Confirmed locally: AppLogger queued flushes but wrote directly to IOSink while
-  a flush was active. A real file-backed regression throws
-  `Bad state: StreamSink is bound to a stream` at `AppLogger._write` before fix.
-  This can abort onWebViewCreated and DAKit diagnostics/OAuth launch callbacks;
-  the phone lacks observer initialization/authorize dispatch on its first visits.
-  Device attribution remains to verify with the next candidate, not a claimed
-  observation of an exception absent from its exported log.
-- Fix in working tree: serialize writes AND flushes, contain file I/O errors.
-  `test/app_logger_write_race_test.dart`: reproduced FAIL before fix, PASS after.
-- Added non-secret bridge dispatch/receipt/callback and login close-reason logs,
-  explicit callback interception setting, shared current-document initializer
-  fallback for missing global. Fallback is server-rendered session identity,
-  never Cookie/CSRF/OAuth/public profile inference. Actual phone schema remains
-  unobserved. No new guessed endpoint or WAF bypass.
-- Earlier follow-up race audit is also UNCOMMITTED: captured recovery IDs,
-  navigation load fence, account-epoch/native Cookie serialization, guarded
-  persistent writes, RFY pre-transport ownership and targeted timeout cancel,
-  terminal trace outcomes; controlled cookie race suite 3 PASS. Old full 446
-  and intermediate 450 results are NOT final verification of this working tree.
-- Before this checkpoint commit, HEAD is e3f79719d4c7f0b8a8d5c39a925490e03aa88416,
-  branch codex/android-session-recovery; retained stash unchanged. All above
-  implementation edits are now ready for a recoverable branch commit.
-- Latest full verification on this working tree: **461 PASS**, format completed,
-  analyze **No issues found**; `git diff --check` PASS. New complete platform
-  login regression 2 PASS including existing challenge/rebuild assertion.
-  Real-disk logger write/flush regression PASS. Code Verified locally; new CI
-  PENDING push. Release PENDING. PR #96 confirmed OPEN/draft.
-- Detailed failure/repair evidence: LOGIN-REGRESSION.md. Original 446 and
-  intermediate 450 are superseded, not the final count.
-- Login workflow regression is complete and preserved existing assertions.
-  The subsequent evidence-tool tests bring latest local total to **463 PASS**.
-  Format gate: 205 files, 0 changed; analyze: no issues. ADB mock verified explicit
-  serial/all arguments and first-failure stop; syntax PASS. No real phone was
-  controlled by that mock. Log organizer parsed the supplied failure attachment
-  into local redacted output at `D:\Android\setup\phone-login-failure-12aaeac-summary`.
-- CI on 3d62b45 PASS: Actions run 38197966964. Forced signed dry-run candidate
-  run 38197965496 is **SUCCESS** (all OS builds + finalize), version=0.5.13, dry_run=true,
-  force=true, repair=true. No merge/tag/formal release. Candidate must identify
-  immutable 3d62b45, not later docs-only commits.
-- Tool checkpoint f7e5d1aa2018aea28abb24a3f217562037787590 pushed. Its CI
-  38198687965 FAILED on 6 new-script lint infos (filename, lib import, braces).
-  Do not represent that run as PASS. Corrected to summarize_session_recovery.dart,
-  package import and braces; current local analyze no issues, summary tests 2 PASS.
-  Corrected checkpoint 6dfb442 CI **PASS**, run 38198964246. APK source unchanged.
-- APK artifact 11724821499 / release-assets-0.5.13-0 produced. Runner confirms
-  assembleRelease/app-release.apk (67.4 MB); archive digest
-  495d2adf3e762497f782103eb646ccc5da544f33998f72729865cb1e9c76b2a6.
-  gh download connection was through proxy port 7892 but stalled; official
-  authenticated redirect + curl range resume succeeded. ZIP digest matches runner.
-- **New APK ready**: `D:\Android\setup\DAViewer-v0.5.13-session-recovery-3d62b45.apk`.
-  SHA256: `df5c9b95c864b06ffc10ba426a200e53a572a282b1f72da6d63076bc69462ec8`.
-  apksigner verify PASS; production certificate unchanged:
-  `686474b39fd91d20c1db3ce5bf6216ed8ab05ec7638f904251e0d108a34e7141`.
-  Package app.daviewer, versionName 0.5.13, versionCode 225, compileSdk36.
-  Embedded arm64 libapp.so revision equals full 3d62b45 source SHA; release
-  app-release.apk build confirmed, no debug fallback. Signed candidate build
-  verified; formal Release Verified remains PENDING. Real phone new login and
-  original cold-start gates PENDING; old 12aaeac login-after-logout FAIL.
-- Next: deliver the verified APK and ANDROID-ACCEPTANCE.md, save/push this final
-  documentation checkpoint. On new phone logs, immediately analyze callback,
-  identity source, close reason and RFY ownership; investigate first failure.
-  Never pass old APK or merge/publish before successful real phone evidence.
-
-Current phase: regression remediation and new candidate delivery; Phase 0–3
-architecture work is retained, Phase 4 now includes explicit-logout login and
-file-backed diagnostic races. Real phone acceptance remains open. Implementation
-remains a candidate, not proven incident closure.
-The SDK/emulator installation is an authorized integration-test subtask.
-
-2026-10-12 follow-up audit started from clean e3f7971, draft PR #96 confirmed
-OPEN/draft. User now owns retained-data phone acceptance on immutable 12aaeac:
-one cold start first, stop/export immediately on failure; ten launches and
-resume/manual-refresh/network cases only after the first success. Explicit user
-gate: no merge and no formal release. Continue independent engineering work.
-Audit plan before edits: capture recovery IDs; invalidate obsolete hidden hosts;
-pause native-document sampling during load; guard RFY before transport and log
-every terminal outcome; scope timeout cancellation to its request; serialize
-native Cookie mutations with logout, protect async snapshot writes. Add controlled
-race regressions, acceptance guide and opt-in ADB scripts. New branch changes
-are NOT included in the phone's 12aaeac APK until a separate build is delivered.
+- User reports immutable **3d62b45 Android startup acceptance: FAIL**: stuck at
+  restoring login, Home/settings inaccessible. Ten cold starts PAUSED by user;
+  independent engineering continues. PR #96 confirmed OPEN/draft this turn.
+- Previous **12aaeac login after explicit logout: FAIL**. Its 10:37:17–10:38:36
+  phone attachment is a separate regression, not retained-account cold-start evidence.
+- **Original Incident Verified: PENDING; formal Release Verified: PENDING**.
+- Resumed from clean `f8a53bb0194e1d79b1069c28a0a0a7de654a4bbe` on
+  codex/android-session-recovery. Retained stash intact; no reapplication.
+- Confirmed source defect: ready=true + OAuth unknown redirects /splash -> /
+  then / -> /splash. The repeated redirect/remount can keep the user on Splash.
+  Added a regression for Home/settings/diagnostics/login remaining reachable
+  after readiness. Actual phone OAuth/Cookie stall location is still unobserved;
+  obtain ADB logcat before claiming a native deadlock or exact device root cause.
+- Startup previously awaited two independent 12s stage timeouts. Now one independent
+  12s total deadline releases ready regardless of an unfinished/circular Future,
+  plus finally release on exceptions. Application-owned single-flight bootstrap
+  continues late Cookie restore after Splash unmount; no credential clearing.
+- Added Release-safe stage start/complete/failure, deadline readiness and route
+  decisions, accountLoad wait/settlement and native Cookie queue/start/settlement.
+  Startup verification/connectivity errors are contained.
+- Independent logger audit reproduced real asynchronous file-open failure:
+  flush was contained but dispose still threw and retained a failed singleton.
+  Observe IOSink.done errors; serialize idempotent close, drain queued writes,
+  catch close failures and clear singleton in finally. Real-file failure/close
+  regressions PASS. This is not evidence that logger caused the phone startup hang.
+- OAuth native loadUrl/reload failures previously escaped unawaited callbacks.
+  Contain them, record source/error type (no sensitive URL/exception text), show
+  the existing localized browser error and allow explicit refresh of failed
+  navigation. Callback interception still returns CANCEL and token exchange is
+  independent of the failed home navigation. Session report failures now logged.
+- Targeted tests: startup pending/cycle/exception/success plus actual production
+  router and route policy 12 PASS; native authorize/home failure + existing PKCE
+  account/one-RFY and challenge/rebuild tests 4 PASS; real-file logger 3 PASS.
+  Full analyze: PASS, no issues. Full Flutter test: **473 PASS**. Format gate:
+  208 files, 0 changes after formatting. Exact checkpoint CI and replacement
+  signed candidate build remain PENDING until pushed/built.
+- These source edits are **NOT in 3d62b45**. Do not redeliver that failed APK or
+  label the existing 463-test/source CI results as verification of new changes.
+- Original source evidence and previous repair: LOGIN-REGRESSION.md. Latest
+  startup/ADB instructions: STARTUP-REGRESSION.md. Full original SPEC unchanged.
 
 ## Confirmed defects versus hypotheses
 
@@ -197,7 +154,7 @@ web_session_refresher_lifecycle_test and home_refresh_no_probe_test. Original
 assertions retained. Docs: authentication.md, en/authentication.md, regression
 catalog and 021-android-session-recovery.md.
 
-## Latest actual verification
+## Previous delivered-source verification (superseded by new checks below)
 
 - Local Flutter 3.47.6 / Dart 3.13.5, existing SDK at `D:\flutter-sdk`.
   CI pins Flutter 3.47.1; runner analyze/test PASS on implementation 3d62b45
@@ -283,7 +240,8 @@ Require an identical candidate certificate before retained-data cover-upgrade.
 - Release: v0.5.13 untouched; signed candidate build verified; formal new release PENDING.
 - Code Verified: local PASS (463); runner analyze/test PASS on implementation 3d62b45.
 - Release Verified: PENDING.
-- Android Verified: **FAIL for 12aaeac login after logout**; replacement candidate PENDING.
+- Android Verified: **FAIL: 12aaeac login after logout; 3d62b45 startup blocked**.
+  Replacement candidate acceptance PENDING; do not re-test ten cold starts yet.
 - Original Incident Verified: PENDING (v0.5.13 user incident FAIL).
 - User agreed to cover-upgrade the retained-data phone and perform 10
   force-stop cold starts once candidate APK is provided. The cross-launch log
@@ -296,16 +254,22 @@ Require an identical candidate certificate before retained-data cover-upgrade.
 
 ## Last success and next concrete actions
 
-Last success: new 3d62b45 APK downloaded, archive digest/signature/package/version/
-embedded source revision verified, distinct delivery file copied. Local 463 PASS;
-source and corrected-tool CI PASS. Remote stash/task commits intact.
+Last success: reproduced route cycle in source, new startup gate tests PASS
+including actual production routerProvider listener and Home/diagnostics routes;
+real-disk logger failure/disposal and native OAuth navigation-failure tests PASS.
+The 3d62b45 signed APK was verified as built correctly but **FAILED phone startup**.
 
-1. Deliver APK and record new phone tests using ANDROID-ACCEPTANCE.md.
-2. Cover-install new 3d62b45 candidate; separately test login after logout and
-   retained-account cold starts. Stop and export first failure, no repeated login.
-3. Publish final docs checkpoint on existing PR branch; source/tools CI PASS, PR stays draft.
-4. Analyze new device logs, including actual page evidence source and RFY terminal
-   outcomes; historical successful-but-unaccepted rfy-4 cause remains unconfirmed.
+1. Finish full format/analyze/test and save/push the startup source checkpoint.
+2. Verify its CI and forced dry-run signed candidate build on exact source SHA;
+   download and inspect certificate/package/revision/digest before delivery.
+3. Obtain user ADB startup logcat; identify the actual stalled native/OAuth stage,
+   distinguish it from the confirmed routing loop. Do not claim a circular native
+   lock or logger wait without evidence.
+4. Cover-install replacement preserving data; first verify Home/settings reachable,
+   then OAuth/account/Web/RFY login. Stop/export first failure. Ten retained-login
+   cold starts follow only after success. PR stays Draft; no formal release.
+5. Analyze new logs and maintain separate Android and Original Incident gates.
+   Historical successful-but-unaccepted rfy-4 cause remains unconfirmed.
 
 Network check: download processes had HTTP_PROXY/HTTPS_PROXY/ALL_PROXY unset,
 Windows ProxyEnable=0. Local ziyoumaoCore listens on 127.0.0.1:7892; explicit HTTP

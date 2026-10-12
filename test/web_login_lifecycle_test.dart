@@ -11,6 +11,7 @@ import 'package:daviewer/core/auth/web_session_status.dart';
 import 'package:daviewer/core/data/web_session.dart' as web;
 import 'package:daviewer/core/auth/webview_oauth_bridge.dart';
 import 'package:daviewer/core/diagnostics/app_logger.dart';
+import 'package:daviewer/core/l10n/app_strings.dart';
 import 'package:daviewer/core/runtime/app_runtime.dart';
 import 'package:daviewer/core/runtime/runtime_provider.dart';
 import 'package:daviewer/features/web_login/web_login_screen.dart';
@@ -37,6 +38,8 @@ final class _LifecyclePlatform extends InAppWebViewPlatform {
   String? username;
   WebUri url = WebUri('https://www.deviantart.com/users/login');
   final launches = <Uri>[];
+  bool failAuthorize = false;
+  bool failHome = false;
 
   bool activateOnce(Key? key) {
     final id = key?.toString() ?? '<none>';
@@ -251,6 +254,16 @@ final class _LifecycleController extends PlatformInAppWebViewController {
     WebUri? allowingReadAccessTo,
     Uri? iosAllowingReadAccessTo,
   }) async {
+    if ((platform.failAuthorize &&
+            urlRequest.url!.path == '/oauth2/authorize') ||
+        (platform.failHome && urlRequest.url!.path == '/')) {
+      platform.failAuthorize = false;
+      platform.failHome = false;
+      throw PlatformException(
+        code: 'native_load_failed',
+        message: 'synthetic-private-query',
+      );
+    }
     platform.url = urlRequest.url!;
     platform.launches.add(platform.url.uriValue);
   }
@@ -261,9 +274,9 @@ final class _LifecycleController extends PlatformInAppWebViewController {
   }
 }
 
-void main() {
+void registerLogoutLoginTest(String failure) {
   testWidgets(
-    'explicit logout then PKCE login restores account, closes and owns one RFY',
+    'explicit logout then PKCE login restores account, closes and owns one RFY: $failure',
     (tester) async {
       final directory = (await tester.runAsync(
         () => Directory.systemTemp.createTemp('daviewer-login-'),
@@ -355,7 +368,10 @@ void main() {
       expect(auth.state.oauthSignedIn, isFalse);
       expect(tokens.value, isNull);
       expect(cookies.values, isEmpty);
-      final platform = _LifecyclePlatform()..challenge = false;
+      final platform = _LifecyclePlatform()
+        ..challenge = false
+        ..failAuthorize = failure == 'authorize'
+        ..failHome = failure == 'home';
       InAppWebViewPlatform.instance = platform;
       final navigator = GlobalKey<NavigatorState>();
       await tester.pumpWidget(
@@ -385,6 +401,22 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 10));
       });
       await tester.pump();
+      if (failure == 'authorize') {
+        await tester.pump(const Duration(milliseconds: 350));
+        expect(
+          find.text(
+            strings(container.read(appLanguageProvider)).loginBrowserOpenFailed,
+          ),
+          findsOneWidget,
+        );
+        expect(endpoint.exchanges, 0);
+        final refresh = find.descendant(
+          of: find.byType(AppBar),
+          matching: find.byIcon(Icons.refresh),
+        );
+        await tester.tap(refresh);
+        await tester.pump();
+      }
       expect(platform.launches, hasLength(1));
       final authorize = platform.launches.single;
       expect(authorize.path, '/oauth2/authorize');
@@ -424,6 +456,28 @@ void main() {
       expect(auth.state.account?.username, 'artist');
       expect(auth.state.oauthSignedIn, isTrue);
       await tester.pump();
+      if (failure == 'home') {
+        await tester.pump(const Duration(milliseconds: 350));
+        expect(
+          find.text(
+            strings(container.read(appLanguageProvider)).loginBrowserOpenFailed,
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.text(strings(container.read(appLanguageProvider)).loginSuccess),
+          findsNothing,
+        );
+        expect(platform.url.path, '/oauth2/authorize');
+        final refresh = find.descendant(
+          of: find.byType(AppBar),
+          matching: find.byIcon(Icons.refresh),
+        );
+        await tester.tap(refresh);
+        await tester.pump();
+        expect(platform.url.path, '/');
+        expect(endpoint.exchanges, 1);
+      }
       expect(
         find.byType(WebLoginScreen),
         findsOneWidget,
@@ -497,9 +551,17 @@ void main() {
       expect(log, contains('oauth.session.saved'));
       expect(log, contains('reason=login_completed'));
       expect(log, contains('phase=accepted'));
+      if (failure != 'none') {
+        expect(log, contains('navigation failed source=oauth_'));
+        expect(log, isNot(contains('synthetic-private-query')));
+      }
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+}
+
+void main() {
+  registerLogoutLoginTest('none');
   testWidgets(
     'rebuild and challenge banner never recreate or reload the WebView',
     (tester) async {

@@ -20,7 +20,11 @@ import 'log_redactor.dart';
 /// logger.error('network', 'request failed', error, stackTrace);
 /// ```
 final class AppLogger implements DiagnosticSink {
-  AppLogger._(this._file, this._directory);
+  AppLogger._(this._file, this._directory) {
+    // File-open/stream errors also complete done with an error, independently
+    // of flush. Observe it immediately so diagnostics never add an uncaught error.
+    unawaited(_file.done.then<void>((_) {}).catchError(_reportFileFailure));
+  }
 
   static AppLogger? _instance;
 
@@ -41,6 +45,7 @@ final class AppLogger implements DiagnosticSink {
   int _errorCount = 0;
   Future<void> _flushTail = Future<void>.value();
   bool _disposed = false;
+  Future<void>? _disposeFuture;
 
   static Future<AppLogger> initialize({String? fileName}) async {
     if (_instance case final existing?) return existing;
@@ -162,21 +167,30 @@ final class AppLogger implements DiagnosticSink {
           _file.writeln(line);
           await _file.flush();
         })
-        .catchError((Object error) {
-          // A disk failure must not fail authentication or recursively log itself.
-          debugPrint('[logger] file write unavailable: ${error.runtimeType}');
-        });
+        .catchError(_reportFileFailure);
+  }
+
+  static void _reportFileFailure(Object error) {
+    // Do not include the exception text: filesystem paths may be sensitive.
+    debugPrint('[logger] file write unavailable: ${error.runtimeType}');
   }
 
   /// Barrier for all previously queued writes, including their flushes.
   /// Abrupt OS kills may still lose the last pending write.
   Future<void> flush() => _flushTail;
 
-  Future<void> dispose() async {
+  Future<void> dispose() => _disposeFuture ??= _close();
+
+  Future<void> _close() async {
     _disposed = true;
-    await flush();
-    await _file.close();
-    if (identical(_instance, this)) _instance = null;
+    try {
+      await flush();
+      await _file.close();
+    } on Object catch (error) {
+      _reportFileFailure(error);
+    } finally {
+      if (identical(_instance, this)) _instance = null;
+    }
   }
 }
 

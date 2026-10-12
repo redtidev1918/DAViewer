@@ -1,0 +1,3 @@
+import 'web_login_lifecycle_test.dart' show registerLogoutLoginTest;
+
+void main() => registerLogoutLoginTest('home');
