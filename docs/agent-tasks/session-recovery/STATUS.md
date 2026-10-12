@@ -29,6 +29,14 @@ Code/Release/Android/Original Incident verification must remain separate.
   older main `6c0ecd4`; it is NOT the new work produced on this repair branch.
   The current implementation is already in the working tree. Do not apply this
   stash to it. No stash was popped/deleted or reapplied. Preserve the backup.
+- Audited all seven stash file changes: earlier headless stop-count patch,
+  feed cache/hydration, recovery single-flight, bilingual stale-cache label,
+  removing login-triggered provider invalidation and request logs. These are
+  already represented in newer main/current candidate; the stashed untracked
+  cache differs from main only in formatting. Preserve the exact original Git
+  snapshot on remote branch `codex/backup-local-edits-before-update-2026-10-12`
+  as well, including the stash's untracked-file parent. Never merge that old
+  snapshot wholesale into main/current repair branch.
 - Original full task attachment remains readable:
   `C:\Users\12629\.codex\attachments\3a366fa0-7ba9-435a-99fa-078e774d52a1\已粘贴的文本.txt`.
   SPEC.md is a verbatim copy; verify SHA256 against the source if available.
@@ -135,6 +143,10 @@ accepted by Android; UI smoke still pending. No real USB device is connected.
 Hardware-rendered emulator subsequently exited with GL context restoration
 errors. Restarted the same AVD without wiping data using `-gpu software -no-audio`;
 ADB again reports emulator-5554 device. Rendering stability is still to verify.
+Observed baseline UI still on splash; process alive, connectivity HTTP 200,
+startup log reports explicit logout and anonymous local state. Do not count this
+as successful baseline smoke or retained-account incident evidence. Investigate
+candidate startup after installing its APK. Emulator has no confirmed login.
 
 New SDK tools 23 route sdkmanager to Android CLI and split semicolon package
 paths incorrectly via the wrapper. Successfully install images using:
@@ -145,6 +157,10 @@ Baseline APK downloaded from v0.5.13 release to
 `D:\Android\setup\DAViewer-v0.5.13.apk`; SHA256 verified against GitHub digest:
 `871ec4415a6ba402e005dd194ac61b72839ccfb54a16bcb56251abd43493105b`.
 This is the OLD baseline APK, not the new fix. Do not deliver it as candidate.
+Build-tools 36.0.0 installed for certificate inspection. Baseline APK passes
+apksigner verify; certificate SHA256:
+`686474b39fd91d20c1db3ce5bf6216ed8ab05ec7638f904251e0d108a34e7141`.
+Require an identical candidate certificate before retained-data cover-upgrade.
 
 ## PR, CI, release and acceptance
 
