@@ -127,9 +127,13 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
 
   final Ref _ref;
   final WebSessionStore _store = const WebSessionStore();
+  Future<void>? _cookieRestore;
+  int _identityEpoch = 0;
 
   Future<void> initialize() async {
+    final epoch = _identityEpoch;
     final saved = await _store.read();
+    if (!mounted || !_ref.mounted || epoch != _identityEpoch) return;
     state = WebSessionState(
       csrf: (saved['csrf'] as String?) ?? '',
       isLoggedIn: saved['isLoggedIn'] as bool?,
@@ -138,15 +142,30 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
     // The platform WebView store can lose its cookies across an app update;
     // re-inject the persisted copy so the signed-in web session (and with it
     // the personalized feed) survives without asking the user to sign in again.
-    await _restoreWebCookies(saved);
+    await restorePersistedCookies();
   }
 
   /// Re-attempts the persisted cookie restore after an app update has already
   /// lost the live WebView cookies. The startup restore can race the WebView/
   /// proxy readiness; website-only adapters call this again when they find no
   /// live cookie header instead of surfacing a generic feed error.
-  Future<void> restorePersistedCookies() async =>
-      _restoreWebCookies(await _store.read());
+  Future<void> restorePersistedCookies() {
+    final active = _cookieRestore;
+    if (active != null) return active;
+    late final Future<void> tracked;
+    tracked = _readAndRestore().whenComplete(() {
+      if (identical(_cookieRestore, tracked)) _cookieRestore = null;
+    });
+    _cookieRestore = tracked;
+    return tracked;
+  }
+
+  Future<void> _readAndRestore() async {
+    final epoch = _identityEpoch;
+    final saved = await _store.read();
+    if (!mounted || !_ref.mounted || epoch != _identityEpoch) return;
+    await _restoreWebCookies(saved);
+  }
 
   /// Re-injects the persisted deviantart.com cookies when the WebView store
   /// is missing cookies from the saved session. Restoring requires a
@@ -156,6 +175,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
   /// a preserved session during a flaky-network cold start — still restores,
   /// because the snapshot itself was identity-policed at write time.
   Future<void> _restoreWebCookies(Map<String, Object?> saved) async {
+    final epoch = _identityEpoch;
     final rawCookies = saved['cookies'];
     final cookies = parsePersistedCookies(rawCookies);
     if (cookies.isEmpty) return;
@@ -174,6 +194,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
     // no account yet, and skipping the re-injection entirely — which is
     // exactly the update scenario this restore exists for.
     await _ref.read(authControllerProvider.notifier).accountLoad;
+    if (!mounted || !_ref.mounted || epoch != _identityEpoch) return;
     final auth = _ref.read(authControllerProvider);
     if (!shouldRestoreSavedWebSession(
       oauthSignedIn: auth.status == AuthStatus.signedIn,
@@ -187,6 +208,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
     }
     try {
       final current = await _ref.read(webSessionProvider).readData();
+      if (!mounted || !_ref.mounted || epoch != _identityEpoch) return;
       final liveUsername = current?.username.trim() ?? '';
       if (liveUsername.isNotEmpty &&
           liveUsername.toLowerCase() != savedUsername.toLowerCase()) {
@@ -204,9 +226,11 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
           ?.cookieManager;
       if (cookieManager == null) return;
       for (final cookie in toRestore) {
+        if (!mounted || !_ref.mounted || epoch != _identityEpoch) return;
         await _setCookie(cookieManager, cookie);
       }
       final restored = await _ref.read(webSessionProvider).readData();
+      if (!mounted || !_ref.mounted || epoch != _identityEpoch) return;
       if (restored?.username.isNotEmpty == true) {
         AppLogger.instance.info(
           'web-session',
@@ -239,6 +263,9 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
     List<PersistedWebCookie>? capturedCookies,
   }) async {
     final loggedIn = username.isNotEmpty;
+    if (loggedIn && username.toLowerCase() != state.username.toLowerCase()) {
+      _identityEpoch++;
+    }
     final oauthUsername = _ref.read(authControllerProvider).account?.username;
     if (loggedIn &&
         oauthUsername != null &&
@@ -538,6 +565,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
   }
 
   Future<void> clear() async {
+    _identityEpoch++;
     state = const WebSessionState(isLoggedIn: false);
     await _store.clear(reason: 'explicit_logout');
   }

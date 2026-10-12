@@ -39,6 +39,12 @@ machine cannot produce the required evidence.
 
 ## Evidence still required before calling the architecture closed
 
+2026-10-12: v0.5.13 failed the original Android cold-start incident despite its
+automated checks. REG-018/019 describe earlier coverage, not closure of that
+incident. See [REG-021](021-android-session-recovery.md) for the shared observer,
+recovery transaction, RFY adoption policy and cross-launch log export; device
+acceptance remains PENDING.
+
 Headless probe and cache: see [REG-018](018-headless-webview-second-navigation.md),
 [REG-019](019-first-page-request-ownership.md), [REG-020](020-personalized-feed-cache.md).
 Automated coverage includes the challenge-page stop sequence, request ownership

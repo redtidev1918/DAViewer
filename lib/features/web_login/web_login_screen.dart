@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -11,6 +10,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/auth/auth_controller.dart';
 import '../../core/auth/auth_state.dart';
 import '../../core/auth/web_session_controller.dart';
+import '../../core/auth/browser_session_observer.dart';
+import '../../core/auth/web_session_refresher.dart'
+    show webSessionRefresherProvider;
 import '../../core/auth/web_session_platform.dart';
 import '../../core/auth/web_session_status.dart';
 import '../../core/auth/webview_oauth_bridge.dart';
@@ -44,6 +46,9 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
   );
 
   InAppWebViewController? _controller;
+  BrowserSessionObserver? _sessionObserver;
+  bool _homeNavigationRequested = false;
+  late final WebSessionStatusController _sessionStatus;
   StreamSubscription<Uri>? _launchSub;
   Uri? _pendingAuthUri;
   bool _loading = true;
@@ -63,6 +68,8 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
   void initState() {
     super.initState();
     AppLogger.instance.info('webview', 'login screen created');
+    _sessionStatus = ref.read(webSessionStatusProvider.notifier);
+    unawaited(ref.read(webSessionRefresherProvider).yieldToVisible());
     _authController = ref.read(authControllerProvider.notifier);
     final bridge = _bridge;
     if (bridge != null) {
@@ -74,6 +81,7 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
     // auto-start the OAuth authorize so it completes in this same WebView.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
+      _sessionStatus.beginInteractiveRecovery();
       final auth = ref.read(authControllerProvider);
       if (!auth.oauthSignedIn) {
         // A stale transaction from an earlier login visit must not block the
@@ -90,6 +98,9 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
 
   @override
   void dispose() {
+    _reportSeq++;
+    _sessionObserver?.dispose();
+    _sessionStatus.endInteractiveRecovery();
     unawaited(_launchSub?.cancel());
     AppLogger.instance.info('webview', 'login screen disposed');
     super.dispose();
@@ -111,18 +122,23 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
   /// because a plain HTTP client is rejected by deviantart.com's bot filter.
   Future<void> _reportWebSession({
     bool serverConfirmedNavigation = false,
+    BrowserSessionEvidence? evidence,
   }) async {
     final controller = _controller;
     if (controller == null) return;
     final seq = ++_reportSeq;
     try {
-      final raw = await controller.evaluateJavascript(
-        source: "JSON.stringify({csrf: window.__CSRF_TOKEN__ || ''})",
-      );
-      if (seq != _reportSeq) return; // a newer report superseded this one
-      if (raw is! String || raw.isEmpty) return;
-      final data = jsonDecode(raw) as Map<String, dynamic>;
-      final csrf = (data['csrf'] as String?) ?? '';
+      final page =
+          evidence ??
+          BrowserSessionEvidence.decode(
+            await controller.evaluateJavascript(
+              source: browserSessionEvidenceScript,
+            ),
+          );
+      if (!mounted || seq != _reportSeq || page.blocked || page.challenge) {
+        return;
+      }
+      final csrf = page.csrf;
       if (csrf.isEmpty) {
         AppLogger.instance.warning(
           'webview',
@@ -136,7 +152,24 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
       // of the page's __INITIAL_STATE__, which the login/authorize pages do
       // not populate reliably.
       final sessionData = await ref.read(webSessionProvider).readData();
-      final username = sessionData?.username ?? '';
+      if (!mounted || seq != _reportSeq) return;
+      final username = page.username == 'anonymous' ? '' : page.username ?? '';
+      if (username.isEmpty) {
+        // Cookie is only a candidate: explicitly navigate to home once to
+        // collect page identity, never treat Cookie + CSRF as confirmation.
+        final url = await controller.getUrl();
+        if (!mounted || seq != _reportSeq) return;
+        if (!_homeNavigationRequested &&
+            sessionData?.username.isNotEmpty == true &&
+            url?.host == 'www.deviantart.com' &&
+            url!.path.startsWith('/users/login')) {
+          _homeNavigationRequested = true;
+          await controller.loadUrl(
+            urlRequest: URLRequest(url: WebUri(_homeUri.toString())),
+          );
+        }
+        return;
+      }
       final isLoggedIn = username.isNotEmpty;
       AppLogger.instance.info(
         'webview',
@@ -150,6 +183,11 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
             username: username,
             capturedCookies: sessionData?.cookies,
           );
+      if (!mounted ||
+          seq != _reportSeq ||
+          ref.read(webSessionControllerProvider).username != username) {
+        return;
+      }
       AppLogger.instance.info('webview', 'web session reported to controller');
       // A redirect from /users/login to the signed-in home page is the
       // server's own verification that the cookie is valid. An extra HTTP
@@ -164,9 +202,10 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
         } else {
           final firstConfirmation = !_serverConfirmedWebSession;
           _serverConfirmedWebSession = true;
-          ref
-              .read(webSessionStatusProvider.notifier)
-              .markHealthy(serverUsername: username);
+          if (firstConfirmation) {
+            _sessionStatus.markHealthy(serverUsername: username);
+            _sessionObserver?.dispose();
+          }
           // Never invalidate personalizedFeedProvider here: the feed already
           // recovers through the healthy-transition listener in home_providers
           // (recoverInitialPage), and an account switch recreates the provider
@@ -343,7 +382,9 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                     // challenge into an automatic reload loop.
                     key: const ValueKey('web-login-webview'),
                     initialUrlRequest: URLRequest(
-                      url: WebUri(_loginUri.toString()),
+                      url: WebUri(
+                        (auth.oauthSignedIn ? _homeUri : _loginUri).toString(),
+                      ),
                     ),
                     initialSettings: InAppWebViewSettings(
                       javaScriptEnabled: true,
@@ -361,6 +402,44 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                     onWebViewCreated: (controller) {
                       AppLogger.instance.info('webview', 'controller created');
                       _controller = controller;
+                      _sessionObserver = BrowserSessionObserver(
+                        read: () async {
+                          final url = await controller.getUrl();
+                          if (url?.host != 'www.deviantart.com' ||
+                              url?.scheme != 'https') {
+                            return const BrowserSessionEvidence();
+                          }
+                          return BrowserSessionEvidence.decode(
+                            await controller.evaluateJavascript(
+                              source: browserSessionEvidenceScript,
+                            ),
+                          );
+                        },
+                        onEvidence: (page) {
+                          if (!mounted) return;
+                          AppLogger.instance.info(
+                            'webview',
+                            'browser recoveryId=${_sessionStatus.recoveryId} host=visible classification=${page.classification} csrfPresent=${page.csrf.isNotEmpty}',
+                          );
+                          if (page.blocked) {
+                            _sessionStatus.markLocked();
+                            setState(() => _challengeBlocked = true);
+                            return;
+                          }
+                          unawaited(
+                            _reportWebSession(
+                              serverConfirmedNavigation: page.hasIdentity,
+                              evidence: page,
+                            ),
+                          );
+                        },
+                        onDeadline: () {
+                          AppLogger.instance.info(
+                            'webview',
+                            'browser recoveryId=${_sessionStatus.recoveryId} host=visible completed reason=deadline',
+                          );
+                        },
+                      )..start();
                       final pending = _pendingAuthUri;
                       if (pending != null) {
                         _pendingAuthUri = null;
@@ -394,6 +473,8 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                           return NavigationActionPolicy.ALLOW;
                         },
                     onLoadStart: (controller, url) {
+                      _reportSeq++;
+                      _sessionObserver?.navigationStarted();
                       _navSeq += 1;
                       AppLogger.instance.info(
                         'webview',
@@ -417,11 +498,22 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                       final uri = url;
                       if (uri != null && uri.host == 'www.deviantart.com') {
                         unawaited(_detectChallenge(controller));
-                        unawaited(
-                          _reportWebSession(
-                            serverConfirmedNavigation: uri.path == '/',
-                          ),
-                        );
+                        if (_sessionObserver?.isDisposed == true &&
+                            !_serverConfirmedWebSession) {
+                          _sessionObserver?.restart();
+                        } else {
+                          unawaited(_sessionObserver?.sample());
+                        }
+                      }
+                    },
+                    onUpdateVisitedHistory: (controller, url, isReload) {
+                      _reportSeq++;
+                      _sessionObserver?.navigationStarted();
+                      if (_sessionObserver?.isDisposed == true &&
+                          !_serverConfirmedWebSession) {
+                        _sessionObserver?.restart();
+                      } else {
+                        unawaited(_sessionObserver?.sample());
                       }
                     },
                     onProgressChanged: (controller, progress) {

@@ -349,6 +349,48 @@ void main() {
     expect(container.read(artworkStoreProvider)['12345'], isNull);
   });
 
+  test('verified same-account recovery adopts a successful in-flight response without second RFY', () async {
+    final gate = Completer<void>();
+    final entered = Completer<void>();
+    final cookies = _FakeCookieManager();
+    final rfy = _RfyAdapter()
+      ..gate = gate.future
+      ..onFetch = entered.complete;
+    final container = feedContainer(rfy, _HomeProbeAdapter(), cookies: cookies);
+    final feed = container.read(personalizedFeedProvider.notifier);
+    final pending = feed.refresh();
+    await entered.future;
+    cookies.csrfCookie = 'verified-rotation';
+    container
+        .read(webSessionStatusProvider.notifier)
+        .markHealthy(serverUsername: 'artist');
+    final joined = feed.refresh();
+    gate.complete();
+    await Future.wait([pending, joined]);
+    expect(container.read(personalizedFeedProvider).items, hasLength(1));
+    expect(container.read(artworkStoreProvider)['12345'], isNotNull);
+    expect(rfy.calls, 1);
+  });
+
+  test('account epoch changes invalidate away-and-back responses', () async {
+    final gate = Completer<void>();
+    final entered = Completer<void>();
+    final rfy = _RfyAdapter()
+      ..gate = gate.future
+      ..onFetch = entered.complete;
+    final container = feedContainer(rfy, _HomeProbeAdapter());
+    final status = container.read(webSessionStatusProvider.notifier);
+    final pending = container.read(personalizedFeedProvider.notifier).refresh();
+    await entered.future;
+    final before = status.accountEpoch;
+    container.read(webSessionControllerProvider.notifier).state =
+        const WebSessionState(isLoggedIn: false);
+    expect(status.accountEpoch, greaterThan(before));
+    gate.complete();
+    await pending;
+    expect(container.read(artworkStoreProvider)['12345'], isNull);
+  });
+
   for (final anonymous in [true, false]) {
     test(
       anonymous

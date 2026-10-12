@@ -22,6 +22,20 @@ Choose **Sign in or create an account** and authorize on DeviantArt's official p
 
 See [Networking and proxy](networking.md) for WebView coverage. The sections below describe implementation and recovery rules.
 
+## Android recovery transaction (2026-10-12)
+
+The original Android incident still fails on v0.5.13. Source inspection confirms that HTTP parse failures were mapped to anonymous and CSRF-only headless observations could terminate early. The specific reason rfy-4 was discarded remains a device hypothesis.
+
+`WebSessionStatusController` owns recovery transactions, account epochs, generation guards and single-flight checks. Cookie restoration coalesces callers and fills missing cookies without replacing live rotations. OAuth, CSRF and cookies are candidates, never independent authentication proof.
+
+Both browser hosts use `BrowserSessionObserver`: load/history events and bounded sampling collect same-origin page identity through asynchronous initialization. Events never extend the original 20-second headless deadline. Explicit anonymous is distinct from missing or malformed state. Interactive recovery stops the hidden host and navigates a visible host with the same native Cookie Store. Native headless-to-visible conversion is supported by the plugin documentation but remains untested on the incident device; the implementation uses explicit navigation instead.
+
+`ArtworkFeedController` owns first-page requests. The RFY transport uses Dio cancellation and DAKit's public parser, avoiding the fetcher's hidden HTTP CSRF retry. Account epoch, ownership, health and generic-fallback checks decide acceptance. A newly verified same-account context may adopt a non-generic earlier response. An unverified cookie rotation remains conservatively rejected with an explicit reason. Cache behavior stays independent.
+
+Diagnostics exports the latest 20 launch files, up to 512 KiB per launch, with redaction and visible truncation markers. The 120-line display is only a preview. Serialized flushing reduces loss on force-stop, though an abrupt kill can still lose the final write. Candidate APKs record buildRevision; signing and the commit SHA must be checked before in-place upgrade.
+
+Existing status names remain compatible: healthy=verified, unverified/unavailable=inconclusive, anonymous=explicit signed-out evidence, locked=blocked. Recovery and interaction are transaction phases. See [REG-021](../regressions/021-android-session-recovery.md) for test evidence and device acceptance.
+
 ## One-entry sign-in contract
 
 The app exposes one **Sign in or create an account** action, which opens the

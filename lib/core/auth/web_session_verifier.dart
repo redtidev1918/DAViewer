@@ -84,9 +84,11 @@ final class WebSessionVerifier {
         );
         return const WebSessionVerification.unavailable();
       }
-      final username = usernameFromInitialState(html);
-      final result = username.isEmpty
+      final username = pageUsernameFromInitialState(html);
+      final result = username == 'anonymous'
           ? const WebSessionVerification.anonymous()
+          : username == null || username.isEmpty
+          ? const WebSessionVerification.unavailable()
           : WebSessionVerification.signedIn(username);
       AppLogger.instance.info(
         'auth',
@@ -105,25 +107,32 @@ final class WebSessionVerifier {
 
   /// Parses the username DeviantArt itself rendered for this cookie session.
   static String usernameFromInitialState(String html) {
+    final username = pageUsernameFromInitialState(html);
+    return username == 'anonymous' ? '' : username ?? '';
+  }
+
+  /// Null means absent or unparseable evidence; only the literal anonymous
+  /// identity is a server statement that the session is signed out.
+  static String? pageUsernameFromInitialState(String html) {
     final start = html.indexOf(_marker);
-    if (start < 0) return '';
+    if (start < 0) return null;
     final quoteStart = start + _marker.length;
     final quoteEnd = html.indexOf('");', quoteStart);
-    if (quoteEnd < 0) return '';
+    if (quoteEnd < 0) return null;
     final escaped = html.substring(quoteStart, quoteEnd);
     try {
       final inner = jsonDecode('"$escaped"') as String;
       final state = jsonDecode(inner);
-      if (state is! Map) return '';
+      if (state is! Map) return null;
       final session = state['@publicSession'];
-      if (session is! Map) return '';
+      if (session is! Map) return null;
       final user = session['user'];
-      if (user is! Map) return '';
+      if (user is! Map) return null;
       final username = user['username'];
-      if (username is! String || username == 'anonymous') return '';
+      if (username is! String) return null;
       return username.trim();
     } on FormatException {
-      return '';
+      return null;
     }
   }
 }

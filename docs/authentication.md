@@ -19,12 +19,26 @@ DAViewer 只有一个用户身份：官方 DeviantArt OAuth 会话。应用既�
 
 代理覆盖范围见 [网络与代理](networking.md)。下面说明会话实现与恢复规则。
 
+## Android 恢复事务（2026-10-12 修正）
+
+v0.5.13 的 Android 原始故障仍未通过实机验收。源码确认 HTTP 解析失败被归类为匿名、Headless 在只有 CSRF 时提前结束；`rfy-4` 的实际废弃原因仍需要候选版日志验证，不能从现有日志确定。
+
+`WebSessionStatusController` 是恢复事务协调器：冷启动、响应信号、前台恢复和 Feed 的上下文刷新共享 single-flight。它管理 `recoveryId`、`accountEpoch` 和 generation；账号变化使旧结果失效。Cookie 恢复归并并保留现有有效 Cookie，不以 Cookie、OAuth 或 CSRF 单独授予健康状态。
+
+后台及可见 WebView 使用 `BrowserSessionObserver`：加载、历史导航和有界采样收集同源页面身份，20 秒总预算不随事件延长。CSRF 已有但身份尚未初始化时继续观察；只有页面明确 `anonymous` 才是匿名证据，缺失/解析失败为不确定。人工恢复停止隐藏浏览器，使用共享原生 Cookie Store 和显式首页导航；没有宣称原生实例转换已在 Android 验证。可见页面的用户导航可以打开新的有界观察窗口。
+
+推荐的请求所有权在 `ArtworkFeedController`；明确区分初次加载、会话恢复、用户刷新、前台刷新、凭据上下文变化和分页。RFY 使用可取消的 Dio 传输及 DAKit 公共解析器，避免 fetcher 内的隐式 HTTP CSRF 重试。成功响应只有在账号 epoch、请求所有者和健康状态仍有效时才能接受；已确认的同账号恢复可以接收非通用旧响应。未经确认的 Cookie 变化仍安全废弃，记录 `credentials_changed`。这条保守规则需要真机证据后再缩小。
+
+诊断页的导出按钮合并最近 20 次启动日志，每次最多 512 KiB，标明截断并脱敏；界面上的最后 120 行仍只是一段预览。每次启动独立文件不覆盖旧日志。日志及时串行刷盘，但不能保证突然断电/强杀瞬间的最后一条写入。日志带 buildRevision；候选 APK 的签名和该 SHA 必须核验后才用于覆盖升级。
+
+状态对应：unknown=尚未恢复，healthy=verified，unverified/unavailable=inconclusive，anonymous=明确匿名，locked=blocked。恢复中与人工交互属于事务阶段，保留已有 UI 状态契约。流程与验收见 [REG-021](regressions/021-android-session-recovery.md)。
+
 ## 单入口登录契约
 
 应用只暴露一个 **登录或创建账号** 操作，它打开内嵌登录界面：
 
 1. DAKit 创建一个 OAuth/PKCE 事务。
-2. DAViewer 以内嵌 WebView 加载官方登录页，并使用桌面 User-Agent ，因为 DeviantArt 的移动登录页不提供桌面页上的一键 Google/Apple 按钮。
+2. DAViewer 以内嵌 WebView 加载官方登录页；Android 保留系统 WebView User-Agent，桌面平台使用桌面 User-Agent。
 3. 账号登录、注册、找回密码以及当前提供的全部服务商（DeviantArt、Google、Apple、Facebook）都由 DeviantArt 页面负责。应用内没有单独的「社交登录」路径。
 4. `dakit://oauth/callback` 在 WebView 内被拦截并完成同一事务。WebView 保留其 Cookie 与 CSRF token，因此这一次登录同时建立了后续个性化 `rfy` 信息流与合集适配器所需的网页会话，不再要求第二次登录。
 
@@ -32,7 +46,7 @@ DAViewer 只有一个用户身份：官方 DeviantArt OAuth 会话。应用既�
 避免用户在“上一次登录已挂在 isLoggingIn”的状态下只刷新了网页 Cookie，
 随后官方 API 页面仍然显示未登录。
 
-应用不模拟服务商按钮点击、不内嵌密码表单、不从系统浏览器拷贝 Cookie，也不探测人机验证的 DOM。它只设置桌面 User-Agent，以便返回完整的桌面登录页。Google、Apple、Facebook 仍可能在自己的页面内展示账号选择或 CAPTCHA 校验；那属于服务商页面，应用不去绕过。
+应用不模拟服务商按钮点击、不内嵌密码表单、不从系统浏览器拷贝 Cookie。浏览器只收集挑战/锁定状态以解释恢复结果，不尝试绕过校验。Google、Apple、Facebook 仍可能展示账号选择或 CAPTCHA，须由用户完成。
 
 ## 会话角色
 

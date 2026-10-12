@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dakit_flutter/dakit_flutter.dart';
 import 'package:daviewer/core/auth/web_session_refresher.dart';
@@ -9,7 +10,23 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-class _Controller extends Fake implements InAppWebViewController {}
+class _Controller extends Fake implements InAppWebViewController {
+  String? username;
+  String csrf = '';
+  bool challenge = false;
+  @override
+  Future<WebUri?> getUrl() async => WebUri('https://www.deviantart.com/');
+  @override
+  Future<dynamic> evaluateJavascript({
+    required String source,
+    ContentWorld? contentWorld,
+  }) async => jsonEncode({
+    'origin': 'https://www.deviantart.com',
+    'username': username,
+    'csrf': csrf,
+    'challenge': challenge,
+  });
+}
 
 class _Browser extends PlatformHeadlessInAppWebView {
   _Browser(super.params) : super.implementation();
@@ -85,6 +102,83 @@ void main() {
       InAppWebViewPlatform.instance = originalPlatform;
     }
   });
+
+  testWidgets(
+    'native host waits past a CSRF-only stop and observes asynchronous identity',
+    (tester) async {
+      var finished = false;
+      final probe = container.read(webSessionRefresherProvider).refresh();
+      unawaited(probe.then((_) => finished = true));
+      await tester.pump();
+      final browser = platform.browsers.single;
+      final page = _Controller()..csrf = 'token';
+      browser.params.onWebViewCreated?.call(page);
+      browser.params.onLoadStop?.call(
+        page,
+        WebUri('https://www.deviantart.com/'),
+      );
+      await tester.pump();
+      expect(finished, isFalse);
+      page.username = 'artist';
+      await tester.pump(const Duration(milliseconds: 500));
+      expect((await probe).username, 'artist');
+    },
+  );
+
+  testWidgets(
+    'native host tolerates more than three challenge stops and SPA recovery',
+    (tester) async {
+      var finished = false;
+      final probe = container.read(webSessionRefresherProvider).refresh();
+      unawaited(probe.then((_) => finished = true));
+      await tester.pump();
+      final browser = platform.browsers.single;
+      final page = _Controller()..challenge = true;
+      browser.params.onWebViewCreated?.call(page);
+      for (var i = 0; i < 5; i++) {
+        browser.params.onLoadStart?.call(
+          page,
+          WebUri('https://www.deviantart.com/'),
+        );
+        browser.params.onLoadStop?.call(
+          page,
+          WebUri('https://www.deviantart.com/'),
+        );
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(finished, isFalse);
+      }
+      page.challenge = false;
+      page.username = 'artist';
+      browser.params.onUpdateVisitedHistory?.call(
+        page,
+        WebUri('https://www.deviantart.com/'),
+        false,
+      );
+      await tester.pump();
+      expect((await probe).outcome, WebSessionProbeOutcome.confirmed);
+    },
+  );
+
+  testWidgets(
+    'visible handoff releases hidden callers and rejects late page identity',
+    (tester) async {
+      final host = container.read(webSessionRefresherProvider);
+      final probe = host.refresh();
+      await tester.pump();
+      final browser = platform.browsers.single;
+      final page = _Controller();
+      browser.params.onWebViewCreated?.call(page);
+      unawaited(host.yieldToVisible());
+      expect((await probe).outcome, WebSessionProbeOutcome.unavailable);
+      page.username = 'artist';
+      browser.params.onLoadStop?.call(
+        page,
+        WebUri('https://www.deviantart.com/'),
+      );
+      await tester.pump(const Duration(seconds: 21));
+      expect(platform.browsers, hasLength(1));
+    },
+  );
 
   testWidgets('startup timeout returns before a stalled browser teardown', (
     tester,
