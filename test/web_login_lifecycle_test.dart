@@ -343,7 +343,10 @@ void registerLogoutLoginTest(String failure) {
         ],
       );
       addTearDown(() async {
-        await tester.runAsync(oauth.authorization.cancelPending);
+        await _runWithWidgetMicrotasks(
+          tester,
+          oauth.authorization.cancelPending,
+        );
         await tester.pump(const Duration(milliseconds: 5));
         await tester.runAsync(() async {
           container.dispose();
@@ -355,6 +358,9 @@ void registerLogoutLoginTest(String failure) {
         });
       });
       final auth = container.read(authControllerProvider.notifier);
+      // Settle constructor microtasks in the widget zone before awaiting
+      // real filesystem work in runAsync. SDK persistence is serialized.
+      await tester.pump();
       await oauth.session.save(
         AuthTokens(
           accessToken: 'synthetic-old-token',
@@ -364,7 +370,7 @@ void registerLogoutLoginTest(String failure) {
         ),
       );
       auth.state = const AuthState(status: AuthStatus.signedIn);
-      await tester.runAsync(auth.logout);
+      await _runWithWidgetMicrotasks(tester, auth.logout);
       expect(auth.state.oauthSignedIn, isFalse);
       expect(tokens.value, isNull);
       expect(cookies.values, isEmpty);
@@ -433,6 +439,23 @@ void registerLogoutLoginTest(String failure) {
           'code': 'synthetic-code',
         },
       );
+      if (failure == 'web_first') {
+        cookies.values.addAll({
+          'userinfo': '{"username":"artist"}',
+          'auth': 'synthetic-cookie',
+        });
+        platform.username = 'artist';
+        platform.url = WebUri('https://www.deviantart.com/');
+        platform.params!.onLoadStop!(platform.controller!, platform.url);
+        await tester.pump(const Duration(milliseconds: 10));
+        await tester.runAsync(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        });
+        expect(
+          container.read(webSessionControllerProvider).isLoggedIn,
+          isFalse,
+        );
+      }
       await tester.runAsync(() async {
         final policy = await platform.params!.shouldOverrideUrlLoading!(
           platform.controller!,
@@ -478,17 +501,19 @@ void registerLogoutLoginTest(String failure) {
         expect(platform.url.path, '/');
         expect(endpoint.exchanges, 1);
       }
-      expect(
-        find.byType(WebLoginScreen),
-        findsOneWidget,
-      ); // OAuth alone cannot close
-      cookies.values.addAll({
-        'userinfo': '{"username":"artist"}',
-        'auth': 'synthetic-cookie',
-      });
-      platform.username = 'artist';
-      platform.url = WebUri('https://www.deviantart.com/');
-      platform.params!.onLoadStop!(platform.controller!, platform.url);
+      if (failure != 'web_first') {
+        expect(
+          find.byType(WebLoginScreen),
+          findsOneWidget,
+        ); // OAuth alone cannot close
+        cookies.values.addAll({
+          'userinfo': '{"username":"artist"}',
+          'auth': 'synthetic-cookie',
+        });
+        platform.username = 'artist';
+        platform.url = WebUri('https://www.deviantart.com/');
+        platform.params!.onLoadStop!(platform.controller!, platform.url);
+      }
       await tester.runAsync(() async {
         for (
           var i = 0;
@@ -551,13 +576,45 @@ void registerLogoutLoginTest(String failure) {
       expect(log, contains('oauth.session.saved'));
       expect(log, contains('reason=login_completed'));
       expect(log, contains('phase=accepted'));
-      if (failure != 'none') {
+      if (failure == 'authorize' || failure == 'home') {
         expect(log, contains('navigation failed source=oauth_'));
         expect(log, isNot(contains('synthetic-private-query')));
       }
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+}
+
+Future<void> _runWithWidgetMicrotasks(
+  WidgetTester tester,
+  Future<void> Function() action,
+) async {
+  late Future<void> operation;
+  await tester.runAsync(() async {
+    operation = action();
+  });
+  var settled = false;
+  Object? failure;
+  unawaited(
+    operation.then(
+      (_) => settled = true,
+      onError: (Object error) {
+        failure = error;
+        settled = true;
+      },
+    ),
+  );
+  // Native/filesystem futures use real I/O; SDK persistence queues also carry
+  // widget-zone continuations. Advance both without blocking the widget zone
+  // inside an awaited runAsync action.
+  for (var i = 0; i < 1000 && !settled; i++) {
+    await tester.pump(const Duration(milliseconds: 5));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 5)),
+    );
+  }
+  expect(settled, isTrue, reason: 'the mixed I/O/widget operation must settle');
+  if (failure != null) throw failure!;
 }
 
 void main() {

@@ -10,6 +10,8 @@ The active long-term task is Android personalized-feed session recovery and RFY
 request ownership. Read `docs/agent-tasks/session-recovery/SPEC.md` and
 `docs/agent-tasks/session-recovery/STATUS.md` before starting/resuming work and
 after context compaction. Verify actual Git status, HEAD and stash before edits.
+The authorized joint DAKit scope and integration checkpoints are in
+`docs/agent-tasks/session-recovery/SDK-INTEGRATION.md`; read it when present.
 
 Keep this task primary through compiler, dependency, SDK, proxy and emulator
 subtasks. Do not restart completed work or blindly apply the retained old stash.

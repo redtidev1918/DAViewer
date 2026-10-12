@@ -204,34 +204,38 @@ packages:
   dakit_api:
     dependency: "direct main"
     description:
-      name: dakit_api
-      sha256: "5b8b994556d4559e5c5ae733963aa4003a105f0a409d72a81bdb32c670f9be96"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
+      path: "packages/dakit_api"
+      ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      resolved-ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      url: "https://github.com/redtidev1918/DAKit.git"
+    source: git
     version: "1.1.1"
   dakit_core:
     dependency: "direct main"
     description:
-      name: dakit_core
-      sha256: "70c729e5dc654345540378e0b00307e36ca4e7b48bbb855e1b46851067de9ef5"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
+      path: "packages/dakit_core"
+      ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      resolved-ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      url: "https://github.com/redtidev1918/DAKit.git"
+    source: git
     version: "1.1.0"
   dakit_flutter:
     dependency: "direct main"
     description:
-      name: dakit_flutter
-      sha256: "5f283084bb9fbcfc12f1a976be39c8e3b9daf0bf4043dd0ce40ac575e04ac222"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
+      path: "packages/dakit_flutter"
+      ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      resolved-ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      url: "https://github.com/redtidev1918/DAKit.git"
+    source: git
     version: "1.0.0"
   dakit_web:
     dependency: "direct main"
     description:
-      name: dakit_web
-      sha256: a706f7aba81b5627d9df07e71752ac947abb0d88704327ced2ce1a06f5d4f629
-      url: "https://pub.flutter-io.cn"
-    source: hosted
+      path: "packages/dakit_web"
+      ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      resolved-ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      url: "https://github.com/redtidev1918/DAKit.git"
+    source: git
     version: "0.2.5"
   dbus:
     dependency: transitive
@@ -1135,4 +1139,4 @@ packages:
     version: "3.1.4"
 sdks:
   dart: ">=3.13.1 <4.0.0"
-  flutter: ">=3.47.1"
+  flutter: ">=3.47.0"

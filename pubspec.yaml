@@ -42,6 +42,27 @@ dev_dependencies:
 # changed PUB_HOSTED_URL forces) on the version the committed lock uses.
 dependency_overrides:
   html: 0.15.6
+  # Joint candidate only; replace with verified published SDK versions before release.
+  dakit_core:
+    git:
+      url: https://github.com/redtidev1918/DAKit.git
+      ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      path: packages/dakit_core
+  dakit_api:
+    git:
+      url: https://github.com/redtidev1918/DAKit.git
+      ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      path: packages/dakit_api
+  dakit_web:
+    git:
+      url: https://github.com/redtidev1918/DAKit.git
+      ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      path: packages/dakit_web
+  dakit_flutter:
+    git:
+      url: https://github.com/redtidev1918/DAKit.git
+      ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      path: packages/dakit_flutter
 
 flutter:
   uses-material-design: true

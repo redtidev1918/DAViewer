@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 
 import 'package:daviewer/core/diagnostics/app_logger.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +7,50 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'native support-directory exception falls back without blocking startup',
+    () async {
+      AppLogger.resetForTest();
+      const channel = MethodChannel('plugins.flutter.io/path_provider');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            channel,
+            (_) async => throw PlatformException(code: 'unavailable'),
+          );
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+      });
+      final logger = await AppLogger.initialize();
+      logger.info('app', 'startup continues');
+      await logger.flush();
+      expect(AppLogger.isInitialized, isTrue);
+      await logger.dispose();
+    },
+  );
+
+  testWidgets(
+    'hung native support-directory lookup cannot block startup forever',
+    (tester) async {
+      AppLogger.resetForTest();
+      const channel = MethodChannel('plugins.flutter.io/path_provider');
+      final never = Completer<String?>();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (_) => never.future);
+      final initializing = AppLogger.initialize();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 5));
+      final logger = await initializing;
+      expect(AppLogger.isInitialized, isTrue);
+      logger.info('app', 'startup continues after timeout');
+      await logger.flush();
+      await logger.dispose();
+      never.complete(null);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    },
+  );
 
   test(
     'failed file open does not poison callbacks, flush or disposal',

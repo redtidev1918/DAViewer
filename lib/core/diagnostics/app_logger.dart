@@ -47,25 +47,55 @@ final class AppLogger implements DiagnosticSink {
   bool _disposed = false;
   Future<void>? _disposeFuture;
 
+  /// Maximum time any single initialization stage may take before the logger
+  /// falls back to the console-only sink. Startup must never stall or crash
+  /// before runApp because the path provider or the filesystem is slow or
+  /// broken.
+  static const _initTimeout = Duration(seconds: 5);
+
   static Future<AppLogger> initialize({String? fileName}) async {
     if (_instance case final existing?) return existing;
-    final support = await getApplicationSupportDirectory();
-    final logsDir = Directory('${support.path}${Platform.pathSeparator}logs');
-    await logsDir.create(recursive: true);
-    final name =
-        fileName ??
-        'daviewer-${DateTime.now().toIso8601String().replaceAll(':', '-')}.log';
-    final file = File('${logsDir.path}${Platform.pathSeparator}$name');
-    final sink = file.openWrite(mode: FileMode.append);
-    final logger = AppLogger._(sink, logsDir);
-    _instance = logger;
-    logger.info('app', 'logger initialized: $name');
-    logger.info(
-      'app',
-      'buildRevision=${const String.fromEnvironment('DAVIEWER_REVISION', defaultValue: 'local')}',
-    );
-    await logger.flush();
-    return logger;
+    try {
+      final support = await getApplicationSupportDirectory().timeout(
+        _initTimeout,
+      );
+      final logsDir = Directory('${support.path}${Platform.pathSeparator}logs');
+      await logsDir.create(recursive: true).timeout(_initTimeout);
+      final name =
+          fileName ??
+          'daviewer-${DateTime.now().toIso8601String().replaceAll(':', '-')}.log';
+      final file = File('${logsDir.path}${Platform.pathSeparator}$name');
+      final sink = file.openWrite(mode: FileMode.append);
+      final logger = AppLogger._(sink, logsDir);
+      _instance = logger;
+      logger.info('app', 'logger initialized: $name');
+      logger.info(
+        'app',
+        'buildRevision=${const String.fromEnvironment('DAVIEWER_REVISION', defaultValue: 'local')}',
+      );
+      await logger.flush().timeout(_initTimeout);
+      return logger;
+    } on Object catch (error, stack) {
+      debugPrint('[logger] initialize failed: ${error.runtimeType}');
+      // Logger setup must never crash the app before runApp: fall back to the
+      // console-only sink so diagnostics still flow.
+      final fallback = AppLogger._(NullSink(), Directory.systemTemp);
+      fallback.warning(
+        'app',
+        'logger initialize failed; using console-only fallback',
+        error,
+        stack,
+      );
+      _instance = fallback;
+      return fallback;
+    }
+  }
+
+  /// Resets the singleton so tests can exercise a fresh [initialize].
+  @visibleForTesting
+  static void resetForTest() {
+    _instance = null;
+    _fallback = null;
   }
 
   /// Directory containing rotated log files (exposed for UI/debugging).

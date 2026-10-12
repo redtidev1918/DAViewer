@@ -50,6 +50,29 @@ Code/Release/Android/Original Incident verification must remain separate.
 
 ## Current phase
 
+### 2026-10-12 joint SDK integration (active; supersedes next-action list below)
+
+Read SDK-INTEGRATION.md for both exact repository revisions, source ownership,
+upstream reproduced defects and joint release sequence. Latest SDK implementation
+bbf52bd: **245 full tests PASS**, analyze/format/diff PASS; four publish dry-runs
+zero warnings. SDK 7004b7a (docs only after bbf52bd) CI 38214466356 PASS including
+Android, Windows/MSIX and macOS example builds. Draft PR #42 remains unmerged.
+DAViewer isolated integration on base 14797b3: **485 full tests PASS**, analyze PASS,
+changed-source format/diff PASS after all startup/logout/Web-first fixes. Main
+checkout advanced to aead827 and has another session's uncommitted edits: preserve.
+Candidate pubspec/lock reproducibly pin four Git packages to bbf52bd; no local path
+override is committed. Build rejects these Git overrides for non-dry-run release;
+replace with verified published versions following upstream release.
+Android API36 emulator upgraded to signed 14797b3 and reached Home/Settings in
+known anonymous/logout state. Authenticated OAuth/RFY and original phone evidence
+remain PENDING. New joint CI/candidate workflow prepared; builds not yet verified.
+Local Windows first build failed because native WebView requires missing NuGet CLI.
+Downloaded the Microsoft-signed official CLI (Authenticode Valid); retry with its
+directory on PATH. SDK/platform initialization timeouts are bounded and optional
+pre-runApp reads now catch exceptions too. Next: save/push this source checkpoint,
+run exact-SHA joint CI and signed three-platform candidate builds, inspect and run
+candidate autonomously. No merge or formal release yet; previous phone FAIL unchanged.
+
 ### 2026-10-12 active startup regression checkpoint
 
 - User reports immutable **3d62b45 Android startup acceptance: FAIL**: stuck at

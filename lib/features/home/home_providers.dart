@@ -453,18 +453,15 @@ Future<Page<Artwork>?> _tryFetchRfy(
       'in_flight',
       'transportId=$requestId-t$attempt transportReason=${attempt == 1 ? 'owner_request' : 'retry_after_failure'} cursor=${request.cursor == null ? 'initial' : 'pagination'}',
     );
-    // Own the physical transport. DAKit's fetch() includes an implicit HTTP
-    // CSRF retry; use its public parser so recovery stays with the orchestrator.
-    final response = await dio.get<Object?>(
-      'https://www.deviantart.com/_puppy/dabrowse/networkbar/rfy/deviations',
-      queryParameters: {
-        'csrf_token': csrf,
-        if (request.cursor != null) 'cursor': request.cursor,
-      },
-      options: webSessionOptions(cookieHeader),
+    // The SDK owns protocol/DTO parsing; the app retains physical request
+    // ownership and recovery. Disable the SDK's optional CSRF refresh retry.
+    final page = await RfyFeedFetcher(dio).fetch(
+      csrfToken: csrf,
+      cookieHeader: cookieHeader,
+      cursor: request.cursor,
       cancelToken: cancelToken,
+      retryInvalidCsrf: false,
     );
-    final page = RfyFeedFetcher.parseJson(response.data);
     // DeviantArt gates paid/blocked works by serving blurred Wix transforms
     // (e.g. `blur_30`) rather than an explicit feed field, so `gated` alone
     // can read 0 on a stream that still contains locked previews. Log both so
