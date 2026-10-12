@@ -15,15 +15,17 @@ Code/Release/Android/Original Incident verification must remain separate.
 - Workspace: `D:\Code\DAViewer`.
 - Branch: `codex/android-session-recovery` (independent from main).
 - Baseline main/HEAD before new commits: `3432842a97fbc1e2b4fb6a7e9fe1060d1d72b100`.
-- Latest implementation commit: `2e1069df7f49c0aa58fd2bfbb9b5d49a2d1d76e4`.
+- Latest implementation commit: `3d62b45a0466fdf817b7d6a1bdccc47edb6385a6`.
+  Previous architecture milestone: `2e1069df7f49c0aa58fd2bfbb9b5d49a2d1d76e4`.
 - Diagnostics milestone: `3c468a0d5cce6fd22c866eacf97d2746a6fea6c8`.
-- Last pushed memory checkpoint before this update: `cec0c049f5e2b235b6df20ff4a24299e7a99a6ca`.
+- Last pushed implementation/memory checkpoint before this update: `3d62b45a0466fdf817b7d6a1bdccc47edb6385a6`.
   This document's next commit follows it; use `git log -1` for current HEAD.
-- All current implementation and task files are committed on the repair branch.
+- Implementation is committed/pushed; acceptance guide, ADB/summary tools and
+  their tests are being saved in the following documentation/tool checkpoint.
   `.gitattributes` preserves the attachment's original CRLF without whitespace
   false positives. SPEC verbatim SHA256:
   `1b2ed96c28c3712e5c8f6ad5a0045995ffc5db0f529e75d714f732f2fdf7e824`.
-- Latest release: v0.5.13; main fetched; no open PRs at initial investigation.
+- Latest formal release remains v0.5.13. PR #96 is OPEN/draft.
 - Retained stash: `stash@{0}`, `backup-local-edits-before-update-2026-10-12`.
   It is the pre-update six tracked files plus an untracked feed cache, based on
   older main `6c0ecd4`; it is NOT the new work produced on this repair branch.
@@ -81,14 +83,25 @@ Code/Release/Android/Original Incident verification must remain separate.
   PENDING push. Release PENDING. PR #96 confirmed OPEN/draft.
 - Detailed failure/repair evidence: LOGIN-REGRESSION.md. Original 446 and
   intermediate 450 are superseded, not the final count.
-- Next: complete logout->OAuth bridge/PKCE->account/browser/feed regressions;
-  full format/analyze/test, commit and push on PR branch, CI + signed dry-run
-  candidate build, verify signer/hash, provide replacement APK/acceptance guide.
+- Login workflow regression is complete and preserved existing assertions.
+  The subsequent evidence-tool tests bring latest local total to **463 PASS**.
+  Format gate: 205 files, 0 changed; analyze: no issues. ADB mock verified explicit
+  serial/all arguments and first-failure stop; syntax PASS. No real phone was
+  controlled by that mock. Log organizer parsed the supplied failure attachment
+  into local redacted output at `D:\Android\setup\phone-login-failure-12aaeac-summary`.
+- CI on 3d62b45 PASS: Actions run 38197966964. Forced signed dry-run candidate
+  run 38197965496 is IN PROGRESS (all OS builds), version=0.5.13, dry_run=true,
+  force=true, repair=true. No merge/tag/formal release. Candidate must identify
+  immutable 3d62b45, not later docs-only commits.
+- Next: finish signed dry-run, verify APK signer/package/version/hash, deliver
+  replacement APK and ANDROID-ACCEPTANCE.md. Save/push this docs/tool checkpoint,
+  verify its CI, then await new phone evidence; investigate first failure directly.
   Never pass old APK or merge/publish before successful real phone evidence.
 
-Phase 0–3 implementation and Phase 4 automated regression complete locally.
-Preparing candidate APK, emulator smoke and real phone
-acceptance. Implementation remains a candidate, not proven incident closure.
+Current phase: regression remediation and new candidate delivery; Phase 0–3
+architecture work is retained, Phase 4 now includes explicit-logout login and
+file-backed diagnostic races. Real phone acceptance remains open. Implementation
+remains a candidate, not proven incident closure.
 The SDK/emulator installation is an authorized integration-test subtask.
 
 2026-10-12 follow-up audit started from clean e3f7971, draft PR #96 confirmed
@@ -168,15 +181,15 @@ catalog and 021-android-session-recovery.md.
 
 - Local Flutter 3.47.6 / Dart 3.13.5, existing SDK at `D:\flutter-sdk`.
   CI pins Flutter 3.47.1; runner analyze/test also PASS on commit 9eb7a61.
-- `dart format --output=none --set-exit-if-changed lib test`: PASS, 201 files,
+- `dart format --output=none --set-exit-if-changed lib test scripts/summarize-session-recovery.dart`: PASS, 205 files,
   0 changed (latest full check).
 - `flutter analyze --no-pub`: PASS, no issues (latest full check).
 - `flutter test --no-pub --dart-define=DAVIEWER_VERSION=0.5.13 --reporter=expanded`:
-  PASS, **446 tests**, latest full run, no failures.
+  PASS, **463 tests**, latest full run, no failures.
 - Earlier 443 PASS was a stage result; superseded by 446 after three native-host
   lifecycle tests. Do not report 443 as final.
 - `git diff --check`: PASS at pre-checkpoint snapshot.
-- Test output: `.session-test-run.log` (ignored local file; summary above is
+- Test output: `.session-followup-full.log` (ignored local file; summary above is
   the durable evidence). Targeted native-host lifecycle suite: 6 PASS.
 - Initial regression failures (now fixed without weakening assertions):
   widget-init Provider mutation, pagination unavailable context refresh losing
@@ -247,9 +260,9 @@ Require an identical candidate certificate before retained-data cover-upgrade.
   cover-upgrade without uninstall/data clearing; phone test remains necessary.
   Actions artifact 11723175164 (release-assets-0.5.13-0), seven-day retention.
 - Release: v0.5.13 untouched; signed candidate build verified; formal new release PENDING.
-- Code Verified: local PASS (446); runner analyze/test PASS.
+- Code Verified: local PASS (463); runner analyze/test PASS on implementation 3d62b45.
 - Release Verified: PENDING.
-- Android Verified: PENDING; emulator bootstrap only.
+- Android Verified: **FAIL for 12aaeac login after logout**; replacement candidate PENDING.
 - Original Incident Verified: PENDING (v0.5.13 user incident FAIL).
 - User agreed to cover-upgrade the retained-data phone and perform 10
   force-stop cold starts once candidate APK is provided. The cross-launch log
@@ -262,20 +275,17 @@ Require an identical candidate certificate before retained-data cover-upgrade.
 
 ## Last success and next concrete actions
 
-Last success: candidate release APK downloaded; signature matches production,
-version/package verified and SHA256 recorded. Remote stash backup and task
-memory remain intact. Emulator install attempt blocked by absent device.
+Last success: source fix 3d62b45 pushed; CI PASS, new full local 463 PASS; controlled
+logout/login callback/account/Web/feed flow and file logger regressions PASS.
+Acceptance guide and tools prepared. Remote stash backup and task memory intact.
 
-1. Deliver verified local candidate path to user for retained-data phone upgrade
-   and ten cold starts; export the cross-launch diagnostic archive afterward.
-2. `D:\Android\Sdk\platform-tools\adb.exe devices -l`; check boot, install
-   candidate on emulator-5554 preserving baseline data, launch app and smoke test.
-3. Review remaining native concurrency risks: a CookieManager write already
-   issued before logout can complete after epoch changes; sampler navigation
-   invalidates old reads but does not pause reads of an old document before
-   commit; recovery-completed logs need captured recoveryId for overlapping
-   transactions. These are audit items, not device-confirmed incident causes.
-4. Update acceptance matrix and proceed under release gates once evidence arrives.
+1. `gh run view 38197965496`: wait for candidate, download the Ubuntu artifact;
+   verify release signing against baseline, package/version and SHA256.
+2. Cover-install new 3d62b45 candidate; separately test login after logout and
+   retained-account cold starts. Stop and export first failure, no repeated login.
+3. Publish checkpoint/tools on the existing PR branch and confirm CI; PR stays draft.
+4. Analyze new device logs, including actual page evidence source and RFY terminal
+   outcomes; historical successful-but-unaccepted rfy-4 cause remains unconfirmed.
 
 Network check: download processes had HTTP_PROXY/HTTPS_PROXY/ALL_PROXY unset,
 Windows ProxyEnable=0. Local ziyoumaoCore listens on 127.0.0.1:7892; explicit HTTP
