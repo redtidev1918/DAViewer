@@ -77,3 +77,6 @@ session.json
 *.session
 *.git-credentials
 session-*/
+!docs/agent-tasks/session-recovery/
+!docs/agent-tasks/session-recovery/SPEC.md
+!docs/agent-tasks/session-recovery/STATUS.md
