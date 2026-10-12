@@ -42,9 +42,9 @@ The app exposes one **Sign in or create an account** action, which opens the
 embedded login screen:
 
 1. DAKit creates one OAuth/PKCE transaction.
-2. DAViewer loads the official login page in its embedded WebView with a desktop
-   User-Agent, because DeviantArt's mobile login page omits the Google and Apple
-   one-click buttons the desktop page offers.
+2. DAViewer loads the official login page in its embedded WebView. Android uses
+   its native WebView User-Agent; desktop platforms use the desktop User-Agent.
+   Available provider buttons depend on the page served by DeviantArt.
 3. DeviantArt's page owns account sign-in, registration, password recovery, and
    every provider it currently offers (DeviantArt, Google, Apple, Facebook).
    There is no separate "social login" route in the app.
@@ -58,8 +58,8 @@ earlier visit and starts a fresh PKCE flow. A user who only refreshed the web
 Cookie must never leave the official-API pages behind in a signed-out state.
 
 The app does not simulate a provider-button click, embed a password form, copy
-cookies out of a system browser, or inspect human-verification DOM. It does set
-a desktop User-Agent so the full desktop login page is served. Google, Apple, or
+cookies out of a system browser, or solve human-verification challenges. Android
+retains its native browser identity; desktop uses a desktop User-Agent. Google, Apple, or
 Facebook may still show their own account or CAPTCHA checks inside the WebView;
 those are the providers' pages and are not bypassed by the app.
 
