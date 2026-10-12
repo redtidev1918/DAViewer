@@ -60,6 +60,8 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
   String _navSource = 'initial';
   double _progress = 0;
   late final AuthController _authController;
+  bool _cookiesReady = false;
+  String _closeReason = 'route_removed';
 
   WebViewOAuthBridge? get _bridge =>
       ref.read(runtimeProvider).webViewOAuthBridge;
@@ -71,6 +73,11 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
     _sessionStatus = ref.read(webSessionStatusProvider.notifier);
     unawaited(ref.read(webSessionRefresherProvider).yieldToVisible());
     _authController = ref.read(authControllerProvider.notifier);
+    unawaited(
+      ref.read(webSessionControllerProvider.notifier).cookieMutations.then((_) {
+        if (mounted) setState(() => _cookiesReady = true);
+      }),
+    );
     final bridge = _bridge;
     if (bridge != null) {
       _launchSub = bridge.launchRequests.listen(_loadAuthRequest);
@@ -102,12 +109,18 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
     _sessionObserver?.dispose();
     _sessionStatus.endInteractiveRecovery();
     unawaited(_launchSub?.cancel());
-    AppLogger.instance.info('webview', 'login screen disposed');
+    AppLogger.instance.info(
+      'webview',
+      'login screen disposed reason=$_closeReason',
+    );
     super.dispose();
   }
 
   void _loadAuthRequest(Uri uri) {
-    AppLogger.instance.info('webview', 'loading oauth authorize: $uri');
+    AppLogger.instance.info(
+      'webview',
+      'oauth authorize received path=${uri.path} controllerReady=${_controller != null}',
+    );
     final controller = _controller;
     if (controller == null) {
       _pendingAuthUri = uri;
@@ -214,7 +227,8 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
           if (firstConfirmation) {
             ref.read(artworkSessionRecoveryProvider)();
           }
-          final oauthSignedIn = ref.read(authControllerProvider).oauthSignedIn;
+          final auth = ref.read(authControllerProvider);
+          final oauthSignedIn = auth.oauthSignedIn && auth.account != null;
           if (shouldCloseWebLoginAfterWebSession(
             serverConfirmedNavigation: true,
             oauthSignedIn: oauthSignedIn,
@@ -225,7 +239,9 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
               'server confirmed web session via signed-in home navigation',
             );
             _closeAfterReport = false;
-            WidgetsBinding.instance.addPostFrameCallback((_) => _closeScreen());
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => _closeScreen(reason: 'login_completed'),
+            );
           } else {
             AppLogger.instance.info(
               'webview',
@@ -246,7 +262,9 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
   void _maybeClose() {
     if (!_closeAfterReport || !mounted) return;
     _closeAfterReport = false;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _closeScreen());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _closeScreen(reason: 'oauth_report_completed'),
+    );
   }
 
   /// Detects DeviantArt's WAF lockout page and surfaces an in-app hint instead
@@ -275,8 +293,10 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
   /// Pops back to the screen the login came from. When the login screen IS the
   /// root route (first run reached it via the splash redirect), popping would
   /// leave an empty navigator and a black screen — go Home instead.
-  void _closeScreen() {
+  void _closeScreen({String reason = 'manual_done'}) {
     if (!mounted) return;
+    _closeReason = reason;
+    AppLogger.instance.info('webview', 'login screen closing reason=$reason');
     final navigator = Navigator.of(context);
     if (navigator.canPop()) {
       navigator.pop();
@@ -296,14 +316,18 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
     // timer could pop before the home page loads and leave the web session
     // recorded as signed-out.
     ref.listen<AuthState>(authControllerProvider, (previous, next) {
-      if (previous?.status != AuthStatus.signedIn &&
+      if ((previous?.status != AuthStatus.signedIn ||
+              previous?.account == null) &&
           next.status == AuthStatus.signedIn &&
+          next.account != null &&
           mounted &&
           !_closeAfterReport) {
         _closeAfterReport = true;
         if (_serverConfirmedWebSession) {
           _closeAfterReport = false;
-          WidgetsBinding.instance.addPostFrameCallback((_) => _closeScreen());
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _closeScreen(reason: 'oauth_completed_after_web'),
+          );
         }
       }
     });
@@ -322,6 +346,9 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
               AppLogger.instance.info('webview', 'manual refresh requested');
               _navSource = 'manual_refresh';
               _controller?.reload();
+              if (auth.oauthSignedIn && auth.account == null) {
+                unawaited(_authController.reloadAccount());
+              }
             },
             icon: const Icon(Icons.refresh),
           ),
@@ -342,7 +369,7 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
           ),
           IconButton(
             tooltip: s.done,
-            onPressed: _closeScreen,
+            onPressed: () => _closeScreen(),
             icon: const Icon(Icons.check),
           ),
         ],
@@ -374,158 +401,169 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
               Expanded(
                 child: ColoredBox(
                   color: theme.scaffoldBackgroundColor,
-                  child: InAppWebView(
-                    // A stable key keeps one WebView/controller across sibling
-                    // banner insertions. Without it, showing the challenge or
-                    // verification hint would shift child slots and recreate
-                    // the WebView, which reloads deviantart.com and can feed a
-                    // challenge into an automatic reload loop.
-                    key: const ValueKey('web-login-webview'),
-                    initialUrlRequest: URLRequest(
-                      url: WebUri(
-                        (auth.oauthSignedIn ? _homeUri : _loginUri).toString(),
-                      ),
-                    ),
-                    initialSettings: InAppWebViewSettings(
-                      javaScriptEnabled: true,
-                      // Android must present its real WebView UA: forcing a
-                      // desktop Chrome UA on Android makes PerimeterX treat the
-                      // WebView as an emulated browser and loop the login page
-                      // into a challenge lock. Desktop keeps the desktop UA.
-                      userAgent: webLoginUserAgent(
-                        isAndroid: Platform.isAndroid,
-                      ),
-                      // Keep the WebView opaque: transparentBackground forces software
-                      // compositing on Android, which causes severe jank when the soft
-                      // keyboard resizes the surface.
-                    ),
-                    onWebViewCreated: (controller) {
-                      AppLogger.instance.info('webview', 'controller created');
-                      _controller = controller;
-                      _sessionObserver = BrowserSessionObserver(
-                        read: () async {
-                          final url = await controller.getUrl();
-                          if (url?.host != 'www.deviantart.com' ||
-                              url?.scheme != 'https') {
-                            return const BrowserSessionEvidence();
-                          }
-                          return BrowserSessionEvidence.decode(
-                            await controller.evaluateJavascript(
-                              source: browserSessionEvidenceScript,
+                  child: !_cookiesReady
+                      ? const Center(child: CircularProgressIndicator())
+                      : InAppWebView(
+                          // A stable key keeps one WebView/controller across sibling
+                          // banner insertions. Without it, showing the challenge or
+                          // verification hint would shift child slots and recreate
+                          // the WebView, which reloads deviantart.com and can feed a
+                          // challenge into an automatic reload loop.
+                          key: const ValueKey('web-login-webview'),
+                          initialUrlRequest: URLRequest(
+                            url: WebUri(
+                              (auth.oauthSignedIn ? _homeUri : _loginUri)
+                                  .toString(),
                             ),
-                          );
-                        },
-                        onEvidence: (page) {
-                          if (!mounted) return;
-                          AppLogger.instance.info(
-                            'webview',
-                            'browser recoveryId=${_sessionStatus.recoveryId} host=visible classification=${page.classification} csrfPresent=${page.csrf.isNotEmpty}',
-                          );
-                          if (page.blocked) {
-                            _sessionStatus.markLocked();
-                            setState(() => _challengeBlocked = true);
-                            return;
-                          }
-                          unawaited(
-                            _reportWebSession(
-                              serverConfirmedNavigation: page.hasIdentity,
-                              evidence: page,
-                            ),
-                          );
-                        },
-                        onDeadline: () {
-                          AppLogger.instance.info(
-                            'webview',
-                            'browser recoveryId=${_sessionStatus.recoveryId} host=visible completed reason=deadline',
-                          );
-                        },
-                      )..start();
-                      final pending = _pendingAuthUri;
-                      if (pending != null) {
-                        _pendingAuthUri = null;
-                        controller.loadUrl(
-                          urlRequest: URLRequest(
-                            url: WebUri(pending.toString()),
                           ),
-                        );
-                      }
-                    },
-                    shouldOverrideUrlLoading:
-                        (controller, navigationAction) async {
-                          final uri = navigationAction.request.url;
-                          if (uri != null &&
-                              uri.scheme == 'dakit' &&
-                              uri.host == 'oauth') {
-                            _bridge?.addCallback(uri);
-                            _navSource = 'oauth_callback';
-                            // Navigate back to the deviantart home page; its onLoadStop then
-                            // reports the real web session (CSRF + login state). Do NOT read
-                            // the session here — the callback page has no __INITIAL_STATE__.
-                            unawaited(
+                          initialSettings: InAppWebViewSettings(
+                            javaScriptEnabled: true,
+                            useShouldOverrideUrlLoading: true,
+                            // Android must present its real WebView UA: forcing a
+                            // desktop Chrome UA on Android makes PerimeterX treat the
+                            // WebView as an emulated browser and loop the login page
+                            // into a challenge lock. Desktop keeps the desktop UA.
+                            userAgent: webLoginUserAgent(
+                              isAndroid: Platform.isAndroid,
+                            ),
+                            // Keep the WebView opaque: transparentBackground forces software
+                            // compositing on Android, which causes severe jank when the soft
+                            // keyboard resizes the surface.
+                          ),
+                          onWebViewCreated: (controller) {
+                            AppLogger.instance.info(
+                              'webview',
+                              'controller created',
+                            );
+                            _controller = controller;
+                            _sessionObserver = BrowserSessionObserver(
+                              read: () => readBrowserSessionEvidence(
+                                getUrl: () async =>
+                                    (await controller.getUrl())?.uriValue,
+                                evaluate: () => controller.evaluateJavascript(
+                                  source: browserSessionEvidenceScript,
+                                ),
+                                getHtml: controller.getHtml,
+                              ),
+                              onEvidence: (page) {
+                                if (!mounted) return;
+                                AppLogger.instance.info(
+                                  'webview',
+                                  'browser recoveryId=${_sessionStatus.recoveryId} host=visible classification=${page.classification} identitySource=${page.identitySource} csrfPresent=${page.csrf.isNotEmpty}',
+                                );
+                                if (page.blocked) {
+                                  _sessionStatus.markLocked();
+                                  setState(() => _challengeBlocked = true);
+                                  return;
+                                }
+                                unawaited(
+                                  _reportWebSession(
+                                    serverConfirmedNavigation: page.hasIdentity,
+                                    evidence: page,
+                                  ),
+                                );
+                              },
+                              onDeadline: () {
+                                AppLogger.instance.info(
+                                  'webview',
+                                  'browser recoveryId=${_sessionStatus.recoveryId} host=visible completed reason=deadline',
+                                );
+                              },
+                            )..start();
+                            final pending = _pendingAuthUri;
+                            if (pending != null) {
+                              _pendingAuthUri = null;
+                              AppLogger.instance.info(
+                                'oauthBridge',
+                                'authorize loading pending=true path=${pending.path}',
+                              );
                               controller.loadUrl(
                                 urlRequest: URLRequest(
-                                  url: WebUri(_homeUri.toString()),
+                                  url: WebUri(pending.toString()),
                                 ),
-                              ),
+                              );
+                            }
+                          },
+                          shouldOverrideUrlLoading:
+                              (controller, navigationAction) async {
+                                final uri = navigationAction.request.url;
+                                if (uri != null &&
+                                    uri.scheme == 'dakit' &&
+                                    uri.host == 'oauth') {
+                                  _bridge?.addCallback(uri);
+                                  _navSource = 'oauth_callback';
+                                  // Navigate back to the deviantart home page; its onLoadStop then
+                                  // reports the real web session (CSRF + login state). Do NOT read
+                                  // the session here — the callback page has no __INITIAL_STATE__.
+                                  unawaited(
+                                    controller.loadUrl(
+                                      urlRequest: URLRequest(
+                                        url: WebUri(_homeUri.toString()),
+                                      ),
+                                    ),
+                                  );
+                                  return NavigationActionPolicy.CANCEL;
+                                }
+                                return NavigationActionPolicy.ALLOW;
+                              },
+                          onLoadStart: (controller, url) {
+                            _reportSeq++;
+                            _sessionObserver?.navigationStarted(loading: true);
+                            _navSeq += 1;
+                            AppLogger.instance.info(
+                              'webview',
+                              'nav seq=$_navSeq event=load_start '
+                                  'source=$_navSource url=${url ?? '<null>'}',
                             );
-                            return NavigationActionPolicy.CANCEL;
-                          }
-                          return NavigationActionPolicy.ALLOW;
-                        },
-                    onLoadStart: (controller, url) {
-                      _reportSeq++;
-                      _sessionObserver?.navigationStarted();
-                      _navSeq += 1;
-                      AppLogger.instance.info(
-                        'webview',
-                        'nav seq=$_navSeq event=load_start '
-                            'source=$_navSource url=${url ?? '<null>'}',
-                      );
-                      // Any later load with no app action is a server redirect
-                      // (for example PerimeterX looping /users/login).
-                      _navSource = 'server_redirect';
-                      if (mounted) setState(() => _loading = true);
-                    },
-                    onLoadStop: (controller, url) {
-                      AppLogger.instance.info(
-                        'webview',
-                        'load stop: ${url ?? '<null>'}',
-                      );
-                      if (mounted) setState(() => _loading = false);
-                      // Report from any deviantart.com page. A sequence counter makes
-                      // the latest page win, so an earlier anonymous page (login) cannot
-                      // overwrite a later signed-in page (home).
-                      final uri = url;
-                      if (uri != null && uri.host == 'www.deviantart.com') {
-                        unawaited(_detectChallenge(controller));
-                        if (_sessionObserver?.isDisposed == true &&
-                            !_serverConfirmedWebSession) {
-                          _sessionObserver?.restart();
-                        } else {
-                          unawaited(_sessionObserver?.sample());
-                        }
-                      }
-                    },
-                    onUpdateVisitedHistory: (controller, url, isReload) {
-                      _reportSeq++;
-                      _sessionObserver?.navigationStarted();
-                      if (_sessionObserver?.isDisposed == true &&
-                          !_serverConfirmedWebSession) {
-                        _sessionObserver?.restart();
-                      } else {
-                        unawaited(_sessionObserver?.sample());
-                      }
-                    },
-                    onProgressChanged: (controller, progress) {
-                      // Only rebuild while the loading bar is visible, and only on a
-                      // meaningful change, so progress ticks don't churn the tree while
-                      // the soft keyboard is animating.
-                      if (!mounted || !_loading) return;
-                      final next = (progress / 100).clamp(0.0, 1.0).toDouble();
-                      if ((next - _progress).abs() < 0.02) return;
-                      setState(() => _progress = next);
-                    },
-                  ),
+                            // Any later load with no app action is a server redirect
+                            // (for example PerimeterX looping /users/login).
+                            _navSource = 'server_redirect';
+                            if (mounted) setState(() => _loading = true);
+                          },
+                          onLoadStop: (controller, url) {
+                            _sessionObserver?.navigationCommitted();
+                            AppLogger.instance.info(
+                              'webview',
+                              'load stop: ${url ?? '<null>'}',
+                            );
+                            if (mounted) setState(() => _loading = false);
+                            // Report from any deviantart.com page. A sequence counter makes
+                            // the latest page win, so an earlier anonymous page (login) cannot
+                            // overwrite a later signed-in page (home).
+                            final uri = url;
+                            if (uri != null &&
+                                uri.host == 'www.deviantart.com') {
+                              unawaited(_detectChallenge(controller));
+                              if (_sessionObserver?.isDisposed == true &&
+                                  !_serverConfirmedWebSession) {
+                                _sessionObserver?.restart();
+                              } else {
+                                unawaited(_sessionObserver?.sample());
+                              }
+                            }
+                          },
+                          onUpdateVisitedHistory: (controller, url, isReload) {
+                            _reportSeq++;
+                            _sessionObserver?.navigationStarted();
+                            if (_sessionObserver?.isDisposed == true &&
+                                !_serverConfirmedWebSession) {
+                              _sessionObserver?.restart();
+                            } else {
+                              unawaited(_sessionObserver?.sample());
+                            }
+                          },
+                          onProgressChanged: (controller, progress) {
+                            // Only rebuild while the loading bar is visible, and only on a
+                            // meaningful change, so progress ticks don't churn the tree while
+                            // the soft keyboard is animating.
+                            if (!mounted || !_loading) return;
+                            final next = (progress / 100)
+                                .clamp(0.0, 1.0)
+                                .toDouble();
+                            if ((next - _progress).abs() < 0.02) return;
+                            setState(() => _progress = next);
+                          },
+                        ),
                 ),
               ),
             ],

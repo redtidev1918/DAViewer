@@ -58,6 +58,7 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
   var requestRevision = 0;
   var triggerReason = 'initial_load';
   final pendingTokens = <CancelToken>{};
+  final requestTokens = Map<PageRequest, CancelToken>.identity();
   void cancelRequests(String reason) {
     for (final token in pendingTokens.toList()) {
       token.cancel(reason);
@@ -73,17 +74,47 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
       final requestId = 'rfy-${++_personalizedRequestSeq}';
       final token = CancelToken();
       pendingTokens.add(token);
+      requestTokens[request] = token;
       final statusOwner = ref.read(webSessionStatusProvider.notifier);
       final epoch = statusOwner.accountEpoch;
       final reason = triggerReason;
       var recoveryId = statusOwner.recoveryId;
       var sessionGeneration = statusOwner.generation;
       var credentialRevision = statusOwner.credentialRevision;
-      void trace(String phase, [String detail = '']) => AppLogger.instance.info(
-        'home',
-        'rfy requestId=$requestId provider=$providerId recoveryId=$recoveryId accountEpoch=$epoch sessionGeneration=$sessionGeneration credentialRevision=$credentialRevision triggerReason=$reason phase=$phase $detail',
-      );
+      String? terminalOutcome;
+      void trace(String phase, [String detail = '']) {
+        if (phase == 'accepted' || phase == 'discarded' || phase == 'failed') {
+          terminalOutcome = phase;
+        }
+        AppLogger.instance.info(
+          'home',
+          'rfy requestId=$requestId provider=$providerId recoveryId=$recoveryId accountEpoch=$epoch sessionGeneration=$sessionGeneration credentialRevision=$credentialRevision triggerReason=$reason phase=$phase $detail',
+        );
+      }
+
+      String? ownershipLost() {
+        if (epoch != statusOwner.accountEpoch) return 'account_changed';
+        if (!ref.mounted) return 'provider_disposed';
+        if (revision != requestRevision) return 'newer_request_won';
+        if (token.isCancelled) {
+          return token.cancelError?.error?.toString() ?? 'request_cancelled';
+        }
+        return null;
+      }
+
+      void requireOwnership() {
+        final lost = ownershipLost();
+        if (lost == null) return;
+        trace('discarded', 'discardReason=$lost');
+        throw const DAKitException(
+          kind: DAKitFailureKind.network,
+          code: 'rfy.session.superseded',
+          message: 'The recommendation request was superseded.',
+        );
+      }
+
       trace('created');
+      trace('queued', 'waitingFor=session_verification');
       try {
         AppLogger.instance.info(
           'home',
@@ -126,6 +157,7 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
         // recommendations.
         if (!ref.read(webSessionStatusProvider).needsLogin) {
           final currentHeader = await webSession.cookieHeader();
+          requireOwnership();
           await ref
               .read(webSessionStatusProvider.notifier)
               .check(
@@ -134,13 +166,7 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
                     .cookieChanged(currentHeader),
               );
         }
-        if (!ref.mounted) {
-          throw const DAKitException(
-            kind: DAKitFailureKind.network,
-            code: 'rfy.session.superseded',
-            message: 'The recommendation request was superseded.',
-          );
-        }
+        requireOwnership();
         final verdict = ref.read(webSessionStatusProvider);
         if (verdict.needsLogin) {
           AppLogger.instance.warning(
@@ -163,6 +189,7 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
         }
         var csrf = ref.read(webSessionControllerProvider).csrf;
         var cookieHeader = await webSession.cookieHeader();
+        requireOwnership();
         recoveryId = statusOwner.recoveryId;
         sessionGeneration = statusOwner.generation;
         credentialRevision = statusOwner.observeCredentials(
@@ -170,9 +197,7 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
           csrf: csrf,
         );
         trace('queued');
-        final generation = ref
-            .read(webSessionStatusProvider.notifier)
-            .generation;
+        var generation = ref.read(webSessionStatusProvider.notifier).generation;
         var page = await _tryFetchRfy(
           dio,
           csrf,
@@ -181,6 +206,7 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
           requestId: requestId,
           cancelToken: token,
           attempt: 1,
+          trace: trace,
         );
         if (page == null) {
           // An app update can clear the live WebView cookie store even though
@@ -192,6 +218,7 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
                 .read(webSessionControllerProvider.notifier)
                 .restorePersistedCookies();
             cookieHeader = await webSession.cookieHeader();
+            requireOwnership();
           }
           // Stale session after a restart: re-read the CSRF from the persisted
           // cookies (headless page load) and retry once. This only refreshes
@@ -200,15 +227,7 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
           await ref
               .read(webSessionStatusProvider.notifier)
               .check(force: true, browser: true);
-          if (!ref.mounted ||
-              token.isCancelled ||
-              epoch != statusOwner.accountEpoch) {
-            throw const DAKitException(
-              kind: DAKitFailureKind.network,
-              code: 'rfy.session.superseded',
-              message: 'The recommendation request was superseded.',
-            );
-          }
+          requireOwnership();
           if (!ref.read(webSessionStatusProvider).isHealthy) {
             trace('discarded', 'discardReason=session_superseded');
             throw const DAKitException(
@@ -219,6 +238,14 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
           }
           csrf = ref.read(webSessionControllerProvider).csrf;
           cookieHeader = await webSession.cookieHeader();
+          requireOwnership();
+          recoveryId = statusOwner.recoveryId;
+          generation = sessionGeneration = statusOwner.generation;
+          credentialRevision = statusOwner.observeCredentials(
+            cookieHeader: cookieHeader,
+            csrf: csrf,
+          );
+          trace('queued', 'transportReason=retry_after_failure');
           page = await _tryFetchRfy(
             dio,
             csrf,
@@ -227,6 +254,7 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
             requestId: requestId,
             cancelToken: token,
             attempt: 2,
+            trace: trace,
           );
         }
         if (page == null) {
@@ -252,7 +280,7 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
         final currentHeader = await webSession.cookieHeader();
         final degraded = rfyCursorSignalsGenericFallback(page.nextCursor);
         final discardReason = personalizedResultDiscardReason(
-          mounted: ref.mounted && !token.isCancelled,
+          mounted: ref.mounted,
           sameAccount:
               ref.mounted &&
               ref.read(webSessionControllerProvider).username ==
@@ -264,10 +292,12 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
           sameCredentials: currentHeader == cookieHeader,
           generic: degraded,
         );
-        if (discardReason != null && discardReason != 'generic_fallback') {
+        final finalDiscardReason = ownershipLost() ?? discardReason;
+        if (finalDiscardReason != null &&
+            finalDiscardReason != 'generic_fallback') {
           trace(
             'discarded',
-            'discardReason=$discardReason credentialRevision=${currentHeader == cookieHeader ? 0 : 1}',
+            'discardReason=$finalDiscardReason credentialsChanged=${currentHeader != cookieHeader}',
           );
           throw const DAKitException(
             kind: DAKitFailureKind.network,
@@ -277,7 +307,7 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
         }
         trace(
           'validated',
-          'credentialRevision=${currentHeader == cookieHeader ? 0 : 1}',
+          'credentialsChanged=${currentHeader != cookieHeader}',
         );
         ref
             .read(personalizedSessionStatusProvider.notifier)
@@ -325,17 +355,26 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
         }
         return page;
       } on Object catch (error) {
-        trace('failed', 'classification=${classifyFeedFetchError(error)}');
+        if (terminalOutcome == null) {
+          final lost = ownershipLost();
+          if (lost != null) {
+            trace('discarded', 'discardReason=$lost');
+          } else {
+            trace('failed', 'failureReason=${classifyFeedFetchError(error)}');
+          }
+        }
         rethrow;
       } finally {
         pendingTokens.remove(token);
-        trace('completed');
+        requestTokens.remove(request);
+        trace('completed', 'outcome=${terminalOutcome ?? 'unknown'}');
       }
     },
     requestTimeout: const Duration(seconds: 60),
     autoLoad: false,
     onRequestStarted: (reason) => triggerReason = reason,
     cancelRequests: cancelRequests,
+    cancelRequest: (request, reason) => requestTokens[request]?.cancel(reason),
     // Identity of the session context this page belongs to: a rotated CSRF or
     // Cookie means an already-loaded first page is stale, so an explicit
     // refresh must fetch again instead of being treated as a duplicate.
@@ -396,6 +435,7 @@ Future<Page<Artwork>?> _tryFetchRfy(
   required String requestId,
   required CancelToken cancelToken,
   required int attempt,
+  required void Function(String phase, String detail) trace,
 }) async {
   final logger = AppLogger.instance;
   if (csrf.isEmpty || cookieHeader.isEmpty) {
@@ -409,9 +449,9 @@ Future<Page<Artwork>?> _tryFetchRfy(
   }
   final stopwatch = Stopwatch()..start();
   try {
-    logger.info(
-      'home',
-      'rfy requestId=$requestId transportId=$requestId-t$attempt phase=in_flight triggerReason=${attempt == 1 ? 'owner_request' : 'retry_after_failure'} cursor=${request.cursor == null ? 'initial' : 'pagination'}',
+    trace(
+      'in_flight',
+      'transportId=$requestId-t$attempt transportReason=${attempt == 1 ? 'owner_request' : 'retry_after_failure'} cursor=${request.cursor == null ? 'initial' : 'pagination'}',
     );
     // Own the physical transport. DAKit's fetch() includes an implicit HTTP
     // CSRF retry; use its public parser so recovery stays with the orchestrator.
@@ -438,9 +478,9 @@ Future<Page<Artwork>?> _tryFetchRfy(
             asset.uri.toString().contains('blur_'),
       );
     }).length;
-    logger.info(
-      'home',
-      'rfy transport success requestId=$requestId transportId=$requestId-t$attempt phase=transport_succeeded elapsedMs=${stopwatch.elapsedMilliseconds} '
+    trace(
+      'transport_succeeded',
+      'transportId=$requestId-t$attempt elapsedMs=${stopwatch.elapsedMilliseconds} '
           'cursor=${request.cursor ?? 'initial'} '
           'items=${page.items.length} '
           'gated=${page.items.where((a) => artworkViewLock(a) != null).length} '
@@ -449,7 +489,14 @@ Future<Page<Artwork>?> _tryFetchRfy(
     );
     return page;
   } on Object catch (error, stack) {
-    if (cancelToken.isCancelled) rethrow;
+    if (cancelToken.isCancelled) {
+      trace('transport_cancelled', 'transportId=$requestId-t$attempt');
+      rethrow;
+    }
+    trace(
+      'transport_failed',
+      'transportId=$requestId-t$attempt failureReason=${classifyFeedFetchError(error)}',
+    );
     logger.warning(
       'home',
       'personalized feed failure '

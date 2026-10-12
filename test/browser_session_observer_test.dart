@@ -5,6 +5,87 @@ import 'package:daviewer/core/auth/browser_session_observer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('current document initializer can confirm identity after the global disappears', () async {
+    final state = jsonEncode({
+      '@publicSession': {
+        'user': {'username': 'artist'},
+      },
+    });
+    final evidence = await readBrowserSessionEvidence(
+      getUrl: () async => Uri.parse('https://www.deviantart.com/'),
+      evaluate: () async => jsonEncode({
+        'origin': 'https://www.deviantart.com',
+        'csrf': 'synthetic',
+      }),
+      getHtml: () async =>
+          'window.__INITIAL_STATE__ = JSON.parse(${jsonEncode(state)});',
+    );
+    expect(evidence.username, 'artist');
+    expect(evidence.identitySource, 'document_initial_state');
+  });
+  test(
+    'CSRF with no global or document identity remains inconclusive',
+    () async {
+      final evidence = await readBrowserSessionEvidence(
+        getUrl: () async => Uri.parse('https://www.deviantart.com/'),
+        evaluate: () async => jsonEncode({
+          'origin': 'https://www.deviantart.com',
+          'csrf': 'synthetic',
+        }),
+        getHtml: () async => '<html>artist public profile</html>',
+      );
+      expect(evidence.hasIdentity, isFalse);
+      expect(evidence.classification, 'page_uninitialized');
+    },
+  );
+  test(
+    'document evidence is rejected if navigation changed while reading',
+    () async {
+      var reads = 0;
+      final state = jsonEncode({
+        '@publicSession': {
+          'user': {'username': 'artist'},
+        },
+      });
+      final evidence = await readBrowserSessionEvidence(
+        getUrl: () async => Uri.parse(
+          'https://www.deviantart.com/${reads++ == 0 ? '' : 'users/login'}',
+        ),
+        evaluate: () async => jsonEncode({
+          'origin': 'https://www.deviantart.com',
+          'csrf': 'synthetic',
+        }),
+        getHtml: () async =>
+            'window.__INITIAL_STATE__ = JSON.parse(${jsonEncode(state)});',
+      );
+      expect(evidence.hasIdentity, isFalse);
+    },
+  );
+  testWidgets('full navigation cannot confirm the previous document', (
+    tester,
+  ) async {
+    var reads = 0;
+    final observations = <BrowserSessionEvidence>[];
+    final observer = BrowserSessionObserver(
+      read: () async {
+        reads++;
+        return const BrowserSessionEvidence(username: 'artist');
+      },
+      onEvidence: observations.add,
+      onDeadline: () {},
+    );
+    observer.navigationStarted(loading: true);
+    observer.start();
+    await tester.pump(const Duration(seconds: 2));
+    observer.navigationStarted(); // history may fire before full load commit
+    await observer.sample();
+    expect(reads, 0);
+    expect(observations, isEmpty);
+    observer.navigationCommitted();
+    await observer.sample();
+    expect(observations.single.username, 'artist');
+    observer.dispose();
+  });
   test(
     'missing, malformed and foreign-origin data cannot confirm identity',
     () {

@@ -180,6 +180,26 @@ void main() {
     },
   );
 
+  testWidgets('account change starts a fresh host and discards old callbacks', (
+    tester,
+  ) async {
+    final host = container.read(webSessionRefresherProvider);
+    final old = host.refresh();
+    await tester.pump();
+    final oldBrowser = platform.browsers.single;
+    unawaited(host.accountChanged());
+    expect((await old).outcome, WebSessionProbeOutcome.unavailable);
+    final current = host.refresh();
+    await tester.pump();
+    expect(platform.browsers, hasLength(2));
+    oldBrowser.params.onWebViewCreated?.call(_Controller()..username = 'old');
+    oldBrowser.fail(mainFrame: true);
+    final newBrowser = platform.browsers.last;
+    newBrowser.params.onWebViewCreated?.call(_Controller()..username = 'new');
+    await tester.pump();
+    expect((await current).username, 'new');
+  });
+
   testWidgets('startup timeout returns before a stalled browser teardown', (
     tester,
   ) async {

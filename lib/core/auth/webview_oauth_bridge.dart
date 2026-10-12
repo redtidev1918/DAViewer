@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:dakit_core/dakit_core.dart';
-import 'package:flutter/foundation.dart';
 
 import '../network/desktop_uri_launcher.dart';
+import '../diagnostics/app_logger.dart';
 
 /// Routes every DAKit OAuth transaction through the embedded WebView so a
 /// single login establishes both the deviantart.com web Cookie/CSRF session and
@@ -32,6 +32,10 @@ final class WebViewOAuthBridge implements ExternalUriLauncher {
 
   void addCallback(Uri uri) {
     if (uri.scheme != 'dakit' || uri.host != 'oauth') return;
+    AppLogger.instance.info(
+      'oauthBridge',
+      'callback received path=${uri.path} listener=${_callbackController.hasListener}',
+    );
     _callbackController.add(uri);
   }
 
@@ -45,10 +49,16 @@ final class WebViewOAuthBridge implements ExternalUriLauncher {
       await Future<void>.delayed(const Duration(milliseconds: 20));
     }
     if (_launchController.hasListener) {
-      debugPrint('[oauth] routing authorize to embedded WebView');
+      AppLogger.instance.info(
+        'oauthBridge',
+        'authorize dispatched target=embedded listener=true path=${uri.path}',
+      );
       _launchController.add(uri);
     } else {
-      debugPrint('[oauth] NO WebView listener -> system browser fallback');
+      AppLogger.instance.warning(
+        'oauthBridge',
+        'authorize dispatched target=system listener=false path=${uri.path}',
+      );
       await _fallback.launch(uri);
     }
   }

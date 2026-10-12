@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'web_session_verifier.dart';
+
 /// Both browser hosts evaluate this script themselves. No identity from a
 /// cookie or an untrusted JS bridge payload is allowed to confirm a session.
 const browserSessionEvidenceScript = '''
@@ -28,6 +30,7 @@ final class BrowserSessionEvidence {
     this.blocked = false,
     this.challenge = false,
     this.parseFailed = false,
+    this.identitySource = 'page_global',
   });
 
   final String? username;
@@ -36,6 +39,7 @@ final class BrowserSessionEvidence {
   final bool blocked;
   final bool challenge;
   final bool parseFailed;
+  final String identitySource;
 
   bool get hasIdentity => username != null && username!.isNotEmpty;
   String get classification => blocked
@@ -74,6 +78,41 @@ final class BrowserSessionEvidence {
   }
 }
 
+/// Some rendered pages keep the server's initializer script after removing the
+/// global during hydration. Read only the current trusted document; Cookie,
+/// OAuth identity, CSRF and public profile markup cannot supply this evidence.
+Future<BrowserSessionEvidence> readBrowserSessionEvidence({
+  required Future<Uri?> Function() getUrl,
+  required Future<Object?> Function() evaluate,
+  required Future<String?> Function() getHtml,
+}) async {
+  final before = await getUrl();
+  if (before?.scheme != 'https' || before?.host != 'www.deviantart.com') {
+    return const BrowserSessionEvidence();
+  }
+  final page = BrowserSessionEvidence.decode(await evaluate());
+  if (page.hasIdentity || page.blocked || page.challenge || page.csrf.isEmpty) {
+    return page;
+  }
+  String? html;
+  try {
+    html = await getHtml();
+  } on Object {
+    return page;
+  }
+  if (await getUrl() != before) return const BrowserSessionEvidence();
+  final username = html == null
+      ? null
+      : WebSessionVerifier.pageUsernameFromInitialState(html);
+  if (username == null || username.isEmpty) return page;
+  return BrowserSessionEvidence(
+    username: username,
+    csrf: page.csrf,
+    initialized: true,
+    identitySource: 'document_initial_state',
+  );
+}
+
 /// One bounded observation window spanning load stops, redirects and SPA
 /// history updates. Events wake the same sampler; they never grant a verdict.
 /// Navigation invalidates reads already in progress. Only one read runs at once.
@@ -95,6 +134,7 @@ final class BrowserSessionObserver {
   Timer? _sampleTimer;
   bool _disposed = false;
   bool _reading = false;
+  bool _loading = false;
   int _navigation = 0;
   String? _lastEvidence;
   bool get isDisposed => _disposed;
@@ -117,13 +157,22 @@ final class BrowserSessionObserver {
     unawaited(sample());
   }
 
-  void navigationStarted() {
+  void navigationStarted({bool loading = false}) {
+    _navigation++;
+    if (loading) _loading = true;
+    _lastEvidence = null;
+  }
+
+  /// A full navigation may still expose the previous document while loading.
+  /// SPA history updates invalidate reads without pausing asynchronous sampling.
+  void navigationCommitted() {
+    _loading = false;
     _navigation++;
     _lastEvidence = null;
   }
 
   Future<void> sample() async {
-    if (_disposed || _reading) return;
+    if (_disposed || _reading || _loading) return;
     _reading = true;
     final navigation = _navigation;
     try {

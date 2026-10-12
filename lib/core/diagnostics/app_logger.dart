@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' hide DiagnosticLevel;
 import 'package:path_provider/path_provider.dart';
 
 import 'crash_marker.dart';
+import 'log_redactor.dart';
 
 /// Level-filtered, file-backed logger that also implements DAKit's
 /// [DiagnosticSink] so every OAuth/network/transfer diagnostic event is
@@ -39,6 +40,7 @@ final class AppLogger implements DiagnosticSink {
   final IOSink _file;
   int _errorCount = 0;
   Future<void> _flushTail = Future<void>.value();
+  bool _disposed = false;
 
   static Future<AppLogger> initialize({String? fileName}) async {
     if (_instance case final existing?) return existing;
@@ -110,8 +112,7 @@ final class AppLogger implements DiagnosticSink {
       stack: stack,
     );
     debugPrint(line);
-    _file.writeln(line);
-    _scheduleFlush();
+    _enqueueLine(line);
     if (level == DiagnosticLevel.error) _errorCount += 1;
   }
 
@@ -131,8 +132,7 @@ final class AppLogger implements DiagnosticSink {
       message: '${event.code}$elapsed$attrs ${event.message}',
     );
     debugPrint(line);
-    _file.writeln(line);
-    _scheduleFlush();
+    _enqueueLine(line);
     if (event.level == DiagnosticLevel.error) _errorCount += 1;
   }
 
@@ -149,20 +149,31 @@ final class AppLogger implements DiagnosticSink {
     );
     if (error != null) buffer.write(' | error=$error');
     if (stack != null) buffer.write('\n$stack');
-    return buffer.toString();
+    return LogRedactor.redactAll(buffer.toString());
   }
 
-  /// Serialize flushes so exported logs and force-stop diagnostics include
-  /// writes already handed to the sink. Abrupt OS kills may lose a final write.
-  Future<void> flush() {
-    final next = _flushTail.then((_) => _file.flush());
-    _flushTail = next.then((_) {}, onError: (Object _) {});
-    return next;
+  /// Writes and flushes must share one queue. IOSink forbids writes while its
+  /// flush is bound to a stream; serializing only flushes can throw from a
+  /// logging call and abort the OAuth/WebView callback being diagnosed.
+  void _enqueueLine(String line) {
+    if (_disposed) return;
+    _flushTail = _flushTail
+        .then((_) async {
+          _file.writeln(line);
+          await _file.flush();
+        })
+        .catchError((Object error) {
+          // A disk failure must not fail authentication or recursively log itself.
+          debugPrint('[logger] file write unavailable: ${error.runtimeType}');
+        });
   }
 
-  void _scheduleFlush() => unawaited(flush().catchError((Object _) {}));
+  /// Barrier for all previously queued writes, including their flushes.
+  /// Abrupt OS kills may still lose the last pending write.
+  Future<void> flush() => _flushTail;
 
   Future<void> dispose() async {
+    _disposed = true;
     await flush();
     await _file.close();
     if (identical(_instance, this)) _instance = null;

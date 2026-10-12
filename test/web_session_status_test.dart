@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:daviewer/core/auth/web_session_controller.dart';
 import 'package:daviewer/core/auth/web_session_refresher.dart'
@@ -12,6 +11,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/foundation.dart';
 
 final class _FakeCookieManager extends Fake implements CookieManager {
   _FakeCookieManager(this._cookies);
@@ -202,6 +202,55 @@ Future<ProviderContainer> _anonymousSessionContainer() async {
 }
 
 void main() {
+  test(
+    'overlapping recovery completions retain their own recovery IDs',
+    () async {
+      final old = Completer<WebSessionProbeResult>();
+      final current = Completer<WebSessionProbeResult>();
+      var calls = 0;
+      final container = _containerWith(
+        _HomeHtmlAdapter(_signedInHomeHtml),
+        probe: () => ++calls == 1 ? old.future : current.future,
+      );
+      addTearDown(container.dispose);
+      final logs = <String>[];
+      final previousPrint = debugPrint;
+      debugPrint = (message, {wrapWidth}) {
+        if (message != null) logs.add(message);
+      };
+      addTearDown(() => debugPrint = previousPrint);
+      final owner = container.read(webSessionStatusProvider.notifier);
+      final first = owner.check(force: true, browser: true);
+      final firstId = owner.recoveryId;
+      owner.beginInteractiveRecovery();
+      owner.endInteractiveRecovery();
+      final second = owner.check(force: true, browser: true);
+      final secondId = owner.recoveryId;
+      old.complete(const WebSessionProbeResult.unavailable());
+      await first;
+      expect(
+        logs.any(
+          (line) => line.contains('recovery completed recoveryId=$firstId '),
+        ),
+        isTrue,
+      );
+      current.complete(
+        const WebSessionProbeResult.confirmed(
+          csrf: 'token',
+          username: 'artist',
+        ),
+      );
+      await second;
+      expect(firstId, isNot(secondId));
+      expect(
+        logs.any(
+          (line) => line.contains('recovery completed recoveryId=$secondId '),
+        ),
+        isTrue,
+      );
+      expect(container.read(webSessionStatusProvider).isHealthy, isTrue);
+    },
+  );
   group('WebSessionStatus', () {
     test('only healthy is usable by the personalized feed', () {
       const healthy = WebSessionStatus(

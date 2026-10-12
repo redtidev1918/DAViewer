@@ -20,10 +20,11 @@ final class LogRedactor {
     // Email addresses.
     RegExp(r'[\w.+-]+@[\w-]+\.[\w.-]+'),
     RegExp(
-      r'\b((?:\w*username|claimed|server)=)[^\s,;]+',
+      r'\b((?:\w*username|claimed|server|user)=)[^\s,;]+',
       caseSensitive: false,
     ),
     RegExp(r'(account loaded:\s*)[^\s,;]+', caseSensitive: false),
+    RegExp(r'(web session candidate:\s*)[^\s,;]+', caseSensitive: false),
     RegExp(r'\b(?:\d{1,3}\.){3}\d{1,3}\b'),
     RegExp(
       r'(?:[A-Za-z]:[\\/]Users[\\/]|/Users/|/home/)[^\\/\r\n]+',

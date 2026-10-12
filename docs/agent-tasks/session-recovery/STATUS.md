@@ -45,10 +45,63 @@ Code/Release/Android/Original Incident verification must remain separate.
 
 ## Current phase
 
+### 2026-10-12 phone failure / active engineering checkpoint
+
+- Candidate **12aaeac login-after-explicit-logout acceptance: FAIL**. Evidence is
+  the user's local attachment `ac48dc7a-dfbd-4748-9cda-575813f77b95/已粘贴的文本.txt`,
+  10:37:17–10:38:36. Do not commit its raw account identifiers/logs.
+- Retained-account original cold-start acceptance: **PENDING**. The supplied
+  timeline includes explicit logout at 10:37:27 and cannot close that incident.
+- Confirmed locally: AppLogger queued flushes but wrote directly to IOSink while
+  a flush was active. A real file-backed regression throws
+  `Bad state: StreamSink is bound to a stream` at `AppLogger._write` before fix.
+  This can abort onWebViewCreated and DAKit diagnostics/OAuth launch callbacks;
+  the phone lacks observer initialization/authorize dispatch on its first visits.
+  Device attribution remains to verify with the next candidate, not a claimed
+  observation of an exception absent from its exported log.
+- Fix in working tree: serialize writes AND flushes, contain file I/O errors.
+  `test/app_logger_write_race_test.dart`: reproduced FAIL before fix, PASS after.
+- Added non-secret bridge dispatch/receipt/callback and login close-reason logs,
+  explicit callback interception setting, shared current-document initializer
+  fallback for missing global. Fallback is server-rendered session identity,
+  never Cookie/CSRF/OAuth/public profile inference. Actual phone schema remains
+  unobserved. No new guessed endpoint or WAF bypass.
+- Earlier follow-up race audit is also UNCOMMITTED: captured recovery IDs,
+  navigation load fence, account-epoch/native Cookie serialization, guarded
+  persistent writes, RFY pre-transport ownership and targeted timeout cancel,
+  terminal trace outcomes; controlled cookie race suite 3 PASS. Old full 446
+  and intermediate 450 results are NOT final verification of this working tree.
+- Before this checkpoint commit, HEAD is e3f79719d4c7f0b8a8d5c39a925490e03aa88416,
+  branch codex/android-session-recovery; retained stash unchanged. All above
+  implementation edits are now ready for a recoverable branch commit.
+- Latest full verification on this working tree: **461 PASS**, format completed,
+  analyze **No issues found**; `git diff --check` PASS. New complete platform
+  login regression 2 PASS including existing challenge/rebuild assertion.
+  Real-disk logger write/flush regression PASS. Code Verified locally; new CI
+  PENDING push. Release PENDING. PR #96 confirmed OPEN/draft.
+- Detailed failure/repair evidence: LOGIN-REGRESSION.md. Original 446 and
+  intermediate 450 are superseded, not the final count.
+- Next: complete logout->OAuth bridge/PKCE->account/browser/feed regressions;
+  full format/analyze/test, commit and push on PR branch, CI + signed dry-run
+  candidate build, verify signer/hash, provide replacement APK/acceptance guide.
+  Never pass old APK or merge/publish before successful real phone evidence.
+
 Phase 0–3 implementation and Phase 4 automated regression complete locally.
 Preparing candidate APK, emulator smoke and real phone
 acceptance. Implementation remains a candidate, not proven incident closure.
 The SDK/emulator installation is an authorized integration-test subtask.
+
+2026-10-12 follow-up audit started from clean e3f7971, draft PR #96 confirmed
+OPEN/draft. User now owns retained-data phone acceptance on immutable 12aaeac:
+one cold start first, stop/export immediately on failure; ten launches and
+resume/manual-refresh/network cases only after the first success. Explicit user
+gate: no merge and no formal release. Continue independent engineering work.
+Audit plan before edits: capture recovery IDs; invalidate obsolete hidden hosts;
+pause native-document sampling during load; guard RFY before transport and log
+every terminal outcome; scope timeout cancellation to its request; serialize
+native Cookie mutations with logout, protect async snapshot writes. Add controlled
+race regressions, acceptance guide and opt-in ADB scripts. New branch changes
+are NOT included in the phone's 12aaeac APK until a separate build is delivered.
 
 ## Confirmed defects versus hypotheses
 

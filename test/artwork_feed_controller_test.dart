@@ -14,6 +14,48 @@ void main() {
     media: const <MediaAsset>[],
   );
 
+  testWidgets('obsolete pagination timeout cancels only its own request', (
+    tester,
+  ) async {
+    final oldPage = Completer<Page<Artwork>>();
+    final newPage = Completer<Page<Artwork>>();
+    final cancelled = <PageRequest>[];
+    PageRequest? paginationRequest;
+    var firstPages = 0;
+    var broadCancelCalls = 0;
+    final controller = ArtworkFeedController(
+      (request) async {
+        if (request.cursor != null) {
+          paginationRequest = request;
+          return oldPage.future;
+        }
+        if (++firstPages > 1) return newPage.future;
+        return Page<Artwork>(
+          items: [artwork(1)],
+          hasMore: true,
+          nextCursor: 'next',
+        );
+      },
+      autoLoad: false,
+      requestTimeout: const Duration(seconds: 10),
+      cancelRequests: (_) => broadCancelCalls++,
+      cancelRequest: (request, _) => cancelled.add(request),
+    );
+    await controller.refresh();
+    final pagination = controller.loadMore();
+    await tester.pump(const Duration(seconds: 9));
+    final refresh = controller.forceRefresh();
+    await tester.pump(const Duration(seconds: 1));
+    await pagination;
+    expect(cancelled, [paginationRequest]);
+    expect(broadCancelCalls, 0);
+    newPage.complete(Page<Artwork>(items: [artwork(2)], hasMore: false));
+    await refresh;
+    expect(controller.state.items.single.id, 'art-2');
+    oldPage.complete(Page<Artwork>(items: [artwork(99)], hasMore: false));
+    controller.dispose();
+  });
+
   test('loads and appends pages from cursor', () async {
     var calls = 0;
     final controller = ArtworkFeedController((request) async {

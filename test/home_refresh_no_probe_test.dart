@@ -27,16 +27,20 @@ import 'package:flutter_test/flutter_test.dart';
 
 final class _FakeCookieManager extends Fake implements CookieManager {
   String csrfCookie = 'token';
+  Future<void>? readGate;
   @override
   Future<List<Cookie>> getCookies({
     required WebUri url,
     InAppWebViewController? webViewController,
     @Deprecated('Use webViewController instead')
     InAppWebViewController? iosBelow11WebViewController,
-  }) async => <Cookie>[
-    Cookie(name: 'userinfo', value: 'artist'),
-    Cookie(name: 'csrf', value: csrfCookie),
-  ];
+  }) async {
+    await readGate;
+    return <Cookie>[
+      Cookie(name: 'userinfo', value: 'artist'),
+      Cookie(name: 'csrf', value: csrfCookie),
+    ];
+  }
 }
 
 /// Serves the rfy endpoint and counts first-page requests by cursor.
@@ -222,6 +226,34 @@ void main() {
     },
   );
 
+  test(
+    'account change while waiting on Cookie read sends no obsolete transport',
+    () async {
+      final gate = Completer<void>();
+      final cookies = _FakeCookieManager()..readGate = gate.future;
+      final rfy = _RfyAdapter();
+      final container = feedContainer(
+        rfy,
+        _HomeProbeAdapter(),
+        cookies: cookies,
+      );
+      final controller = container.read(personalizedFeedProvider.notifier);
+      final pending = controller.refresh();
+      await Future<void>.delayed(Duration.zero);
+      container
+          .read(webSessionControllerProvider.notifier)
+          .state = const WebSessionState(
+        csrf: 'other-token',
+        isLoggedIn: true,
+        username: 'other-account',
+      );
+      gate.complete();
+      await pending;
+      expect(rfy.calls, 0);
+      expect(container.read(artworkStoreProvider)['12345'], isNull);
+    },
+  );
+
   test('changed cookies bypass a recently healthy identity lease', () async {
     final cookies = _FakeCookieManager();
     final probe = _HomeProbeAdapter();
@@ -234,6 +266,85 @@ void main() {
     expect(probe.calls, 1);
     expect(container.read(personalizedFeedProvider).items, hasLength(1));
   });
+
+  for (final verifiedRotation in [false, true]) {
+    test(
+      'RFY trace has complete metadata and one terminal outcome (verified rotation=$verifiedRotation)',
+      () async {
+        final logs = <String>[];
+        final previousPrint = debugPrint;
+        debugPrint = (message, {wrapWidth}) {
+          if (message != null) logs.add(message);
+        };
+        addTearDown(() => debugPrint = previousPrint);
+        final entered = Completer<void>();
+        final gate = Completer<void>();
+        final cookies = _FakeCookieManager();
+        final rfy = _RfyAdapter()
+          ..gate = gate.future
+          ..onFetch = entered.complete;
+        final container = feedContainer(
+          rfy,
+          _HomeProbeAdapter(),
+          cookies: cookies,
+        );
+        final pending = container
+            .read(personalizedFeedProvider.notifier)
+            .refresh();
+        await entered.future;
+        cookies.csrfCookie = 'rotated';
+        if (verifiedRotation) {
+          container
+              .read(webSessionStatusProvider.notifier)
+              .markHealthy(serverUsername: 'artist');
+        }
+        gate.complete();
+        await pending;
+        final traces = logs
+            .where((line) => line.contains('[home] rfy requestId='))
+            .toList();
+        final phases = traces
+            .map((line) => RegExp(r'phase=(\w+)').firstMatch(line)!.group(1))
+            .toList();
+        expect(
+          phases,
+          containsAllInOrder([
+            'created',
+            'queued',
+            'in_flight',
+            'transport_succeeded',
+            verifiedRotation ? 'accepted' : 'discarded',
+            'completed',
+          ]),
+        );
+        expect(
+          phases.where((p) => ['accepted', 'discarded', 'failed'].contains(p)),
+          hasLength(1),
+        );
+        for (final line in traces) {
+          for (final key in [
+            'recoveryId',
+            'accountEpoch',
+            'sessionGeneration',
+            'credentialRevision',
+            'triggerReason',
+          ]) {
+            expect(line, contains('$key='));
+          }
+        }
+        expect(traces.any((line) => line.contains('transportId=')), isTrue);
+        if (!verifiedRotation) {
+          expect(
+            traces.any(
+              (line) => line.contains('discardReason=credentials_changed'),
+            ),
+            isTrue,
+          );
+        }
+        expect(rfy.calls, 1);
+      },
+    );
+  }
 
   test(
     'verification recovery automatically resumes a stopped initial feed',

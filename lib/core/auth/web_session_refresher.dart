@@ -68,6 +68,8 @@ final class WebSessionRefresher {
   Completer<WebSessionProbeResult>? _completion;
   int _sequence = 0;
   String recoveryId = 'metadata';
+  String _activeRecoveryId = 'metadata';
+  int _activeIdentityEpoch = 0;
 
   Future<WebSessionProbeResult> refresh() {
     final active = _completion;
@@ -75,6 +77,10 @@ final class WebSessionRefresher {
     final completion = Completer<WebSessionProbeResult>();
     _completion = completion;
     _sequence++;
+    _activeRecoveryId = recoveryId;
+    _activeIdentityEpoch = _ref
+        .read(webSessionControllerProvider.notifier)
+        .identityEpoch;
     _log('created');
     // Original total budget includes proxy/startup; events never extend it.
     _timeout = Timer(const Duration(seconds: 20), () {
@@ -85,15 +91,21 @@ final class WebSessionRefresher {
   }
 
   bool _current(Completer<WebSessionProbeResult> completion) =>
-      identical(_completion, completion) && _ref.mounted;
+      identical(_completion, completion) &&
+      _ref.mounted &&
+      _activeIdentityEpoch ==
+          _ref.read(webSessionControllerProvider.notifier).identityEpoch;
 
   void _log(String event) => AppLogger.instance.info(
     'web-session',
-    'browser probe=$_sequence recoveryId=$recoveryId host=headless $event',
+    'browser probe=$_sequence recoveryId=$_activeRecoveryId host=headless $event',
   );
 
   Future<void> _startProbe(Completer<WebSessionProbeResult> completion) async {
+    final identityEpoch = _activeIdentityEpoch;
     try {
+      await _ref.read(webSessionControllerProvider.notifier).cookieMutations;
+      if (!_current(completion)) return;
       final runtime = _ref.read(runtimeProvider);
       final environment = await runtime.webViewProxyManager?.prepare();
       if (!_current(completion)) return;
@@ -110,28 +122,25 @@ final class WebSessionRefresher {
         onWebViewCreated: (controller) {
           if (!_current(completion)) return;
           _observer = BrowserSessionObserver(
-            read: () async {
-              final url = await controller.getUrl();
-              if (url?.host != 'www.deviantart.com' || url?.scheme != 'https') {
-                return const BrowserSessionEvidence();
-              }
-              return BrowserSessionEvidence.decode(
-                await controller.evaluateJavascript(
-                  source: browserSessionEvidenceScript,
-                ),
-              );
-            },
+            read: () => readBrowserSessionEvidence(
+              getUrl: () async => (await controller.getUrl())?.uriValue,
+              evaluate: () => controller.evaluateJavascript(
+                source: browserSessionEvidenceScript,
+              ),
+              getHtml: controller.getHtml,
+            ),
             onEvidence: (evidence) {
               if (!_current(completion)) return;
               _log(
-                'classification=${evidence.classification} csrfPresent=${evidence.csrf.isNotEmpty}',
+                'classification=${evidence.classification} identitySource=${evidence.identitySource} csrfPresent=${evidence.csrf.isNotEmpty}',
               );
               if (evidence.csrf.isNotEmpty) {
                 unawaited(
                   _ref
                       .read(webSessionControllerProvider.notifier)
-                      .updateCsrf(evidence.csrf)
+                      .updateCsrf(evidence.csrf, expectedEpoch: identityEpoch)
                       .catchError((Object error) {
+                        if (!_current(completion)) return;
                         _log(
                           'metadata_save_failed errorType=${error.runtimeType}',
                         );
@@ -159,12 +168,13 @@ final class WebSessionRefresher {
         },
         onLoadStart: (controller, url) {
           if (!_current(completion)) return;
-          _observer?.navigationStarted();
+          _observer?.navigationStarted(loading: true);
           _log('event=load_start');
         },
         onLoadStop: (controller, url) {
           if (!_current(completion)) return;
           _log('event=load_stop');
+          _observer?.navigationCommitted();
           unawaited(_observer?.sample());
         },
         onUpdateVisitedHistory: (controller, url, isReload) {
@@ -191,6 +201,9 @@ final class WebSessionRefresher {
   /// Stop hidden observation before interactive navigation takes over. Cookie
   /// store continuity is maintained without copying credentials between hosts.
   Future<void> yieldToVisible() => _dispose(null, null, 'visible_handoff');
+
+  /// A new account must never join a browser belonging to the old account.
+  Future<void> accountChanged() => _dispose(null, null, 'account_changed');
 
   Future<void> _dispose([
     WebSessionProbeResult? result,

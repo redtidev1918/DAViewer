@@ -109,6 +109,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         _accountEpoch++;
         _generation++;
         _activeCheck = null;
+        unawaited(_ref.read(webSessionRefresherProvider).accountChanged());
         _lastSuccess = null;
         _lastRestrictionCheck = null;
         if (mounted) state = const WebSessionStatus();
@@ -221,6 +222,8 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
 
     final generation = _generation;
     _recoveryId = 'recovery-${++_recoverySequence}';
+    final recoveryId = _recoveryId;
+    final epoch = _accountEpoch;
     AppLogger.instance.info(
       'auth',
       'recovery created recoveryId=$_recoveryId accountEpoch=$_accountEpoch sessionGeneration=$generation force=$force',
@@ -230,6 +233,8 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         _performCheck(
           force: force,
           generation: generation,
+          recoveryId: recoveryId,
+          accountEpoch: epoch,
           browser: browser,
         ).whenComplete(() {
           if (identical(_activeCheck, tracked)) _activeCheck = null;
@@ -301,13 +306,15 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   Future<void> _performCheck({
     required bool force,
     required int generation,
+    required String recoveryId,
+    required int accountEpoch,
     bool browser = false,
   }) async {
     try {
       if (browser) {
         // A transport-context refresh observes the live browser store, without
         // waiting on optional persistence or re-injecting saved credentials.
-        _ref.read(webSessionRefresherProvider).recoveryId = _recoveryId;
+        _ref.read(webSessionRefresherProvider).recoveryId = recoveryId;
         final probe = await _ref.read(webSessionProbeProvider)();
         if (!_isCurrent(generation)) return;
         final last = _lastSuccess;
@@ -317,7 +324,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
             DateTime.now().difference(last) < _cacheDuration) {
           AppLogger.instance.info(
             'auth',
-            'recovery inconclusive recoveryId=$_recoveryId retained=healthy_lease',
+            'recovery inconclusive recoveryId=$recoveryId retained=healthy_lease',
           );
           return;
         }
@@ -410,7 +417,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       );
       var confirmedCookies = cookies;
       if (decision.escalateToRealBrowser) {
-        _ref.read(webSessionRefresherProvider).recoveryId = _recoveryId;
+        _ref.read(webSessionRefresherProvider).recoveryId = recoveryId;
         final after = await webSession.snapshot(
           source: 'check-after-unconfirmed',
         );
@@ -464,7 +471,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     } finally {
       AppLogger.instance.info(
         'auth',
-        'recovery completed sessionGeneration=$generation current=$_generation state=${mounted ? state.state.name : 'disposed'}',
+        'recovery completed recoveryId=$recoveryId accountEpoch=$accountEpoch sessionGeneration=$generation current=$_generation state=${mounted ? state.state.name : 'disposed'}',
       );
     }
   }

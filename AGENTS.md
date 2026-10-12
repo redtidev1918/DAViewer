@@ -22,3 +22,7 @@ Android and Original Incident verification. Never mark Original Incident Verifie
 without real retained-account Android evidence. These navigation rules remain
 active until completion; archive/remove their temporary pointers afterward using
 repository maintenance conventions.
+
+PR #96 must remain draft/pending acceptance. The user is testing the immutable
+12aaeac candidate on the incident phone. Do not merge or publish a formal release
+before their device results; distinguish later branch changes from that APK.

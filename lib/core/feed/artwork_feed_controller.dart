@@ -48,6 +48,7 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
     this.sessionContextKey,
     this.onRequestStarted,
     this.cancelRequests,
+    this.cancelRequest,
   }) : _now = now ?? DateTime.now,
        _paginationBackoff =
            paginationBackoff ??
@@ -70,6 +71,7 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
   final Future<String> Function()? sessionContextKey;
   final void Function(String reason)? onRequestStarted;
   final void Function(String reason)? cancelRequests;
+  final void Function(PageRequest request, String reason)? cancelRequest;
 
   final Future<Page<Artwork>> Function(PageRequest request) _fetch;
 
@@ -131,13 +133,15 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
         .timeout(
           requestTimeout,
           onTimeout: () {
-            // Drop the in-flight entry so a retry after backoff starts a fresh
-            // request. The abandoned request is not cancelled (no cancel token is
-            // threaded through _fetch); its connection is reclaimed when dio's own
-            // timeout or the OS closes it. ponytail: single shared timeout; per-feed
-            // cancellation tokens if abandoned requests accumulate.
+            // Cancel only this page. An old pagination deadline must not cancel
+            // a newer first-page owner running concurrently.
             gate.cancel(key);
-            cancelRequests?.call('request_timeout');
+            final cancel = cancelRequest;
+            if (cancel != null) {
+              cancel(request, 'request_timeout');
+            } else {
+              cancelRequests?.call('request_timeout');
+            }
             throw const DAKitException(
               kind: DAKitFailureKind.network,
               code: 'feed.request.timeout',

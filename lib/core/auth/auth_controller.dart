@@ -289,7 +289,9 @@ final class AuthController extends StateNotifier<AuthState> {
     try {
       _log.info('auth', 'login: starting OAuth authorize');
       await runtime.oauth!.authorize();
+      if (!_isCurrentEpoch(epoch)) return;
       await AppPreferences.saveOAuthSessionKnown(true);
+      if (!_isCurrentEpoch(epoch)) return;
       _log.info('auth', 'login: authorize returned, loading account');
       await _loadAccount(runtime, epoch: epoch);
     } on DAKitException catch (error) {
@@ -307,7 +309,7 @@ final class AuthController extends StateNotifier<AuthState> {
       _log.error('auth', 'OAuth login failed (unexpected)', error, stack);
       state = AuthState(status: AuthStatus.signedOut, error: error);
     } finally {
-      _loggingIn = false;
+      if (_isCurrentEpoch(epoch)) _loggingIn = false;
     }
   }
 
@@ -352,7 +354,18 @@ final class AuthController extends StateNotifier<AuthState> {
     // the user back in on the next launch.
     _authEpoch += 1;
     state = const AuthState(status: AuthStatus.signedOut);
+    // Fence Web/RFY work immediately, before network revocation can stall.
+    final webClear = _ref
+        .read(webSessionControllerProvider.notifier)
+        .clear()
+        .catchError((Object error) {
+          _log.warning(
+            'auth',
+            'logout: web session clear failed errorType=${error.runtimeType}',
+          );
+        });
     await AppPreferences.saveOAuthSessionKnown(false);
+    await webClear;
     if (runtime.isConfigured && runtime.oauth != null) {
       try {
         _log.info('auth', 'logout: revoking oauth session');
@@ -367,13 +380,6 @@ final class AuthController extends StateNotifier<AuthState> {
         }
       }
     }
-    // Clear the embedded web session too (cookies + snapshot + state).
-    try {
-      await runtime.webViewProxyManager?.cookieManager.deleteAllCookies();
-    } on Object catch (error, stack) {
-      _log.warning('auth', 'logout: web cookie clear failed', error, stack);
-    }
-    await _ref.read(webSessionControllerProvider.notifier).clear();
   }
 
   /// Starts the background account profile load once and memoizes its future,
@@ -385,6 +391,8 @@ final class AuthController extends StateNotifier<AuthState> {
   /// Completes when the initial account profile load settles (account loaded,
   /// or the load failed and signed-in state has no account).
   Future<void> get accountLoad => _accountLoad ?? Future<void>.value();
+
+  Future<void> reloadAccount() => _loadAccount(_runtime, epoch: _authEpoch);
 
   Future<void> _loadAccount(AppRuntime runtime, {int? epoch}) async {
     final activeEpoch = epoch ?? _authEpoch;
@@ -407,11 +415,11 @@ final class AuthController extends StateNotifier<AuthState> {
       _log.error('auth', 'account load failed', error, stack);
       // Tokens are still valid even if the profile fetch failed; stay signed
       // in with an unknown profile instead of forcing a logout.
-      state = const AuthState(status: AuthStatus.signedIn);
+      state = AuthState(status: AuthStatus.signedIn, error: error);
     } on Object catch (error, stack) {
       if (!_isCurrentEpoch(activeEpoch)) return;
       _log.error('auth', 'account load failed', error, stack);
-      state = const AuthState(status: AuthStatus.signedIn);
+      state = AuthState(status: AuthStatus.signedIn, error: error);
     }
   }
 
