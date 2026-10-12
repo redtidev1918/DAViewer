@@ -17,9 +17,11 @@ Code/Release/Android/Original Incident verification must remain separate.
 - Baseline main/HEAD before new commits: `3432842a97fbc1e2b4fb6a7e9fe1060d1d72b100`.
 - Latest implementation commit: `2e1069df7f49c0aa58fd2bfbb9b5d49a2d1d76e4`.
 - Diagnostics milestone: `3c468a0d5cce6fd22c866eacf97d2746a6fea6c8`.
-- Task-memory checkpoint follows these commits; use `git log -1` for its own HEAD.
-- All current implementation is committed on the repair branch; initial memory
-  creation is being committed next. SPEC verbatim SHA256:
+- Last pushed memory checkpoint: `9eb7a6113abc6e7243b88191ab33dd4b4de87326`.
+  This document's next commit follows it; use `git log -1` for current HEAD.
+- All current implementation and task files are committed on the repair branch.
+  `.gitattributes` preserves the attachment's original CRLF without whitespace
+  false positives. SPEC verbatim SHA256:
   `1b2ed96c28c3712e5c8f6ad5a0045995ffc5db0f529e75d714f732f2fdf7e824`.
 - Latest release: v0.5.13; main fetched; no open PRs at initial investigation.
 - Retained stash: `stash@{0}`, `backup-local-edits-before-update-2026-10-12`.
@@ -34,7 +36,7 @@ Code/Release/Android/Original Incident verification must remain separate.
 ## Current phase
 
 Phase 0–3 implementation and Phase 4 automated regression complete locally.
-Preparing durable commits, PR/CI candidate APK, emulator smoke and real phone
+Preparing candidate APK, emulator smoke and real phone
 acceptance. Implementation remains a candidate, not proven incident closure.
 The SDK/emulator installation is an authorized integration-test subtask.
 
@@ -102,7 +104,7 @@ catalog and 021-android-session-recovery.md.
 ## Latest actual verification
 
 - Local Flutter 3.47.6 / Dart 3.13.5, existing SDK at `D:\flutter-sdk`.
-  CI pins Flutter 3.47.1, so runner verification is still required.
+  CI pins Flutter 3.47.1; runner analyze/test also PASS on commit 9eb7a61.
 - `dart format --output=none --set-exit-if-changed lib test`: PASS, 201 files,
   0 changed (latest full check).
 - `flutter analyze --no-pub`: PASS, no issues (latest full check).
@@ -128,7 +130,8 @@ x86_64 image in `D:\Android\Sdk`. User ANDROID_HOME and Flutter SDK config set.
 CPU virtualization enabled; WHPX acceleration check PASS; ~356 GB D: free.
 AVD `DAViewer_API36` created, emulator launched visibly (2 cores/2048 MB).
 Emulator booted and ADB reports `emulator-5554 device` (API36 x86_64).
-App operation still to verify. No real USB device is connected.
+Baseline v0.5.13 APK installed successfully on emulator-5554 and activity launch
+accepted by Android; UI smoke still pending. No real USB device is connected.
 
 New SDK tools 23 route sdkmanager to Android CLI and split semicolon package
 paths incorrectly via the wrapper. Successfully install images using:
@@ -142,10 +145,14 @@ This is the OLD baseline APK, not the new fix. Do not deliver it as candidate.
 
 ## PR, CI, release and acceptance
 
-- PR: NOT YET CREATED at initial checkpoint.
-- CI: NOT YET RUN for candidate.
+- Draft PR: https://github.com/redtidev1918/DAViewer/pull/96 (attached to chat).
+- CI analyze/test PASS on 9eb7a61:
+  https://github.com/redtidev1918/DAViewer/actions/runs/38193540169.
+- Branch contract PASS: run 38193540533.
+- Release plan run 38193540559 succeeded, but build/finalize were SKIPPED because
+  v0.5.13 is already healthy. No candidate APK was produced by that run.
 - Release: v0.5.13 untouched; candidate/formal new release PENDING.
-- Code Verified: local PASS (446); runner pending.
+- Code Verified: local PASS (446); runner analyze/test PASS.
 - Release Verified: PENDING.
 - Android Verified: PENDING; emulator bootstrap only.
 - Original Incident Verified: PENDING (v0.5.13 user incident FAIL).
@@ -160,14 +167,14 @@ This is the OLD baseline APK, not the new fix. Do not deliver it as candidate.
 
 ## Last success and next concrete actions
 
-Last success: final full regression **446 PASS**, format/analyze clean; AVD
-created and launch requested; persistent task files being established.
+Last success: implementation and complete task memory pushed; draft PR #96 and
+runner analyze/test PASS. Baseline APK installed and launch accepted on emulator.
 
-1. Verify SPEC copy hashes, inspect these task files, `git diff --check`.
-2. Commit diagnostic milestone, implementation+tests/docs, then durable memory;
-   update this checkpoint with resulting code commit and push branch.
-3. Create candidate draft PR, attach it to this Codex chat, inspect CI/Release
-   dry-run artifacts. Record PR URL, exact head SHA and runs in STATUS.
+1. Commit/push this updated checkpoint and CRLF-preserving `.gitattributes`.
+2. Dispatch existing Release workflow on repair branch with dry_run=true,
+   force=true, repair=true, version=0.5.13; reviewed reusable workflow guards
+   publication with !dry_run and checks out the caller branch. Do not move tag.
+3. Record candidate build run/head and inspect signed APK artifacts.
 4. `D:\Android\Sdk\platform-tools\adb.exe devices -l`; check boot, install
    baseline/candidate only on the intended emulator, launch app and smoke test.
 5. Download candidate APK from runner, record SHA256/certificate/buildRevision,
