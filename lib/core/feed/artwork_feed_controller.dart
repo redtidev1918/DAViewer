@@ -15,6 +15,7 @@ final class ArtworkFeedState {
     this.error,
     this.lastRefreshError,
     this.phase = FeedRequestPhase.idle,
+    this.lastSuccessfulRefreshAt,
   });
 
   final List<Artwork> items;
@@ -23,6 +24,12 @@ final class ArtworkFeedState {
   final Object? error;
   final Object? lastRefreshError;
   final FeedRequestPhase phase;
+
+  /// When the current items were last served by a successful first-page
+  /// fetch (or by a cache hydration, whose value is the cache's save time).
+  /// Retained across refresh failures so the UI can label stale-but-visible
+  /// content with its age instead of presenting it as live.
+  final DateTime? lastSuccessfulRefreshAt;
 
   bool get hasMore => nextCursor != null;
 }
@@ -120,13 +127,31 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
 
   Future<void> refresh() => _runFirstPageFetch();
 
-  /// Resume a failed initial load after its session prerequisite recovers.
-  /// Existing lists and active requests must not be refreshed by this signal.
+  /// Seeds the feed with a persisted first page so a cold start can render
+  /// the last good content while the refresh runs. The pending refresh (the
+  /// caller starts it right after) still replaces the list, so hydration is
+  /// skipped once any content exists.
+  void hydrate(List<Artwork> items, DateTime refreshedAt) {
+    if (!mounted || items.isEmpty || state.items.isNotEmpty) return;
+    _resetPaginationBackoff();
+    state = ArtworkFeedState(
+      items: List<Artwork>.unmodifiable(items),
+      lastSuccessfulRefreshAt: refreshedAt,
+      phase: FeedRequestPhase.refreshing,
+    );
+  }
+
+  /// Resume a failed load after its session prerequisite recovers.
+  ///
+  /// Recovers the initial page when the previous attempt errored, and also
+  /// resumes a refresh whose failure left stale (cached) content on screen:
+  /// the healthy transition is exactly the signal that the retry can now
+  /// succeed. Content whose last refresh succeeded is never touched.
   Future<void> recoverInitialPage() async {
-    if (!mounted ||
-        state.isLoading ||
-        state.items.isNotEmpty ||
-        state.error == null) {
+    if (!mounted || state.isLoading) return;
+    final staleContent = state.items.isNotEmpty && state.lastRefreshError != null;
+    final failedInitialLoad = state.items.isEmpty && state.error != null;
+    if (!staleContent && !failedInitialLoad) {
       return;
     }
     await refresh();
@@ -163,6 +188,7 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
         items: _uniqueItems(page.items),
         nextCursor: page.nextCursor,
         phase: FeedRequestPhase.idle,
+        lastSuccessfulRefreshAt: _now(),
       );
     } catch (error) {
       if (!mounted || revision != _revision) return;
@@ -172,9 +198,15 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
           nextCursor: state.nextCursor,
           lastRefreshError: error,
           phase: FeedRequestPhase.stopped,
+          // Keep the age label of whatever the user is still looking at.
+          lastSuccessfulRefreshAt: state.lastSuccessfulRefreshAt,
         );
       } else {
-        state = ArtworkFeedState(error: error, phase: FeedRequestPhase.stopped);
+        state = ArtworkFeedState(
+          error: error,
+          phase: FeedRequestPhase.stopped,
+          lastSuccessfulRefreshAt: state.lastSuccessfulRefreshAt,
+        );
       }
     }
   }
@@ -200,6 +232,7 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
         items: _uniqueItems(<Artwork>[...state.items, ...page.items]),
         nextCursor: page.nextCursor == cursor ? null : page.nextCursor,
         phase: FeedRequestPhase.idle,
+        lastSuccessfulRefreshAt: state.lastSuccessfulRefreshAt,
       );
     } catch (error) {
       if (!mounted || revision != _revision) return;

@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dakit_flutter/dakit_flutter.dart' hide WebSession;
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../core/auth/auth_controller.dart';
 import '../../core/auth/personalized_session_status.dart';
@@ -13,12 +15,20 @@ import '../../core/auth/web_session_status.dart';
 import 'package:dakit_web/dakit_web.dart';
 
 import '../../core/diagnostics/app_logger.dart';
+import '../../core/feed/artwork_feed_cache.dart';
 import '../../core/feed/artwork_feed_controller.dart';
 import '../../core/runtime/runtime_provider.dart';
 import '../artwork/artwork_access.dart';
 import '../artwork/artwork_store.dart';
 
 int _personalizedProviderSeq = 0;
+int _personalizedRequestSeq = 0;
+
+/// Overrides where per-account personalized-feed caches live (tests inject a
+/// temporary directory here). `null` — the default — resolves to
+/// `<application support>/feed_cache`, or to no cache at all on platforms
+/// without a support directory.
+final feedCacheDirectoryProvider = Provider<Directory?>((ref) => null);
 
 /// The website-personalized `rfy/deviations` recommendation feed, fetched with
 /// the embedded WebView's web session (Cookie + CSRF). Requires a signed-in web
@@ -46,9 +56,11 @@ final personalizedFeedProvider =
         final revision = request.cursor == null
             ? ++requestRevision
             : requestRevision;
+        final requestId = 'rfy-${++_personalizedRequestSeq}';
         AppLogger.instance.info(
           'home',
           'personalized feed fetch '
+              'request=$requestId '
               'reason=${request.cursor == null ? 'initial_or_refresh' : 'pagination'} '
               'cursor=${request.cursor ?? 'initial'}',
         );
@@ -126,7 +138,13 @@ final personalizedFeedProvider =
         final generation = ref
             .read(webSessionStatusProvider.notifier)
             .generation;
-        var page = await _tryFetchRfy(dio, csrf, cookieHeader, request);
+        var page = await _tryFetchRfy(
+          dio,
+          csrf,
+          cookieHeader,
+          request,
+          requestId: requestId,
+        );
         if (page == null) {
           // An app update can clear the live WebView cookie store even though
           // the persisted snapshot and OAuth identity survive. The startup
@@ -145,9 +163,21 @@ final personalizedFeedProvider =
           await ref.read(webSessionProbeProvider)();
           csrf = ref.read(webSessionControllerProvider).csrf;
           cookieHeader = await webSession.cookieHeader();
-          page = await _tryFetchRfy(dio, csrf, cookieHeader, request);
+          page = await _tryFetchRfy(
+            dio,
+            csrf,
+            cookieHeader,
+            request,
+            requestId: requestId,
+          );
         }
         if (page == null) {
+          AppLogger.instance.warning(
+            'home',
+            'rfy feed unavailable after retry request=$requestId '
+                'verdict=${ref.read(webSessionStatusProvider).state.name} '
+                'claimed=${webSessionState.username}',
+          );
           // The retry already refreshed the request context. A still-failing
           // rfy request is a feed failure (WAF/proxy/CSRF), not a login
           // verdict: only the authoritative session chain may produce the
@@ -204,10 +234,41 @@ final personalizedFeedProvider =
         ref.read(artworkStoreProvider.notifier).putAll(page.items);
         AppLogger.instance.info(
           'home',
-          'personalized feed accepted items=${page.items.length} generation=$generation',
+          'personalized feed accepted items=${page.items.length} '
+              'request=$requestId generation=$generation',
         );
+        // Persist the first page for the next cold start. Fire-and-forget:
+        // storage latency must never delay the feed, and a failed save only
+        // costs the next start its cached preview.
+        if (request.cursor == null) {
+          unawaited(
+            _persistPersonalizedFeedCache(
+              ref,
+              webSessionState.username,
+              page.items,
+            ),
+          );
+        }
         return page;
-      }, requestTimeout: const Duration(seconds: 60));
+      }, requestTimeout: const Duration(seconds: 60), autoLoad: false);
+      // autoLoad is off: the first page is triggered after the per-account
+      // cache had its chance to seed the list, so a cold start renders the
+      // last good recommendations instead of a skeleton while verification
+      // and the fetch run.
+      final cacheIdentity = ref.read(
+        webSessionControllerProvider.select(personalizedFeedSessionIdentity),
+      );
+      if (cacheIdentity.$1 == true && cacheIdentity.$2.trim().isNotEmpty) {
+        unawaited(
+          _hydratePersonalizedFeedFromCache(
+            ref,
+            controller,
+            cacheIdentity.$2.trim(),
+          ),
+        );
+      } else {
+        unawaited(controller.refresh());
+      }
       ref.listen(webSessionStatusProvider, (previous, next) {
         if (previous?.isHealthy == false && next.isHealthy) {
           // Verification can recover after the initial feed attempt stopped.
@@ -238,13 +299,15 @@ Future<Page<Artwork>?> _tryFetchRfy(
   Dio dio,
   String csrf,
   String cookieHeader,
-  PageRequest request,
-) async {
+  PageRequest request, {
+  required String requestId,
+}) async {
   final logger = AppLogger.instance;
   if (csrf.isEmpty || cookieHeader.isEmpty) {
     logger.warning(
       'home',
-      'rfy skipped: csrf=${csrf.isEmpty ? 'missing' : 'ok'} '
+      'rfy skipped: request=$requestId '
+          'csrf=${csrf.isEmpty ? 'missing' : 'ok'} '
           'cookie=${cookieHeader.isEmpty ? 'missing' : 'ok'}',
     );
     return null;
@@ -282,13 +345,120 @@ Future<Page<Artwork>?> _tryFetchRfy(
   } on Object catch (error, stack) {
     logger.warning(
       'home',
-      'personalized feed failure elapsedMs=${stopwatch.elapsedMilliseconds} '
+      'personalized feed failure '
+          'request=$requestId '
+          'classification=${classifyFeedFetchError(error)} '
+          'elapsedMs=${stopwatch.elapsedMilliseconds} '
           'cursor=${request.cursor ?? 'initial'}',
       error,
       stack,
     );
     return null;
   }
+}
+
+/// Buckets a failed feed fetch into a stable, greppable classification so
+/// production logs can tell proxy/network failures from WAF blocks and
+/// protocol changes without dumping raw provider payloads.
+String classifyFeedFetchError(Object error) {
+  if (error is DAKitException) {
+    return 'dakit:${error.kind.name}:${error.code}';
+  }
+  if (error is DioException) {
+    final response = error.response;
+    if (response != null && response.statusCode != null) {
+      return 'http:${response.statusCode}';
+    }
+    return switch (error.type) {
+      DioExceptionType.connectionTimeout => 'net:connection-timeout',
+      DioExceptionType.receiveTimeout => 'net:receive-timeout',
+      DioExceptionType.sendTimeout => 'net:send-timeout',
+      DioExceptionType.connectionError => 'net:connection-error',
+      DioExceptionType.badCertificate => 'net:bad-certificate',
+      DioExceptionType.cancel => 'net:cancelled',
+      _ => 'net:${error.type.name}',
+    };
+  }
+  return 'unknown:${error.runtimeType}';
+}
+
+Future<Directory?> _resolvePersonalizedFeedCacheDirectory(Ref ref) async {
+  final override = ref.read(feedCacheDirectoryProvider);
+  if (override != null) return override;
+  try {
+    // A platform that never answers (or a test fake-async zone without
+    // channel handlers) must not stall the first feed load: a slow
+    // resolution simply means "no cache this run".
+    final support = await getApplicationSupportDirectory()
+        .timeout(const Duration(seconds: 3));
+    return Directory('${support.path}${Platform.pathSeparator}feed_cache');
+  } on Object {
+    // No support directory (or storage unavailable): run without a cache.
+    return null;
+  }
+}
+
+Future<void> _persistPersonalizedFeedCache(
+  Ref ref,
+  String username,
+  List<Artwork> items,
+) async {
+  final trimmed = username.trim();
+  if (trimmed.isEmpty || !ref.mounted) return;
+  try {
+    final directory = await _resolvePersonalizedFeedCacheDirectory(ref);
+    if (directory == null) return;
+    await ArtworkFeedCacheStore(directory: directory).write(trimmed, items);
+    AppLogger.instance.info(
+      'home',
+      'personalized feed cache saved items=${items.length} user=$trimmed',
+    );
+  } on Object catch (error, stack) {
+    AppLogger.instance.warning(
+      'home',
+      'personalized feed cache save failed',
+      error,
+      stack,
+    );
+  }
+}
+
+Future<void> _hydratePersonalizedFeedFromCache(
+  Ref ref,
+  ArtworkFeedController controller,
+  String username,
+) async {
+  try {
+    final directory = await _resolvePersonalizedFeedCacheDirectory(ref);
+    if (directory != null) {
+      final snapshot = await ArtworkFeedCacheStore(directory: directory).read(
+        username,
+      );
+      if (snapshot != null && snapshot.items.isNotEmpty) {
+        final ageMinutes = DateTime.now()
+            .difference(snapshot.savedAt)
+            .inMinutes
+            .abs();
+        controller.hydrate(snapshot.items, snapshot.savedAt);
+        AppLogger.instance.info(
+          'home',
+          'personalized feed hydrated from cache '
+              'items=${snapshot.items.length} ageMinutes=$ageMinutes',
+        );
+      }
+    }
+  } on Object catch (error, stack) {
+    AppLogger.instance.warning(
+      'home',
+      'personalized feed cache hydration failed',
+      error,
+      stack,
+    );
+  }
+  if (!controller.mounted) return;
+  // Always refresh after hydration (or when no cache existed): cached pages
+  // are a preview, never a substitute for live recommendations.
+  await controller.refresh();
 }
 
 /// Daily deviations (official API, requires an OAuth session). Rebuilds when

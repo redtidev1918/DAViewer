@@ -11,6 +11,31 @@ import '../runtime/runtime_provider.dart';
 import 'web_session_controller.dart';
 import 'web_session_platform.dart';
 
+/// The raw markers a page exposed to the probe script, before any verdict
+/// mapping. A page showing neither a username nor a CSRF token is almost
+/// always a WAF/interstitial challenge (PerimeterX, AWS WAF): it redirects
+/// once its JavaScript has solved, so the probe must stay alive and observe
+/// the follow-up navigation instead of treating the first load stop as the
+/// final answer.
+final class WebSessionProbeObservation {
+  const WebSessionProbeObservation({
+    required this.pageUsername,
+    required this.csrf,
+  });
+
+  /// The rendered `@publicSession.user.username`, or `null` when the page
+  /// exposed no user marker at all (challenge, incomplete load, parser gap).
+  final String? pageUsername;
+
+  /// The page's `__CSRF_TOKEN__`, empty when absent.
+  final String csrf;
+
+  /// Pages that carry at least one DeviantArt session marker are final
+  /// observations; marker-less pages are expected to be replaced by a
+  /// challenge redirect.
+  bool get hasSessionMarkers => pageUsername != null || csrf.isNotEmpty;
+}
+
 /// What a real (headless WebView) load of the DeviantArt home page reported.
 ///
 /// This is the authoritative session probe: it carries the same cookie store,
@@ -94,6 +119,12 @@ final class WebSessionRefresher {
   bool _running = false;
   Timer? _timeout;
   Completer<WebSessionProbeResult>? _completion;
+  int _inconclusiveStops = 0;
+
+  /// Marker-less load stops tolerated while waiting for a WAF challenge to
+  /// redirect. Bounded so a static block page still reports within the probe
+  /// deadline instead of waiting for the full timeout every time.
+  static const int _maxInconclusiveStops = 3;
 
   /// Loads `www.deviantart.com` headlessly and reports what the real browser
   /// saw: a CSRF token plus whether the page rendered a signed-in username.
@@ -105,6 +136,7 @@ final class WebSessionRefresher {
       return active.future;
     }
     _running = true;
+    _inconclusiveStops = 0;
     final completion = Completer<WebSessionProbeResult>();
     _completion = completion;
     // Include proxy setup and browser startup in the deadline. Neither may
@@ -134,7 +166,44 @@ final class WebSessionRefresher {
         onLoadStop: (controller, url) async {
           if (!identical(_completion, completion)) return;
           if (url == null || url.host != 'www.deviantart.com') return;
-          final result = await _report(controller, completion);
+          final observation = await _observe(controller, completion);
+          if (!identical(_completion, completion) || !_ref.mounted) return;
+          final result = webSessionProbeResultFromPage(
+            pageUsername: observation.pageUsername?.trim(),
+            csrf: observation.csrf,
+          );
+          // Logging context only: the local identity must never impersonate the
+          // page observation (see REG-010).
+          final localUsername = _ref.read(webSessionControllerProvider).username;
+          debugPrint(
+            '[web-session] probe outcome=${result.outcome.name} '
+            'csrf=${observation.csrf.length} '
+            'pageUsername=${observation.pageUsername == null
+                ? 'missing'
+                : observation.pageUsername!.isEmpty
+                ? '-'
+                : observation.pageUsername} '
+            'localUsername=${localUsername.isEmpty ? '-' : localUsername}',
+          );
+          if (result.outcome != WebSessionProbeOutcome.unavailable) {
+            await _dispose(result, completion);
+            return;
+          }
+          _inconclusiveStops += 1;
+          if (!observation.hasSessionMarkers &&
+              _inconclusiveStops < _maxInconclusiveStops) {
+            // A WAF challenge first renders a marker-less interstitial and
+            // redirects after solving. Disposing on this stop made every
+            // challenged cold start report "unavailable" for a valid session
+            // (the first load stop carries no __INITIAL_STATE__ or CSRF at
+            // all); wait for the redirect's own load stop, bounded by the
+            // probe timeout and the inconclusive-stop cap.
+            debugPrint(
+              '[web-session] probe page has no session markers (challenge?); '
+              'waiting for redirect stop=$_inconclusiveStops/$_maxInconclusiveStops',
+            );
+            return;
+          }
           await _dispose(result, completion);
         },
         onReceivedError: (controller, request, error) async {
@@ -153,17 +222,20 @@ final class WebSessionRefresher {
     }
   }
 
-  Future<WebSessionProbeResult> _report(
+  /// Reads the page's session markers without mapping them onto a verdict.
+  /// Also rotates the live CSRF when the page exposed one (the probe is a pure
+  /// observer: it never writes an identity or a session verdict, REG-010).
+  Future<WebSessionProbeObservation> _observe(
     InAppWebViewController controller,
     Completer<WebSessionProbeResult> completion,
   ) async {
     try {
       final raw = await controller.evaluateJavascript(source: _probeScript);
       if (!identical(_completion, completion) || !_ref.mounted) {
-        return const WebSessionProbeResult.unavailable();
+        return const WebSessionProbeObservation(pageUsername: null, csrf: '');
       }
       if (raw is! String || raw.isEmpty) {
-        return const WebSessionProbeResult.unavailable();
+        return const WebSessionProbeObservation(pageUsername: null, csrf: '');
       }
       final data = jsonDecode(raw) as Map<String, dynamic>;
       final csrf = (data['csrf'] as String?) ?? '';
@@ -171,23 +243,6 @@ final class WebSessionRefresher {
       // challenge, incomplete load) and 'anonymous' only when the page itself
       // explicitly reported a signed-out session. The two must never merge.
       final pageUsername = (data['username'] as String?)?.trim();
-      final result = webSessionProbeResultFromPage(
-        pageUsername: pageUsername,
-        csrf: csrf,
-      );
-      // Logging context only: the local identity must never impersonate the
-      // page observation (see REG-010).
-      final localUsername = _ref.read(webSessionControllerProvider).username;
-      debugPrint(
-        '[web-session] probe outcome=${result.outcome.name} '
-        'csrf=${csrf.length} '
-        'pageUsername=${pageUsername == null
-            ? 'missing'
-            : pageUsername.isEmpty
-            ? '-'
-            : pageUsername} '
-        'localUsername=${localUsername.isEmpty ? '-' : localUsername}',
-      );
       // A public browser session is sufficient for numeric-id and website
       // metadata fallbacks. This probe is a pure observer: it rotates the CSRF
       // for website adapters and returns its observation. It never writes an
@@ -208,10 +263,10 @@ final class WebSessionRefresher {
               }),
         );
       }
-      return result;
+      return WebSessionProbeObservation(pageUsername: pageUsername, csrf: csrf);
     } on Object catch (error) {
       debugPrint('[web-session] headless report failed: $error');
-      return const WebSessionProbeResult.unavailable();
+      return const WebSessionProbeObservation(pageUsername: null, csrf: '');
     }
   }
 
