@@ -1,0 +1,26 @@
+=== remote state verification for candidate 14797b3 ===
+local time: 2026-10-12T12:19:21.5327334+08:00
+
+--- gh auth status ---
+github.com
+  ✓ Logged in to github.com account redtidev1918 (keyring)
+  - Active account: true
+  - Git operations protocol: https
+  - Token: gho_************************************
+  - Token scopes: 'gist', 'read:org', 'repo', 'workflow'
+
+--- PR #96 ---
+{"baseRefName":"main","headRefName":"codex/android-session-recovery","headRefOid":"14797b3aaccab0d9a33624cde2c85a568327edd7","isDraft":true,"state":"OPEN","title":"fix(auth): coordinate Android session recovery and RFY ownership"}
+
+--- CI run 38201334742 ---
+{"conclusion":"success","displayTitle":"fix(auth): coordinate Android session recovery and RFY ownership","headSha":"14797b3aaccab0d9a33624cde2c85a568327edd7","status":"completed","workflowName":"CI"}
+
+--- release build run 38201331890 ---
+{"conclusion":"success","displayTitle":"Release","headSha":"14797b3aaccab0d9a33624cde2c85a568327edd7","status":"completed","workflowName":"Release"}
+
+--- artifact 11725054596 ---
+{"created_at":"2026-10-12T03:59:38Z","expired":false,"id":11725054596,"name":"release-assets-0.5.13-0","size_bytes":31523334,"workflow_run_id":38201331890}
+
+--- branch heads ---
+origin/codex/android-session-recovery: 14797b3aaccab0d9a33624cde2c85a568327edd7
+local HEAD: 14797b3aaccab0d9a33624cde2c85a568327edd7

@@ -1,0 +1,6 @@
+=== artifact download for candidate 14797b3 ===
+downloaded: 2026-10-12T12:21:06.4965439+08:00
+source: run 38201331890 artifact release-assets-0.5.13-0 (id 11725054596)
+target dir: D:\Android\setup\candidate-14797b3
+
+release\DAViewer-v0.5.13.apk  67445302 bytes

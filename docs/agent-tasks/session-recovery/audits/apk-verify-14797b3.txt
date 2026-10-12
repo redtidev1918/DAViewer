@@ -1,0 +1,32 @@
+=== APK verification for candidate 14797b3 ===
+time: 2026-10-12T12:23:30.5882842+08:00
+source apk: D:\Android\setup\candidate-14797b3\release\DAViewer-v0.5.13.apk (from Actions run 38201331890 artifact release-assets-0.5.13-0)
+JAVA_HOME: C:\Program Files\Microsoft\jdk-21.0.12.101-hotspot
+file SHA256: c801132bde1da095bdf30f32286500f21824ff5e421e003c0fcc3ad016af4412
+--- apksigner verify --print-certs ---
+Signer #1 certificate DN: C=CN, O=redtidev1918, CN=DAViewer
+Signer #1 certificate SHA-256 digest: 686474b39fd91d20c1db3ce5bf6216ed8ab05ec7638f904251e0d108a34e7141
+Signer #1 certificate SHA-1 digest: 9b104c08b142560b704bb31fb9eace2f83eac63a
+Signer #1 certificate MD5 digest: cf36434428906e094f48dfafd4cafa7b
+parsed cert SHA256: 686474b39fd91d20c1db3ce5bf6216ed8ab05ec7638f904251e0d108a34e7141
+expected cert SHA256: 686474b39fd91d20c1db3ce5bf6216ed8ab05ec7638f904251e0d108a34e7141
+cert match: True
+--- aapt dump badging (selected) ---
+package: name='app.daviewer' versionCode='225' versionName='0.5.13' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'
+sdkVersion:'24'
+targetSdkVersion:'36'
+uses-permission: name='android.permission.WRITE_EXTERNAL_STORAGE' maxSdkVersion='29'
+uses-permission: name='android.permission.READ_EXTERNAL_STORAGE' maxSdkVersion='29'
+uses-implied-permission: name='android.permission.READ_EXTERNAL_STORAGE' maxSdkVersion='29' reason='requested WRITE_EXTERNAL_STORAGE'
+native-code: 'arm64-v8a' 'armeabi-v7a' 'x86_64'
+package/version ok: True ; debuggable flag present: False
+--- embedded buildRevision search in libapp.so ---
+lib/arm64-v8a/libapp.so: full revision string found = True (index 466716)
+lib/x86_64/libapp.so: full revision string found = True (index 466857)
+--- artifacts of run 38201331890 ---
+11726200749 release-assets-0.5.13-1 25304645 bytes expired=false
+11725841842 release-assets-0.5.13-2 14584812 bytes expired=false
+11725054596 release-assets-0.5.13-0 31523334 bytes expired=false
+--- delivery decision ---
+all checks PASS -> delivered: D:\Android\setup\DAViewer-v0.5.13-session-recovery-14797b3.apk
+delivered file SHA256: c801132bde1da095bdf30f32286500f21824ff5e421e003c0fcc3ad016af4412 (same as source: True)

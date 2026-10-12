@@ -16,8 +16,9 @@ Code/Release/Android/Original Incident verification must remain separate.
 - Branch: `codex/android-session-recovery` (independent from main).
 - Baseline main/HEAD before new commits: `3432842a97fbc1e2b4fb6a7e9fe1060d1d72b100`.
 - Previous delivered implementation: `3d62b45a0466fdf817b7d6a1bdccc47edb6385a6` (phone FAIL).
-- New startup/source checkpoint follows `f8a53bb0194e1d79b1069c28a0a0a7de654a4bbe`;
-  use `git log -1` for the exact new HEAD. Full verification/build below.
+- Latest pushed source: `14797b3aaccab0d9a33624cde2c85a568327edd7`.
+  It follows `f8a53bb0194e1d79b1069c28a0a0a7de654a4bbe`; later docs commits
+  do not alter this candidate source. Use `git log -1` for actual current HEAD.
   Previous architecture milestone: `2e1069df7f49c0aa58fd2bfbb9b5d49a2d1d76e4`.
 - Diagnostics milestone: `3c468a0d5cce6fd22c866eacf97d2746a6fea6c8`.
 - Last pushed implementation/memory checkpoint before this update: `3d62b45a0466fdf817b7d6a1bdccc47edb6385a6`.
@@ -72,6 +73,58 @@ directory on PATH. SDK/platform initialization timeouts are bounded and optional
 pre-runApp reads now catch exceptions too. Next: save/push this source checkpoint,
 run exact-SHA joint CI and signed three-platform candidate builds, inspect and run
 candidate autonomously. No merge or formal release yet; previous phone FAIL unchanged.
+
+### 2026-10-12 13:54 cross-platform takeover checkpoint (session 3)
+
+- New agent session took over after 14797b3. Remote re-verified: PR #96
+  OPEN/draft head=`14797b3aaccab0d9a33624cde2c85a568327edd7` (= local HEAD),
+  CI run 38201334742 PASS, release dry-run 38201331890 PASS, artifact
+  11725054596 (release-assets-0.5.13-0). Local format/analyze/test on the
+  same SHA: `No issues found!` + `473 passed`. Evidence:
+  `audits/remote-state-14797b3.txt`, `audits/local-verify-14797b3.txt`.
+- Candidate APK verified and delivered:
+  `D:\Android\setup\DAViewer-v0.5.13-session-recovery-14797b3.apk`.
+  Certificate SHA256 equals the v0.5.13 baseline
+  (`686474b3…7141`, DN C=CN,O=redtidev1918,CN=DAViewer);
+  aapt `app.daviewer` versionName=0.5.13 versionCode=225, no
+  application-debuggable; `DAVIEWER_REVISION=14797b3…edd7` present in all
+  three ABIs of libapp.so; file SHA256
+  `c801132bde1da095bdf30f32286500f21824ff5e421e003c0fcc3ad016af4412`
+  (67,445,302 bytes). Four-item evidence with raw commands/outputs:
+  `audits/apk-s3-{1..4}-14797b3.txt`. Independent verdict registration for
+  this step hit a task-tool registration failure twice (evidence itself
+  re-verified clean); recorded as "technical verification PASS, independent
+  verdict blocked" per user instruction, engineering continues.
+- Four no-phone audits of 14797b3 complete (full reports under `audits/`):
+  - Startup routing (14797b3-startup-routing.md): gate/redirect logic sound;
+    12s deadline, finally-release, no /splash loop; no defect. 3 test gaps.
+  - Session recovery (14797b3-session-recovery.md): Q1-Q3 OK.
+    DEFECT D1 (P1): explicit logout has no tombstone — a stale login-page
+    WebView sample can resurrect `isLoggedIn=true` in memory
+    (report() self-bumps _identityEpoch; markHealthy always accepts).
+    D2-D5 (P2): logout doesn't cancel pending PKCE; signedOut evidence
+    leaves status unknown; authorize() unbounded; native cookie queue and
+    secure-storage writes unbounded. R1 (risk, code-indeterminate):
+    dakit:// callback captured only in shouldOverrideUrlLoading — a
+    server-side 30x redirect would bypass it, matching the 12aaeac phone
+    failure signature; decide on device/emulator via logcat `oauthBridge`.
+  - Logger (14797b3-logger.md): D1 (P1) initialize() IO exceptions uncaught
+    → crash before runApp; D2 (P1) main() awaits AppLogger/CrashMarker/
+    AppPreferences without bound → hang before runApp on stalled disk;
+    D3-D5 (P2). Flush/close hardening already present and tested.
+  - RFY ownership (14797b3-rfy-ownership.md): single-flight, transport
+    terminal states, discard reasons, backoff all sound; no P0/P1. The
+    original incident's rfy-4-discard mechanism (v0.5.13) remains
+    CANNOT-DETERMINE without that build's sources.
+- User authorization extended (m00292): cross-platform reliability program
+  (Android/Windows/macOS), keep existing work, fix P0/P1 first, then
+  extend audits to platform adapters, build L1-L4 test matrix, merge PR #96
+  and release v0.5.14+ after gates pass. Planned code fixes (session 3,
+  in progress): logger initialize crash-safety + bounded main-chain IO,
+  logout tombstone in WebSessionController.report, logout cancelPending,
+  signedOut evidence explicit state, authorize() hang bound, OAuth callback
+  fallback capture (R1). Emulator for L3 vanished twice (AVD boots then
+  exits); to be re-established before Android run-level verification.
 
 ### 2026-10-12 active startup regression checkpoint
 
