@@ -74,6 +74,21 @@ pre-runApp reads now catch exceptions too. Next: save/push this source checkpoin
 run exact-SHA joint CI and signed three-platform candidate builds, inspect and run
 candidate autonomously. No merge or formal release yet; previous phone FAIL unchanged.
 
+Implementation 71c45ae was merged with the existing docs-only aead827 checkpoint
+in isolated branch HEAD 643f3c1; main checkout's uncommitted work remains untouched.
+Integration Draft PR #97 targets the PR #96 branch, not main. CI 38215587099 PASS;
+joint run 38215587214 quality/Android production-signed/macOS PASS, Windows FAIL
+(VS 2026 removed the experimental coroutine header used by the pinned WebView
+plugin). Change joint runner to the existing Windows 2022 release toolchain and
+rerun before claiming complete build verification. No package/source workaround.
+Local Windows NuGet installed successfully, but ATL installation exited 5007;
+local native build remains blocked by missing ATL and source codepage 936 warnings.
+SDK core/api/web API docs generated; local Flutter-package dartdoc failed in its
+doc-import stripping with RangeError, not package analyze. Add Linux graph/docs/
+publish preflight to joint CI; no SDK merge/publish until that gate is checked.
+Android candidate 643f3c1 download/signature/provenance/smoke is the next action;
+it contains fixed SDK bbf52bd. It is a candidate, not accepted original-incident evidence.
+
 ### 2026-10-12 13:54 cross-platform takeover checkpoint (session 3)
 
 - New agent session took over after 14797b3. Remote re-verified: PR #96

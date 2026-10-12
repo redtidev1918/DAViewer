@@ -39,7 +39,11 @@ jobs:
           cache: true
       - name: Verify SDK workspace
         working-directory: .joint-sdk
-        run: ./tool/verify.sh
+        run: |
+          ./tool/verify.sh
+          dart run melos run graph
+          dart run melos run doc
+          dart run melos run publish:check
       - name: Verify application with exact SDK source
         shell: bash
         run: |
@@ -56,7 +60,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-latest, windows-2025, macos-26]
+        # Current WebView plugin requires the project's VS 2022 toolchain.
+        runner: [ubuntu-latest, windows-2022, macos-26]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     steps:
