@@ -137,6 +137,17 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
   Future<void>? _cookieRestore;
   int _identityEpoch = 0;
   int get identityEpoch => _identityEpoch;
+
+  // Logout tombstone: a signed-in report that started before an explicit
+  // logout (or while one is unresolved) must not resurrect the in-memory
+  // signed-in state. [clear] bumps the revision; a report captures the
+  // revision at entry and is dropped when it is stale or the tombstone is
+  // unresolved; a *new* valid signed-in snapshot (or a verified restore)
+  // resolves it.
+  int _logoutRevision = 0;
+  int _resolvedLogoutRevision = 0;
+  bool get _hasUnresolvedLogout => _logoutRevision > _resolvedLogoutRevision;
+
   Future<void> _nativeCookieTail = Future<void>.value();
   int _cookieOperationSequence = 0;
   Future<void> get cookieMutations => _nativeCookieTail;
@@ -290,6 +301,9 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
             isLoggedIn: true,
             username: restored.username,
           );
+          // A verified restore is a fresh signed-in establishment: it
+          // resolves any logout tombstone from an earlier explicit logout.
+          _resolvedLogoutRevision = _logoutRevision;
           await _store.update(
             isLoggedIn: true,
             username: restored.username,
@@ -315,6 +329,9 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
     List<PersistedWebCookie>? capturedCookies,
   }) async {
     final loggedIn = username.isNotEmpty;
+    // Tombstone: capture the logout revision so a report racing an explicit
+    // logout can be dropped at the write-back branches below.
+    final logoutRevision = _logoutRevision;
     if (loggedIn && username.toLowerCase() != state.username.toLowerCase()) {
       _identityEpoch++;
     }
@@ -363,6 +380,21 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
       return;
     }
 
+    // Tombstone gate: a signed-in report that started before the explicit
+    // logout (or while its cleanup is still unresolved) must not resurrect
+    // the in-memory signed-in state. Only a *new* valid signed-in snapshot
+    // after a fresh login resolves the tombstone (see the write-back branch
+    // below and the restore-verified path).
+    if (loggedIn &&
+        (_logoutRevision != logoutRevision || _hasUnresolvedLogout)) {
+      AppLogger.instance.warning(
+        'web-session',
+        'stale signed-in report dropped reason=post_logout_no_snapshot '
+            'claimedUsername=$username',
+      );
+      return;
+    }
+
     if (loggedIn &&
         !isValidCookieSnapshot(
           cookies: capturedCookies ?? const <PersistedWebCookie>[],
@@ -383,6 +415,11 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
       isLoggedIn: loggedIn,
       username: username,
     );
+    if (loggedIn) {
+      // A fresh, valid signed-in snapshot from a new login resolves any
+      // earlier logout tombstone.
+      _resolvedLogoutRevision = _logoutRevision;
+    }
     await _store.update(
       csrf: csrf,
       isLoggedIn: loggedIn,
@@ -651,6 +688,9 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
 
   Future<void> clear() async {
     _identityEpoch++;
+    // Raise the logout tombstone: signed-in reports captured before this
+    // point are dropped until a fresh valid snapshot resolves it.
+    _logoutRevision++;
     _cookieRestore = null;
     state = const WebSessionState(isLoggedIn: false);
     final nativeClear = _withNativeCookies(() async {

@@ -127,6 +127,10 @@ final class AuthController extends StateNotifier<AuthState> {
               stack,
             );
           }
+          // Record the signed-out verdict in state: leaving it `unknown`
+          // routes the app into /web-login even though the user explicitly
+          // logged out last session.
+          state = const AuthState(status: AuthStatus.signedOut);
           _initializing = false;
           return;
         }
@@ -288,7 +292,38 @@ final class AuthController extends StateNotifier<AuthState> {
     );
     try {
       _log.info('auth', 'login: starting OAuth authorize');
-      await runtime.oauth!.authorize();
+      // Bounded authorize: a WebView/plugin that never returns the callback
+      // must not leave the login flow spinning forever. Five minutes covers
+      // password entry and 2FA; on timeout the transaction is cancelled and
+      // the abandoned future is swallowed.
+      final authorize = runtime.oauth!.authorize();
+      try {
+        await authorize.timeout(const Duration(minutes: 5));
+      } on TimeoutException {
+        if (!_isCurrentEpoch(epoch)) return;
+        _log.warning(
+          'auth',
+          'login: OAuth authorize timed out after 5min; abandoning',
+        );
+        try {
+          await runtime.oauth!.authorization.cancelPending();
+        } on Object catch (error, stack) {
+          _log.warning(
+            'auth',
+            'login: cancel after timeout failed',
+            error,
+            stack,
+          );
+        }
+        // The abandoned authorize future may still complete (or fail) later;
+        // observe it silently so it cannot become an unhandled error.
+        unawaited(authorize.then((_) {}, onError: (Object _) {}));
+        state = AuthState(
+          status: AuthStatus.signedOut,
+          error: TimeoutException('OAuth login timed out'),
+        );
+        return;
+      }
       if (!_isCurrentEpoch(epoch)) return;
       await AppPreferences.saveOAuthSessionKnown(true);
       if (!_isCurrentEpoch(epoch)) return;
@@ -354,6 +389,20 @@ final class AuthController extends StateNotifier<AuthState> {
     // the user back in on the next launch.
     _authEpoch += 1;
     state = const AuthState(status: AuthStatus.signedOut);
+    // End any in-flight PKCE transaction: a late callback for an abandoned
+    // authorize must not complete a login the user has logged out of.
+    if (runtime.oauth != null) {
+      try {
+        await runtime.oauth!.authorization.cancelPending();
+      } on Object catch (error, stack) {
+        _log.warning(
+          'auth',
+          'logout: cancel pending OAuth transaction failed',
+          error,
+          stack,
+        );
+      }
+    }
     // Fence Web/RFY work immediately, before network revocation can stall.
     final webClear = _ref
         .read(webSessionControllerProvider.notifier)

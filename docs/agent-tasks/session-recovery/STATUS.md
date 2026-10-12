@@ -51,6 +51,22 @@ Code/Release/Android/Original Incident verification must remain separate.
 
 ## Current phase
 
+### Active joint SDK continuation — 2026-10-12
+
+Engineering continues in the attached isolated worktree
+`C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer`, branch
+`codex/daviewer-sdk-integration`, latest pushed source `1d8ba3bff818b71bc235ef514e0495a968ba38ee`.
+Read its STATUS.md and SDK-INTEGRATION.md before proceeding; Draft PR #97 targets
+this PR #96 branch. SDK workspace is `D:\Code\DAKit`, branch
+`codex/oauth-lifecycle-reliability`, Draft PR #42, implementation `feec94f09c1f6b12628a099fe374e6ebafb3e9df`.
+App 486 tests / SDK 251 tests PASS; replacement joint CI in progress, prior joint
+CI 38216761322 passed three-platform builds. This main checkout's five existing
+uncommitted source edits are preserved and reviewed/corrected in the isolated
+branch; do not reset/reapply stash or independently duplicate them. Follow-up
+Web-verification deadline error handling is under final test in that worktree.
+Old phone candidates remain FAIL; Original Incident Verified and formal release
+remain PENDING. This local pointer is not a source-code milestone.
+
 ### 2026-10-12 13:54 cross-platform takeover checkpoint (session 3)
 
 - New agent session took over after 14797b3. Remote re-verified: PR #96

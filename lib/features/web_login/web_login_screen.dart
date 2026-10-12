@@ -139,6 +139,37 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
     );
   }
 
+  /// Detects the `dakit://oauth` OAuth callback on any navigation path and
+  /// hands it to the bridge. Some redirect chains (server-side 30x, history
+  /// restores) bypass [onLoadStart] via `shouldOverrideUrlLoading`, so every
+  /// navigation hook calls this; the bridge's `addCallback` is idempotent, so
+  /// a double delivery at worst reloads the home page once.
+  ///
+  /// Returns true when the URI was an OAuth callback (the caller must cancel
+  /// that navigation: the callback page has no reportable session state).
+  bool _handlePossibleOAuthCallback(
+    InAppWebViewController controller,
+    Uri? uri,
+  ) {
+    if (uri == null || uri.scheme != 'dakit' || uri.host != 'oauth') {
+      return false;
+    }
+    _bridge?.addCallback(uri);
+    _navSource = 'oauth_callback';
+    // Navigate back to the deviantart home page; its onLoadStop then
+    // reports the real web session (CSRF + login state). Do NOT read the
+    // session here — the callback page has no __INITIAL_STATE__.
+    unawaited(
+      _navigate(
+        () => controller.loadUrl(
+          urlRequest: URLRequest(url: WebUri(_homeUri.toString())),
+        ),
+        source: 'oauth_callback_home',
+      ),
+    );
+    return true;
+  }
+
   Future<void> _navigate(
     Future<void> Function() action, {
     required String source,
@@ -534,29 +565,18 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                           shouldOverrideUrlLoading:
                               (controller, navigationAction) async {
                                 final uri = navigationAction.request.url;
-                                if (uri != null &&
-                                    uri.scheme == 'dakit' &&
-                                    uri.host == 'oauth') {
-                                  _bridge?.addCallback(uri);
-                                  _navSource = 'oauth_callback';
-                                  // Navigate back to the deviantart home page; its onLoadStop then
-                                  // reports the real web session (CSRF + login state). Do NOT read
-                                  // the session here — the callback page has no __INITIAL_STATE__.
-                                  unawaited(
-                                    _navigate(
-                                      () => controller.loadUrl(
-                                        urlRequest: URLRequest(
-                                          url: WebUri(_homeUri.toString()),
-                                        ),
-                                      ),
-                                      source: 'oauth_callback_home',
-                                    ),
-                                  );
+                                if (_handlePossibleOAuthCallback(
+                                  controller,
+                                  uri,
+                                )) {
                                   return NavigationActionPolicy.CANCEL;
                                 }
                                 return NavigationActionPolicy.ALLOW;
                               },
                           onLoadStart: (controller, url) {
+                            if (_handlePossibleOAuthCallback(controller, url)) {
+                              return;
+                            }
                             _reportSeq++;
                             _sessionObserver?.navigationStarted(loading: true);
                             _navSeq += 1;
@@ -593,6 +613,9 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                             }
                           },
                           onUpdateVisitedHistory: (controller, url, isReload) {
+                            if (_handlePossibleOAuthCallback(controller, url)) {
+                              return;
+                            }
                             _reportSeq++;
                             _sessionObserver?.navigationStarted();
                             if (_sessionObserver?.isDisposed == true &&

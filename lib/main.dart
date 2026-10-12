@@ -58,7 +58,12 @@ Future<void> main() async {
   installGlobalErrorHandlers(logger);
   logger.info('app', 'DAViewer starting');
   // Detect whether the previous run ended with an uncaught error (local only).
-  final crashedLastSession = await CrashMarker.consume();
+  // Startup-critical awaits are bounded: a wedged plugin channel must not
+  // block the app before runApp.
+  final crashedLastSession = await CrashMarker.consume().timeout(
+    const Duration(seconds: 5),
+    onTimeout: () => false,
+  );
 
   final runtime = await AppRuntime.create();
   _sharedStorageSaver = SharedStorageSaver(
@@ -73,7 +78,10 @@ Future<void> main() async {
 
   // Restore persisted preferences so language and theme survive a restart
   // without flashing the defaults.
-  final preferences = await AppPreferences.load();
+  final preferences = await AppPreferences.load().timeout(
+    const Duration(seconds: 5),
+    onTimeout: () => const <String, String>{},
+  );
   final initialLanguage = preferences['language'] == 'en'
       ? AppLanguage.en
       : AppLanguage.zh;
