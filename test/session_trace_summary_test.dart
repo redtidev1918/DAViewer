@@ -1,7 +1,7 @@
 import 'package:daviewer/core/diagnostics/log_redactor.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../scripts/summarize-session-recovery.dart';
+import '../scripts/summarize_session_recovery.dart';
 
 void main() {
   test('IDs are scoped per launch and incomplete/duplicate terminal facts stay visible', () {

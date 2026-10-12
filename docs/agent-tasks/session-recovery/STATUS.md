@@ -90,9 +90,19 @@ Code/Release/Android/Original Incident verification must remain separate.
   controlled by that mock. Log organizer parsed the supplied failure attachment
   into local redacted output at `D:\Android\setup\phone-login-failure-12aaeac-summary`.
 - CI on 3d62b45 PASS: Actions run 38197966964. Forced signed dry-run candidate
-  run 38197965496 is IN PROGRESS (all OS builds), version=0.5.13, dry_run=true,
+  run 38197965496 is **SUCCESS** (all OS builds + finalize), version=0.5.13, dry_run=true,
   force=true, repair=true. No merge/tag/formal release. Candidate must identify
   immutable 3d62b45, not later docs-only commits.
+- Tool checkpoint f7e5d1aa2018aea28abb24a3f217562037787590 pushed. Its CI
+  38198687965 FAILED on 6 new-script lint infos (filename, lib import, braces).
+  Do not represent that run as PASS. Corrected to summarize_session_recovery.dart,
+  package import and braces; current local analyze no issues, summary tests 2 PASS.
+  Next commit/push will rerun CI; APK source is unchanged.
+- APK artifact 11724821499 / release-assets-0.5.13-0 produced. Runner confirms
+  assembleRelease/app-release.apk (67.4 MB); archive digest
+  495d2adf3e762497f782103eb646ccc5da544f33998f72729865cb1e9c76b2a6.
+  gh download connection is confirmed through proxy port 7892 but stalled;
+  replacing only that download with a bounded/retryable official artifact fetch.
 - Next: finish signed dry-run, verify APK signer/package/version/hash, deliver
   replacement APK and ANDROID-ACCEPTANCE.md. Save/push this docs/tool checkpoint,
   verify its CI, then await new phone evidence; investigate first failure directly.
@@ -181,7 +191,7 @@ catalog and 021-android-session-recovery.md.
 
 - Local Flutter 3.47.6 / Dart 3.13.5, existing SDK at `D:\flutter-sdk`.
   CI pins Flutter 3.47.1; runner analyze/test also PASS on commit 9eb7a61.
-- `dart format --output=none --set-exit-if-changed lib test scripts/summarize-session-recovery.dart`: PASS, 205 files,
+- `dart format --output=none --set-exit-if-changed lib test scripts/summarize_session_recovery.dart`: PASS, 205 files,
   0 changed (latest full check).
 - `flutter analyze --no-pub`: PASS, no issues (latest full check).
 - `flutter test --no-pub --dart-define=DAVIEWER_VERSION=0.5.13 --reporter=expanded`:

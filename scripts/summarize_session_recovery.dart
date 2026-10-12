@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import '../lib/core/diagnostics/log_redactor.dart';
+import 'package:daviewer/core/diagnostics/log_redactor.dart';
 
 /// Facts only. Request IDs are local to each launch; neither an accepted
 /// response nor a synthetic log establishes real phone/incident acceptance.
@@ -26,15 +26,17 @@ Map<String, Object?> summarizeSessionTrace(String text) {
       startLaunch(section[1]!);
       continue;
     }
-    if (line.trim().isEmpty || line.startsWith('DAViewer diagnostic archive'))
+    if (line.trim().isEmpty || line.startsWith('DAViewer diagnostic archive')) {
       continue;
+    }
     if (launch == null) startLaunch('unsectioned');
     final fields = <String, String>{
       for (final match in RegExp(r'\b(\w+)=([^\s]+)').allMatches(line))
         match[1]!: match[2]!,
     };
-    if (fields['buildRevision'] != null)
+    if (fields['buildRevision'] != null) {
       launch!['buildRevision'] = fields['buildRevision'];
+    }
     if (line.contains('recovery ') ||
         line.contains('browser ') ||
         line.contains('oauthBridge') ||
@@ -55,10 +57,12 @@ Map<String, Object?> summarizeSessionTrace(String text) {
       },
     );
     (request['events'] as List<Map<String, String>>).add(fields);
-    if (fields['phase'] != null)
+    if (fields['phase'] != null) {
       (request['phases'] as List<String>).add(fields['phase']!);
-    if (fields['transportId'] != null)
+    }
+    if (fields['transportId'] != null) {
       (request['transports'] as Set<String>).add(fields['transportId']!);
+    }
   }
   for (final launch in launches) {
     for (final request
@@ -91,7 +95,7 @@ Future<void> main(List<String> arguments) async {
   final output = options['--output'];
   if (input == null || output == null || arguments.length != 4) {
     stderr.writeln(
-      'Usage: dart run scripts/summarize-session-recovery.dart --input archive.txt --output new-directory',
+      'Usage: dart run scripts/summarize_session_recovery.dart --input archive.txt --output new-directory',
     );
     exitCode = 64;
     return;

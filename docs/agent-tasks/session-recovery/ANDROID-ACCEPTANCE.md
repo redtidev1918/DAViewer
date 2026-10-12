@@ -57,7 +57,7 @@ pwsh -File scripts/android-session-recovery.ps1 -Serial '设备序列号' -Count
 ## 本机日志整理
 
 ```powershell
-D:\flutter-sdk\bin\dart.bat run scripts/summarize-session-recovery.dart --input '导出文件路径' --output '新的整理目录'
+D:\flutter-sdk\bin\dart.bat run scripts/summarize_session_recovery.dart --input '导出文件路径' --output '新的整理目录'
 ```
 
 输出脱敏文本和 JSON：按启动/请求列出阶段、物理传输数、终态和缺失终态。
