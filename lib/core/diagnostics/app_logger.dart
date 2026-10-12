@@ -38,6 +38,7 @@ final class AppLogger implements DiagnosticSink {
   final Directory _directory;
   final IOSink _file;
   int _errorCount = 0;
+  Future<void> _flushTail = Future<void>.value();
 
   static Future<AppLogger> initialize({String? fileName}) async {
     if (_instance case final existing?) return existing;
@@ -52,6 +53,11 @@ final class AppLogger implements DiagnosticSink {
     final logger = AppLogger._(sink, logsDir);
     _instance = logger;
     logger.info('app', 'logger initialized: $name');
+    logger.info(
+      'app',
+      'buildRevision=${const String.fromEnvironment('DAVIEWER_REVISION', defaultValue: 'local')}',
+    );
+    await logger.flush();
     return logger;
   }
 
@@ -105,6 +111,7 @@ final class AppLogger implements DiagnosticSink {
     );
     debugPrint(line);
     _file.writeln(line);
+    _scheduleFlush();
     if (level == DiagnosticLevel.error) _errorCount += 1;
   }
 
@@ -125,6 +132,7 @@ final class AppLogger implements DiagnosticSink {
     );
     debugPrint(line);
     _file.writeln(line);
+    _scheduleFlush();
     if (event.level == DiagnosticLevel.error) _errorCount += 1;
   }
 
@@ -144,8 +152,18 @@ final class AppLogger implements DiagnosticSink {
     return buffer.toString();
   }
 
+  /// Serialize flushes so exported logs and force-stop diagnostics include
+  /// writes already handed to the sink. Abrupt OS kills may lose a final write.
+  Future<void> flush() {
+    final next = _flushTail.then((_) => _file.flush());
+    _flushTail = next.then((_) {}, onError: (Object _) {});
+    return next;
+  }
+
+  void _scheduleFlush() => unawaited(flush().catchError((Object _) {}));
+
   Future<void> dispose() async {
-    await _file.flush();
+    await flush();
     await _file.close();
     if (identical(_instance, this)) _instance = null;
   }

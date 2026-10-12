@@ -1,10 +1,13 @@
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/diagnostics/app_logger.dart';
+import '../../core/diagnostics/log_archive.dart';
 import '../../core/diagnostics/crash_marker.dart';
 import '../../core/diagnostics/report_builder.dart';
 import '../../core/diagnostics/log_redactor.dart';
@@ -36,6 +39,7 @@ final class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
     setState(() => _loading = true);
     final s = strings(ref.read(appLanguageProvider));
     try {
+      await AppLogger.instance.flush();
       final dir = Directory(AppLogger.instance.logsDirectory);
       final files = await dir
           .list()
@@ -64,6 +68,46 @@ final class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
         _logTail = s.logReadFailed(error);
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _exportLogs() async {
+    final chinese = ref.read(appLanguageProvider) == AppLanguage.zh;
+    try {
+      await AppLogger.instance.flush();
+      final text = await LogArchive.readRecent(
+        Directory(AppLogger.instance.logsDirectory),
+        accountNames: [
+          ref.read(authControllerProvider).account?.username ?? '',
+          ref.read(webSessionControllerProvider).username,
+        ],
+      );
+      if (!mounted) return;
+      final render = context.findRenderObject();
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [
+            XFile.fromData(
+              const Utf8Encoder().convert(text),
+              mimeType: 'text/plain',
+            ),
+          ],
+          fileNameOverrides: ['DAViewer-cold-start-logs.txt'],
+          subject: 'DAViewer diagnostics',
+          sharePositionOrigin: render is RenderBox && render.hasSize
+              ? render.localToGlobal(Offset.zero) & render.size
+              : null,
+        ),
+      );
+    } on Object {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            chinese ? '日志导出失败，请重试' : 'Log export failed. Please retry.',
+          ),
+        ),
+      );
     }
   }
 
@@ -137,6 +181,11 @@ final class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
       appBar: AppBar(
         title: Text(s.diagnostics),
         actions: <Widget>[
+          IconButton(
+            tooltip: 'Export recent launch logs (20)',
+            onPressed: _exportLogs,
+            icon: const Icon(Icons.file_upload_outlined),
+          ),
           IconButton(
             tooltip: s.reportProblem,
             onPressed: () => _reportProblem(s),
