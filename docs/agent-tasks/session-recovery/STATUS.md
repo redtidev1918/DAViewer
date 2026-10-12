@@ -19,6 +19,7 @@ Code/Release/Android/Original Incident verification must remain separate.
   Previous architecture milestone: `2e1069df7f49c0aa58fd2bfbb9b5d49a2d1d76e4`.
 - Diagnostics milestone: `3c468a0d5cce6fd22c866eacf97d2746a6fea6c8`.
 - Last pushed implementation/memory checkpoint before this update: `3d62b45a0466fdf817b7d6a1bdccc47edb6385a6`.
+- Latest pushed tool checkpoint: `6dfb442cc6023646f2e754f67f2b8748e4b068dd`.
   This document's next commit follows it; use `git log -1` for current HEAD.
 - Implementation is committed/pushed; acceptance guide, ADB/summary tools and
   their tests are being saved in the following documentation/tool checkpoint.
@@ -97,15 +98,24 @@ Code/Release/Android/Original Incident verification must remain separate.
   38198687965 FAILED on 6 new-script lint infos (filename, lib import, braces).
   Do not represent that run as PASS. Corrected to summarize_session_recovery.dart,
   package import and braces; current local analyze no issues, summary tests 2 PASS.
-  Next commit/push will rerun CI; APK source is unchanged.
+  Corrected checkpoint 6dfb442 CI **PASS**, run 38198964246. APK source unchanged.
 - APK artifact 11724821499 / release-assets-0.5.13-0 produced. Runner confirms
   assembleRelease/app-release.apk (67.4 MB); archive digest
   495d2adf3e762497f782103eb646ccc5da544f33998f72729865cb1e9c76b2a6.
-  gh download connection is confirmed through proxy port 7892 but stalled;
-  replacing only that download with a bounded/retryable official artifact fetch.
-- Next: finish signed dry-run, verify APK signer/package/version/hash, deliver
-  replacement APK and ANDROID-ACCEPTANCE.md. Save/push this docs/tool checkpoint,
-  verify its CI, then await new phone evidence; investigate first failure directly.
+  gh download connection was through proxy port 7892 but stalled; official
+  authenticated redirect + curl range resume succeeded. ZIP digest matches runner.
+- **New APK ready**: `D:\Android\setup\DAViewer-v0.5.13-session-recovery-3d62b45.apk`.
+  SHA256: `df5c9b95c864b06ffc10ba426a200e53a572a282b1f72da6d63076bc69462ec8`.
+  apksigner verify PASS; production certificate unchanged:
+  `686474b39fd91d20c1db3ce5bf6216ed8ab05ec7638f904251e0d108a34e7141`.
+  Package app.daviewer, versionName 0.5.13, versionCode 225, compileSdk36.
+  Embedded arm64 libapp.so revision equals full 3d62b45 source SHA; release
+  app-release.apk build confirmed, no debug fallback. Signed candidate build
+  verified; formal Release Verified remains PENDING. Real phone new login and
+  original cold-start gates PENDING; old 12aaeac login-after-logout FAIL.
+- Next: deliver the verified APK and ANDROID-ACCEPTANCE.md, save/push this final
+  documentation checkpoint. On new phone logs, immediately analyze callback,
+  identity source, close reason and RFY ownership; investigate first failure.
   Never pass old APK or merge/publish before successful real phone evidence.
 
 Current phase: regression remediation and new candidate delivery; Phase 0–3
@@ -190,7 +200,8 @@ catalog and 021-android-session-recovery.md.
 ## Latest actual verification
 
 - Local Flutter 3.47.6 / Dart 3.13.5, existing SDK at `D:\flutter-sdk`.
-  CI pins Flutter 3.47.1; runner analyze/test also PASS on commit 9eb7a61.
+  CI pins Flutter 3.47.1; runner analyze/test PASS on implementation 3d62b45
+  (38197966964) and corrected tools 6dfb442 (38198964246).
 - `dart format --output=none --set-exit-if-changed lib test scripts/summarize_session_recovery.dart`: PASS, 205 files,
   0 changed (latest full check).
 - `flutter analyze --no-pub`: PASS, no issues (latest full check).
@@ -285,15 +296,14 @@ Require an identical candidate certificate before retained-data cover-upgrade.
 
 ## Last success and next concrete actions
 
-Last success: source fix 3d62b45 pushed; CI PASS, new full local 463 PASS; controlled
-logout/login callback/account/Web/feed flow and file logger regressions PASS.
-Acceptance guide and tools prepared. Remote stash backup and task memory intact.
+Last success: new 3d62b45 APK downloaded, archive digest/signature/package/version/
+embedded source revision verified, distinct delivery file copied. Local 463 PASS;
+source and corrected-tool CI PASS. Remote stash/task commits intact.
 
-1. `gh run view 38197965496`: wait for candidate, download the Ubuntu artifact;
-   verify release signing against baseline, package/version and SHA256.
+1. Deliver APK and record new phone tests using ANDROID-ACCEPTANCE.md.
 2. Cover-install new 3d62b45 candidate; separately test login after logout and
    retained-account cold starts. Stop and export first failure, no repeated login.
-3. Publish checkpoint/tools on the existing PR branch and confirm CI; PR stays draft.
+3. Publish final docs checkpoint on existing PR branch; source/tools CI PASS, PR stays draft.
 4. Analyze new device logs, including actual page evidence source and RFY terminal
    outcomes; historical successful-but-unaccepted rfy-4 cause remains unconfirmed.
 

@@ -4,6 +4,12 @@ PR #96 保持待验收；候选构建不是正式发版。12aaeac 的退出后�
 已经失败。新 APK 的来源、SHA256 和签名核对结果见 STATUS.md；请使用明确
 带有新提交编号的文件，不要继续重复测试旧候选版。
 
+本次新文件：`D:\Android\setup\DAViewer-v0.5.13-session-recovery-3d62b45.apk`。
+来源提交 `3d62b45a0466fdf817b7d6a1bdccc47edb6385a6`，Actions
+`38197965496`，签名与正式版一致，包名/版本为 app.daviewer / 0.5.13 (225)。
+APK SHA256：`df5c9b95c864b06ffc10ba426a200e53a572a282b1f72da6d63076bc69462ec8`。
+APK 内嵌的 buildRevision 已核对；可以直接覆盖旧候选版。
+
 ## 安装与测试顺序
 
 1. 直接覆盖安装新 APK。不要卸载、清除数据或清除 Cookie。包名是
