@@ -9,6 +9,23 @@ request ownership, cache and diagnostics. No protocol logic moves just for purit
 
 ## Source and ownership
 
+Latest additive implementation: SDK `feec94f09c1f6b12628a099fe374e6ebafb3e9df`
+adds public protocol text redaction for raw/nested percent-encoded OAuth secrets.
+DAViewer previous HEAD `96eec26032b1e5fd1aad33fb380af659e90a92a5` is followed by
+the app redaction checkpoint (inspect Git HEAD). App full suite **486 PASS**,
+analyze/changed-source format PASS. Exact pin/lock are updated together.
+Joint CI 38216761322 passed Android signed, Windows 2022, macOS and Linux
+SDK graph/docs/publish preflight; it used older SDK bbf52bd. SDK feec94f CI
+38217602856 passed. Replacement joint CI must be verified on new app source.
+643f3c1 emulator startup/usable login/Settings/diagnostics PASS in logged-out state;
+OAuth authorize was dispatched to a listening WebView. Service authorization and
+retained-account recovery remain unverified. Nested encoded state leakage found
+in this smoke is fixed at SDK text/export level; app navigation now logs only paths.
+Raw local logcat is sensitive and must never enter Git or public artifacts.
+At the ReleaseGraph version PR, the Flutter package minimum API version must
+include the new `recoveryLookupTimeout` contract; do not publish Flutter with an
+old API lower bound merely because workspace resolution hides incompatibility.
+
 - Main DAViewer checkout: `D:\Code\DAViewer`, PR #96 branch
   `codex/android-session-recovery`, observed HEAD `aead827dfd67ddf16ff9df26a4d1be66b738f507`.
   Another session has five uncommitted startup/logout fixes there. Never overwrite

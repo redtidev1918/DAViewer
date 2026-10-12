@@ -595,7 +595,7 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                             AppLogger.instance.info(
                               'webview',
                               'nav seq=$_navSeq event=load_start '
-                                  'source=$_navSource url=${url ?? '<null>'}',
+                                  'source=$_navSource path=${url?.path ?? '<null>'}',
                             );
                             // Any later load with no app action is a server redirect
                             // (for example PerimeterX looping /users/login).
@@ -606,7 +606,7 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                             _sessionObserver?.navigationCommitted();
                             AppLogger.instance.info(
                               'webview',
-                              'load stop: ${url ?? '<null>'}',
+                              'load stop path=${url?.path ?? '<null>'}',
                             );
                             if (mounted) setState(() => _loading = false);
                             // Report from any deviantart.com page. A sequence counter makes

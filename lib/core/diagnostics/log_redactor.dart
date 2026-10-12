@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:dakit_api/dakit_api.dart';
+
 /// Removes credentials, tokens, and personally identifying fragments from a
 /// diagnostic line before it is offered to the user for a bug report. This is a
 /// conservative, best-effort redactor: it targets the obvious secrets and lets
@@ -8,12 +10,6 @@ final class LogRedactor {
   const LogRedactor._();
 
   static final List<RegExp> _patterns = <RegExp>[
-    // OAuth / session parameters and their values, whether in a query string
-    // (`?token=…`) or plain `key=value` text.
-    RegExp(
-      r'\b((?:access_token|refresh_token|id_token|csrf_token|client_secret|signature|sig|token|code|state)=)[^\s&,;]+',
-      caseSensitive: false,
-    ),
     // Header lines that carry credentials or a browser session.
     RegExp(r'(Cookie:\s*).*', caseSensitive: false),
     RegExp(r'(Authorization:\s*).*', caseSensitive: false),
@@ -36,7 +32,9 @@ final class LogRedactor {
     String line, {
     Iterable<String> accountNames = const [],
   }) {
-    var result = line;
+    // The SDK owns raw/nested URI credential parameter parsing. The host adds
+    // privacy filters for exported diagnostic text below.
+    var result = const Redactor().text(line);
     for (final pattern in _patterns) {
       result = result.replaceAllMapped(
         pattern,

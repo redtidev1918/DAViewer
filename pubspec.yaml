@@ -46,22 +46,22 @@ dependency_overrides:
   dakit_core:
     git:
       url: https://github.com/redtidev1918/DAKit.git
-      ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      ref: feec94f09c1f6b12628a099fe374e6ebafb3e9df
       path: packages/dakit_core
   dakit_api:
     git:
       url: https://github.com/redtidev1918/DAKit.git
-      ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      ref: feec94f09c1f6b12628a099fe374e6ebafb3e9df
       path: packages/dakit_api
   dakit_web:
     git:
       url: https://github.com/redtidev1918/DAKit.git
-      ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      ref: feec94f09c1f6b12628a099fe374e6ebafb3e9df
       path: packages/dakit_web
   dakit_flutter:
     git:
       url: https://github.com/redtidev1918/DAKit.git
-      ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      ref: feec94f09c1f6b12628a099fe374e6ebafb3e9df
       path: packages/dakit_flutter
 
 flutter:

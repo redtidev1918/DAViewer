@@ -205,8 +205,8 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/dakit_api"
-      ref: bbf52bdd737233c965bf8531db174651ea7cec0f
-      resolved-ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      ref: feec94f09c1f6b12628a099fe374e6ebafb3e9df
+      resolved-ref: feec94f09c1f6b12628a099fe374e6ebafb3e9df
       url: "https://github.com/redtidev1918/DAKit.git"
     source: git
     version: "1.1.1"
@@ -214,8 +214,8 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/dakit_core"
-      ref: bbf52bdd737233c965bf8531db174651ea7cec0f
-      resolved-ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      ref: feec94f09c1f6b12628a099fe374e6ebafb3e9df
+      resolved-ref: feec94f09c1f6b12628a099fe374e6ebafb3e9df
       url: "https://github.com/redtidev1918/DAKit.git"
     source: git
     version: "1.1.0"
@@ -223,8 +223,8 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/dakit_flutter"
-      ref: bbf52bdd737233c965bf8531db174651ea7cec0f
-      resolved-ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      ref: feec94f09c1f6b12628a099fe374e6ebafb3e9df
+      resolved-ref: feec94f09c1f6b12628a099fe374e6ebafb3e9df
       url: "https://github.com/redtidev1918/DAKit.git"
     source: git
     version: "1.0.0"
@@ -232,8 +232,8 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/dakit_web"
-      ref: bbf52bdd737233c965bf8531db174651ea7cec0f
-      resolved-ref: bbf52bdd737233c965bf8531db174651ea7cec0f
+      ref: feec94f09c1f6b12628a099fe374e6ebafb3e9df
+      resolved-ref: feec94f09c1f6b12628a099fe374e6ebafb3e9df
       url: "https://github.com/redtidev1918/DAKit.git"
     source: git
     version: "0.2.5"

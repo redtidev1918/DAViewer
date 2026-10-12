@@ -53,6 +53,24 @@ Code/Release/Android/Original Incident verification must remain separate.
 
 ### 2026-10-12 joint SDK integration (active; supersedes next-action list below)
 
+Latest checkpoint: integration branch `codex/daviewer-sdk-integration`, previous
+HEAD `96eec26032b1e5fd1aad33fb380af659e90a92a5`; the next commit contains the
+redaction follow-up. Exact SDK pin is now `feec94f09c1f6b12628a099fe374e6ebafb3e9df`.
+Full app regression **486 PASS**, analyze PASS, changed-source format PASS.
+Two initial failures were old placeholder assertions (`[redacted]` versus SDK
+`<redacted>`); corrected assertions retain secret-absence/non-secret preservation.
+SDK feec94f CI 38217602856 PASS. Joint CI 38216761322 on app 96eec26 / SDK bbf52bd
+PASS: SDK graph/docs/four publish dry-runs, app quality, production-signed Android,
+Windows 2022 and macOS builds. These older builds do not contain this redaction fix.
+Signed 643f3c1 emulator upgrade reached usable login/Settings/diagnostics; observed
+authorize dispatch with live bridge listener. No authenticated service account was
+available. An encoded nested OAuth `state` in navigation diagnostics escaped the
+old app redactor; raw logs stay private. SDK now owns reusable percent-encoded
+protocol redaction; app navigation logs record paths only and exports use the SDK
+redactor. New exact-SHA build and emulator verification are required before APK
+delivery. All original phone acceptance and formal release gates remain PENDING;
+12aaeac/3d62b45 FAIL unchanged. Stash and external main edits remain preserved.
+
 Read SDK-INTEGRATION.md for both exact repository revisions, source ownership,
 upstream reproduced defects and joint release sequence. Latest SDK implementation
 bbf52bd: **245 full tests PASS**, analyze/format/diff PASS; four publish dry-runs
