@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.17](https://github.com/redtidev1918/DAViewer/compare/v0.5.16...v0.5.17) (2026-10-13)
+
+
+### Bug Fixes
+
+* unlock recommendation pagination after cached preview ([7b60012](https://github.com/redtidev1918/DAViewer/commit/7b60012b24c8e02c2b93f567ed869f1ebdc82b13))
+* unlock recommendation pagination after cached preview ([27ede3f](https://github.com/redtidev1918/DAViewer/commit/27ede3f2a499b639a95751bb64a68585bc1adc39))
+
 ## [0.5.16](https://github.com/redtidev1918/DAViewer/compare/v0.5.15...v0.5.16) (2026-10-13)
 
 
