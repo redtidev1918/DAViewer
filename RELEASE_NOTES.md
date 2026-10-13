@@ -3,6 +3,17 @@
 这里只写下载者需要知道的变化，一行一条。内部实现、协议与调试细节请见
 `CHANGELOG.md`。
 
+## 0.5.14
+
+- 修复 Android 已登录冷启动可能卡在“恢复登录”的问题：启动就绪有独立总时限并修复启动页路由循环，卡住时也能进入应用。
+- 修复显式登出后无法重新登录的问题：登出会取消未完成的登录请求并记录退出状态，残留登录页不能再把已登出会话改回已登录。
+- OAuth 回调统一交由 SDK 处理：无效回调停留在登录页显示错误，不再中断页面；页面加载失败可手动刷新。
+- 个性化推荐首屏请求单一归属：同一账号只由一个请求负责首屏加载，重复触发不再发出重复网络请求。
+- 诊断日志可导出最近多次启动记录，OAuth 跳转地址在日志中脱敏，发布包内嵌构建修订号。
+- 接入正式发布的 DAKit 会话可靠性组件（core 2.0.0 / api 1.2.0 / web 0.3.0 / flutter 1.1.0）。
+
+- Fixed Android cold-start stall on "restoring login", post-logout login, SDK-owned OAuth callbacks and single-flight feed requests; adopted the published DAKit session-reliability packages.
+
 ## 0.5.13
 
 - 已登录冷启动时不再把有效的网页会话误判为未确认：会话探测会等待挑战页跳转完成后再判断，不会再出现推荐页空转。
