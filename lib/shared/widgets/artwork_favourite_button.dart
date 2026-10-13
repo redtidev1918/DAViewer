@@ -7,6 +7,7 @@ import '../../core/diagnostics/error_text.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../features/artwork/artwork_store.dart';
 import '../../features/artwork/favourite_actions.dart';
+import 'app_feedback.dart';
 
 /// One-tap action with shared pending state and server-confirmed feedback.
 final class ArtworkFavouriteButton extends ConsumerWidget {
@@ -51,28 +52,27 @@ final class ArtworkFavouriteButton extends ConsumerWidget {
       try {
         final favourited = await mutate(artwork.id, !current.isFavourited);
         if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(favourited ? s.favouritedToast : s.unfavouritedToast),
-          ),
+        showFeedback(
+          context,
+          favourited ? s.favouritedToast : s.unfavouritedToast,
+          source: 'favourite-toggle',
         );
       } on Object catch (error) {
         if (!context.mounted) return;
         final needsLogin =
             error is DAKitException &&
             error.kind == DAKitFailureKind.authentication;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              needsLogin ? s.loginFirst : friendlyErrorMessage(error),
-            ),
-            action: needsLogin
-                ? SnackBarAction(
-                    label: s.login,
-                    onPressed: () => context.push('/web-login'),
-                  )
-                : null,
-          ),
+        showFeedback(
+          context,
+          needsLogin ? s.loginFirst : friendlyErrorMessage(error),
+          source: 'favourite-toggle',
+          severity: AppNoticeSeverity.error,
+          action: needsLogin
+              ? SnackBarAction(
+                  label: s.login,
+                  onPressed: () => context.push('/web-login'),
+                )
+              : null,
         );
       }
     }

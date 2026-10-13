@@ -3,6 +3,9 @@ import 'dart:io';
 
 import 'package:dakit_flutter/dakit_flutter.dart';
 import 'package:flutter/material.dart';
+
+import '../../shared/widgets/app_feedback.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -54,14 +57,13 @@ final class DownloadsScreen extends ConsumerWidget {
                             .deleteFinished();
                       } on Object catch (error) {
                         if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              s.deleteFinishedDownloadsFailed(
-                                friendlyErrorMessage(error),
-                              ),
-                            ),
+                        showFeedback(
+                          context,
+                          s.deleteFinishedDownloadsFailed(
+                            friendlyErrorMessage(error),
                           ),
+                          source: 'download-delete',
+                          severity: AppNoticeSeverity.error,
                         );
                       }
                     },

@@ -6,6 +6,7 @@ import '../core/auth/auth_controller.dart';
 import '../core/auth/auth_state.dart';
 import '../core/l10n/app_strings.dart';
 import '../shared/widgets/app_notice_host.dart';
+import '../shared/widgets/app_feedback.dart';
 
 final class AppShell extends ConsumerWidget {
   const AppShell({required this.navigationShell, super.key});
@@ -20,8 +21,7 @@ final class AppShell extends ConsumerWidget {
     ref.listen<AuthState>(authControllerProvider, (previous, next) {
       if (previous?.status == AuthStatus.signedOut &&
           next.status == AuthStatus.signedIn) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(s.loginSuccess)));
+        showFeedback(context, s.loginSuccess, source: 'interactive-sign-in');
       }
     });
     return Scaffold(

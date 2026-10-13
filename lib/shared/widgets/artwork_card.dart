@@ -1,6 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dakit_core/dakit_core.dart';
 import 'package:flutter/material.dart';
+
+import 'app_feedback.dart';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -253,7 +256,7 @@ final class ArtworkCard extends ConsumerWidget {
     final url = artwork.pageUri.toString();
     showModalBottomSheet<void>(
       context: context,
-      builder: (context) => SafeArea(
+      builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
@@ -261,7 +264,7 @@ final class ArtworkCard extends ConsumerWidget {
               leading: const Icon(Icons.visibility_outlined),
               title: Text(s.viewDetail),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 onTap?.call();
               },
             ),
@@ -271,7 +274,7 @@ final class ArtworkCard extends ConsumerWidget {
               ),
               title: Text(favourited ? s.unfavourite : s.favourite),
               onTap: () async {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 try {
                   final now = await setArtworkFavourite(
                     ref,
@@ -279,18 +282,19 @@ final class ArtworkCard extends ConsumerWidget {
                     !favourited,
                   );
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          now ? s.favouritedToast : s.unfavouritedToast,
-                        ),
-                      ),
+                    showFeedback(
+                      context,
+                      now ? s.favouritedToast : s.unfavouritedToast,
+                      source: 'favourite-toggle',
                     );
                   }
                 } on Object catch (error) {
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(friendlyErrorMessage(error))),
+                    showFeedback(
+                      context,
+                      friendlyErrorMessage(error),
+                      source: 'favourite-toggle',
+                      severity: AppNoticeSeverity.error,
                     );
                   }
                 }
@@ -300,7 +304,7 @@ final class ArtworkCard extends ConsumerWidget {
               leading: const Icon(Icons.share_outlined),
               title: Text(s.share),
               onTap: () async {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 await shareDeviantArtLink(
                   context,
                   uri: artwork.pageUri,
@@ -313,11 +317,10 @@ final class ArtworkCard extends ConsumerWidget {
               leading: const Icon(Icons.copy_outlined),
               title: Text(s.copyLink),
               onTap: () async {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 await Clipboard.setData(ClipboardData(text: url));
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(SnackBar(content: Text(s.linkCopied)));
+                  showFeedback(context, s.linkCopied, source: 'link-copy');
                 }
               },
             ),
@@ -325,7 +328,7 @@ final class ArtworkCard extends ConsumerWidget {
               leading: const Icon(Icons.open_in_new),
               title: Text(s.openInBrowser),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 final uri = Uri.tryParse(url);
                 if (uri != null) {
                   launchUrl(uri, mode: LaunchMode.externalApplication);

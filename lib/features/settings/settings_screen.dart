@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dakit_core/dakit_core.dart' hide WebSession;
 import 'package:flutter/material.dart';
+
+import '../../shared/widgets/app_feedback.dart';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -157,8 +160,11 @@ final class SettingsScreen extends ConsumerWidget {
                   if (signedIn) {
                     await ref.read(authControllerProvider.notifier).logout();
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(SnackBar(content: Text(s.signedOut)));
+                      showFeedback(
+                        context,
+                        s.signedOut,
+                        source: 'explicit-sign-out',
+                      );
                     }
                   } else {
                     await context.push('/web-login');
@@ -394,8 +400,7 @@ Future<void> _clearCache(BuildContext context, AppStrings s) async {
   PaintingBinding.instance.imageCache.clearLiveImages();
   await DefaultCacheManager().emptyCache();
   if (context.mounted) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(s.cacheCleared)));
+    showFeedback(context, s.cacheCleared, source: 'cache-clear');
   }
 }
 
@@ -410,8 +415,12 @@ Future<void> _checkUpdates(
     final info = await fetchLatestReleaseInfo(dio: dio);
     if (!context.mounted) return;
     if (info == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(s.updateCheckFailed)));
+      showFeedback(
+        context,
+        s.updateCheckFailed,
+        source: 'manual-update-check',
+        severity: AppNoticeSeverity.error,
+      );
       return;
     }
     // Only compare when both sides are plain semver; a `development` build has
@@ -456,8 +465,12 @@ Future<void> _checkUpdates(
     );
   } on Object {
     if (context.mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(s.updateCheckFailed)));
+      showFeedback(
+        context,
+        s.updateCheckFailed,
+        source: 'manual-update-check',
+        severity: AppNoticeSeverity.error,
+      );
     }
   }
 }
@@ -494,8 +507,11 @@ Future<void> _showAccountCookies(
   ref.invalidate(personalizedFeedProvider);
   unawaited(ref.read(webSessionRefresherProvider).refresh());
   unawaited(ref.read(webSessionStatusProvider.notifier).check(force: true));
-  ScaffoldMessenger.of(context)
-      .showSnackBar(SnackBar(content: Text(s.cookiesImported(importedUser))));
+  showFeedback(
+    context,
+    s.cookiesImported(importedUser),
+    source: 'cookie-import',
+  );
   // A web-only session powers the personalized feed, but official-API
   // features (follow, notifications, favourites, downloads) still need the
   // OAuth account. Offer the normal sign-in; the embedded DA page recognizes
@@ -603,8 +619,7 @@ final class _AccountCookiesDialog extends ConsumerWidget {
               : () async {
                   await Clipboard.setData(ClipboardData(text: value));
                   if (!context.mounted) return;
-                  ScaffoldMessenger.maybeOf(context)
-                      ?.showSnackBar(SnackBar(content: Text(s.cookiesCopied)));
+                  showFeedback(context, s.cookiesCopied, source: 'cookie-copy');
                 },
         ),
       ],

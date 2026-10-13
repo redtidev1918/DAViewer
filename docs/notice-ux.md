@@ -22,6 +22,22 @@
   existing operation-specific behavior. Destructive confirmations remain
   explicit dialogs; no new notification queue or runtime service is introduced.
 
+Operation feedback uses `showFeedback`: identical visible results coalesce,
+new results replace stale queued feedback, and inactive routes/tabs cannot show
+late completions. The helper logs constant source/severity only, never message
+text or filenames. Bottom-sheet actions use the surviving page context.
+
+| Evidence/source | Presentation |
+| --- | --- |
+| Authoritative session verdict | Existing incident-bound recovery notice |
+| Inconclusive probe or unverified cursor group | Diagnostics; local retry where needed |
+| One feed request failure | Inline retry, retain already loaded content |
+| Completed user operation | Short-lived shared feedback |
+| Update version | Existing version-bound reminder and release notes |
+
+These rules retain state-provider ownership. UI helpers never decide login,
+personalization, or account identity; recovery removes notices via existing state.
+
 ## 2026-10-14 checkpoint
 
 Workspace `C:\Users\12629\.codex\worktrees\notice-ux\DAViewer`, branch

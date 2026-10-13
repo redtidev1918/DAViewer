@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../l10n/app_strings.dart';
+import '../../shared/widgets/app_feedback.dart';
 
 Uri artistShareUri(String username) =>
     Uri.https('www.deviantart.com', '/${username.toLowerCase()}');
@@ -47,7 +48,11 @@ Future<void> shareDeviantArtLink(
   } on Object {
     await Clipboard.setData(ClipboardData(text: uri.toString()));
     if (!context.mounted) return;
-    ScaffoldMessenger.maybeOf(context)
-        ?.showSnackBar(SnackBar(content: Text(strings.shareFailedCopied)));
+    showFeedback(
+      context,
+      strings.shareFailedCopied,
+      source: 'share-fallback',
+      severity: AppNoticeSeverity.warning,
+    );
   }
 }

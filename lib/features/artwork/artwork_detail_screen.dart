@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dakit_flutter/dakit_flutter.dart';
 import 'package:flutter/material.dart';
+
+import '../../shared/widgets/app_feedback.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -178,15 +181,19 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
       setState(() => _favourite = isFavourite);
       _heartController.forward(from: 0);
       final s = strings(ref.read(appLanguageProvider));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isFavourite ? s.favouritedToast : s.unfavouritedToast),
-        ),
+      showFeedback(
+        context,
+        isFavourite ? s.favouritedToast : s.unfavouritedToast,
+        source: 'favourite-toggle',
       );
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(friendlyErrorMessage(error))));
+        showFeedback(
+          context,
+          friendlyErrorMessage(error),
+          source: 'favourite-toggle',
+          severity: AppNoticeSeverity.error,
+        );
       }
     } finally {
       if (mounted) setState(() => _favBusy = false);
@@ -264,8 +271,12 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
         MediaSessionSignal.report(context, error, 'media-transfer-403');
         final s = strings(ref.read(appLanguageProvider));
         final reason = immediateDownloadFailureReason(s, error);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(s.downloadFailed(reason))));
+        showFeedback(
+          context,
+          s.downloadFailed(reason),
+          source: 'download-start',
+          severity: AppNoticeSeverity.error,
+        );
       }
     } finally {
       if (mounted) setState(() => _downloading = false);
@@ -290,9 +301,11 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
 
   void _showTransferMessage(TransferSnapshot snapshot) {
     final s = strings(ref.read(appLanguageProvider));
-    ScaffoldMessenger.of(
+    showFeedback(
       context,
-    ).showSnackBar(SnackBar(content: Text(transferStatusMessage(s, snapshot))));
+      transferStatusMessage(s, snapshot),
+      source: 'download-status',
+    );
   }
 
   Future<void> _trackTransfer(
@@ -332,8 +345,12 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
       '${snapshot.failureCode ?? ''} ${snapshot.failureMessage ?? ''}',
       'media-transfer-403',
     );
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(s.downloadFailed(reason))));
+    showFeedback(
+      context,
+      s.downloadFailed(reason),
+      source: 'download-failure',
+      severity: AppNoticeSeverity.error,
+    );
   }
 
   Future<void> _retryDownload(MediaAsset asset) async {

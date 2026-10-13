@@ -1,5 +1,8 @@
 import 'package:dakit_flutter/dakit_flutter.dart';
 import 'package:flutter/material.dart';
+
+import '../../shared/widgets/app_feedback.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/diagnostics/error_text.dart';
@@ -76,14 +79,13 @@ final class _ArtistScreenState extends ConsumerState<ArtistScreen> {
             message.contains('403') ||
             message.contains('authorization') ||
             message.contains('Forbidden');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              isForbidden
-                  ? strings(ref.read(appLanguageProvider)).permissionDeniedWatch
-                  : message,
-            ),
-          ),
+        showFeedback(
+          context,
+          isForbidden
+              ? strings(ref.read(appLanguageProvider)).permissionDeniedWatch
+              : message,
+          source: 'watch-toggle',
+          severity: AppNoticeSeverity.error,
         );
       }
     } finally {

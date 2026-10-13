@@ -62,20 +62,21 @@ final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
     // recommendations tab, attached to the content it qualifies, with retry
     // and dismissal there (P0-B, 2026-10-13).
     final sessionNotice = _sessionNotice(session, s);
-    if (sessionNotice != null && !_loginNoticeLogged) {
-      _loginNoticeLogged = true;
-      AppLogger.instance.warning(
-        'notice',
-        'web-session login notice shown state=${session.state.name} '
-            'source=verdict-chain',
-      );
-    } else if (sessionNotice == null) {
-      _loginNoticeLogged = false;
-    }
     final visibleSessionNotice =
         sessionNotice != null && dismissedNoticeIds.contains(sessionNotice.id)
         ? null
         : sessionNotice;
+    if (visibleSessionNotice != null && !_loginNoticeLogged) {
+      _loginNoticeLogged = true;
+      AppLogger.instance.warning(
+        'notice',
+        'web-session login notice shown noticeId=${visibleSessionNotice.id} '
+            'state=${session.state.name} source=verdict-chain '
+            'generation=${ref.read(webSessionStatusProvider.notifier).generation}',
+      );
+    } else if (visibleSessionNotice == null) {
+      _loginNoticeLogged = false;
+    }
     final effective = visibleSessionNotice ?? notice;
     return Align(
       alignment: Alignment.bottomCenter,
@@ -114,6 +115,7 @@ final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
   }
 
   void _openWebLogin() {
+    if (!mounted || !ref.read(webSessionStatusProvider).needsLogin) return;
     // The session notice uses the shell context; the router is available at
     // the root, so routing through the context captured by the state is safe.
     final router = GoRouter.of(context);
