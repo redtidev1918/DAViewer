@@ -2,11 +2,23 @@
 
 ## 2026-10-13: active P0 — v0.5.16 cached-preview pagination lock
 
-- Latest phase: implementation/review complete; formal v0.5.17 publication
-  IN PROGRESS. PR #109 passed all checks and merged to release source
+- Latest phase: implementation/review/publication complete; device acceptance
+  PENDING. PR #109 passed all checks and merged to release source
   `360fce097dcca8619650e3c61e762a68ab5e1cf8`; release run `38419603553`.
   Reporting branch `codex/pagination-release-report` was created from that
   source. Implementation branch/reference information below is historical.
+  Release https://github.com/redtidev1918/DAViewer/releases/tag/v0.5.17
+  published at `2026-10-13T15:23:32Z`, draft=false, all three platform assets,
+  SHA256SUMS and RELEASE-METADATA.json present. Release run `38419603553` PASS.
+  Download-page update `38421724220` and Pages deployment `38421748059` PASS.
+  Locally downloaded official APK: `D:\Android\setup\release-v0.5.17-360fce0\DAViewer-v0.5.17.apk`;
+  `app.daviewer`, versionName 0.5.17, versionCode 229, 67,478,178 bytes.
+  `apksigner verify` PASS; certificate matches the original v0.5.16 certificate.
+  APK SHA256 `295a47614f7fd8d097520325f9de5eb9801c06930ae395ca4f154506f73ffad9`
+  matches downloaded SHA256SUMS, release metadata and GitHub's asset digest.
+  Windows SHA256 `96129d5b7979064697645277e8ba6266109abbf8d2fa8488282483e7a4817503`;
+  macOS SHA256 `b1804689dcce8ae513f1c459e08af595f69a773464a5754b55daa3228d65d725`.
+  Code Verified PASS; Release Verified PASS; Android/Original Incident PENDING.
 
 - Workspace `D:\Code\DAViewer`; branch `codex/rfy-scroll-pagination` from
   current main `642e2f477aa4f9f18c953c674ad561171ea6faef`.
@@ -32,7 +44,7 @@
   Exact-release reproduction deliberately FAILS only the added cache-race test;
   identical repaired test passes. These are automation results, not phone acceptance.
 - Code commit `27ede3f`; independent PR #108:
-  https://github.com/redtidev1918/DAViewer/pull/108 . Pushed; CI in progress.
+  https://github.com/redtidev1918/DAViewer/pull/108 . Merged; all checks PASS.
   Candidate workflow's stale 0.5.13 label/define is replaced by the current
   manifest version so the pagination test APK identifies itself correctly.
   No dependency, signing or build-tool changes.
@@ -47,8 +59,8 @@
   `686474b39fd91d20c1db3ce5bf6216ed8ab05ec7638f904251e0d108a34e7141`);
   package `app.daviewer`, versionName 0.5.16, versionCode 228. Provenance JSON
   binds exact app/SDK SHAs above. Artifact id `11823612619`, run `38413948879`.
-  Version PR #109 (`chore(main): release 0.5.17`) is open; this checkpoint is
-  included in its release branch. New release: PENDING (normal CI/artifact gates).
+  Version PR #109 (`chore(main): release 0.5.17`) merged after all checks PASS;
+  official v0.5.17 release and signed artifact checks completed as recorded above.
   Android pagination acceptance: PENDING
   (ADB has no attached device); user's v0.5.16 incident FAIL. Original Incident
   Verified remains PENDING. Do not claim real-device resolution from widgets.
@@ -57,9 +69,11 @@
   test logs in `D:\Android\setup\daviewer-cache-pagination-baseline.log` and
   `daviewer-pagination-final-tests.log`; preserve evidence until PR review.
 - Retained old stash untouched; historic untracked audits/clear/imports untouched.
-- Next: complete normal 0.5.17 release-please PR/CI/publication (notes already
-  prepared). Original-phone release gate is removed; Android acceptance stays
-  PENDING until actual scrolling evidence arrives, then locate the last trace.
+- Next: install official v0.5.17 over retained data (never uninstall/clear storage),
+  verify cache/live first-page -> second/third-page scrolling, fling, failure retry
+  and independent pull-to-refresh. Export Settings -> Diagnostics -> upload icon
+  (recent 20 launches) immediately if stalled; inspect the last pagination stage.
+  No device is attached, so physical acceptance remains PENDING, not a release gate.
 - Other authorized tasks preserved, not superseded: DeviantDrop uncertain-send
   WIP `ce296e9` pushed on `codex/telegram-uncertain-delivery`, still needs new
   regressions/review/PR. Python `codex/verified-range-resume` clean at `14b7291`;
