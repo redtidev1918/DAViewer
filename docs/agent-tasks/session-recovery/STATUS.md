@@ -1,5 +1,21 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-14: integrated runtime and notification verification
+
+UI branch `codex/notice-ux` integrates runtime fix `1de1c63564c46bac07274ea2f1ea906a439d4948`.
+Shared operation feedback migrated all existing Snackbar call sites, coalesces
+duplicates, replaces stale queued results, suppresses hidden route/tab late
+completions, and retains readable severity/action/close colors in both themes.
+Bottom-sheet operations now use the surviving page context. Session notices
+log actual presentation after dismissal filtering; stale login actions recheck
+the current verdict. No notification queue or new auth policy was introduced.
+Local final source: format complete, analyze clean, **544 tests PASS**, including
+feedback, narrow-screen/theme/update dismissal and all runtime boundary cases.
+Logs `D:\Android\setup\notice-final-*.log`. CI must correspond to the final
+pushed commit; prior 530 and ce32870 results are historical. Merge order remains
+#111 then #112; release-please and artifact/Pages checks follow. Android and
+Original Incident verification remain PENDING; retained account evidence absent.
+
 ## 2026-10-14: isolated reminder UI follow-up
 
 User authorized reminder optimization while zcode continues the P0 runtime

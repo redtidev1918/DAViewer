@@ -58,7 +58,9 @@ previews, not screenshots from an Android installation.
 
 No OAuth/WebSession verdict or RFY ownership code changed in this UI delta.
 Integrated zcode's updated P0 source `63ba115352588cd9d35e8c8603111ae167ef4c41`.
-Final local validation: format 217 files, 0 changed; analyze clean; **530 tests
-PASS**, including the new dismissal race and update-dialog regression.
+That checkpoint's 530-test result is historical. Latest integrated source
+includes runtime `1de1c63`, shared operation feedback and failure-path tests;
+analyze is clean and **544 tests PASS**. Final pushed SHA and CI are tracked
+in STATUS and the PR.
 CI and release state are recorded in the PR; Android and original-incident
 verification remain separate and PENDING absent real-device evidence.
