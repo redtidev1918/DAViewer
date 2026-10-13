@@ -26,6 +26,12 @@
   boundary tests added: reload-not-landed (wait), unverified rotation
   (reject), expired lease (transitions to unavailable after the 5-minute
   lease, clock-injected). PR #111 checks re-run after push.
+- PR #111 (https://github.com/redtidev1918/DAViewer/pull/111) all checks
+  PASS on review-fix commit `ee7f01d`: Analyze and test, branch-contract,
+  quality (macOS/ubuntu/windows candidate builds), release build-plan.
+  CI Verified: PASS. Review continues (reviewer is focused-verifying the
+  evidence boundaries); do not merge before review concludes. Release
+  Verified: PENDING (release jobs correctly skip on the PR branch).
 - Key code-level facts (confirmed): a single anonymous browser-probe sample
   used to complete an authoritative logout (A4) while media-image 403 regex
   matching, rfy's own 403, WAF-unavailable escalation and timeout retries all
