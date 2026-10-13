@@ -45,22 +45,42 @@ WebSessionProbeResult webSessionProbeResultFromPage({
 }
 
 /// What a probe transaction should do with one identity-bearing page sample.
-enum WebSessionProbeSampleDecision { complete, corroborateAnonymous }
+enum WebSessionProbeSampleDecision {
+  /// The sample decides the transaction.
+  complete,
+
+  /// A first anonymous sample: arm one corroborating reload.
+  corroborateAnonymous,
+
+  /// An anonymous sample that did not come from a new navigation (the reload
+  /// has not landed / the same stale document was re-read). The transaction
+  /// keeps waiting; its deadline resolves `unavailable`.
+  wait,
+}
 
 /// A first anonymous sample is weak evidence: a redirect intermediate state,
 /// an anonymous shell before session cookies re-attach, or a challenge
 /// variant can all render `isLoggedIn: false` while the Cookie session is
 /// alive. The first anonymous sample arms one corroborating reload instead of
-/// completing the probe; the sample that survives the reload decides. A
-/// confirmed sample always completes immediately, so a live session is never
-/// delayed by the anonymous guard (invariant 2 stays intact).
+/// completing the probe. Completion then requires the anonymous verdict to be
+/// delivered under a strictly newer navigation sequence than the arming
+/// sample — `corroborationPending` alone proves nothing about whether the new
+/// page actually loaded (review 2026-10-14). A confirmed sample always
+/// completes immediately, so a live session is never delayed (invariant 2
+/// stays intact).
 WebSessionProbeSampleDecision webSessionProbeSampleDecision(
   WebSessionProbeResult result, {
   required bool corroborationPending,
+  int evidenceNavigation = 0,
+  int armedNavigation = 0,
 }) {
-  if (result.outcome == WebSessionProbeOutcome.anonymous &&
-      !corroborationPending) {
-    return WebSessionProbeSampleDecision.corroborateAnonymous;
+  if (result.outcome == WebSessionProbeOutcome.anonymous) {
+    if (!corroborationPending) {
+      return WebSessionProbeSampleDecision.corroborateAnonymous;
+    }
+    if (evidenceNavigation <= armedNavigation) {
+      return WebSessionProbeSampleDecision.wait;
+    }
   }
   return WebSessionProbeSampleDecision.complete;
 }
@@ -97,9 +117,15 @@ final class WebSessionRefresher {
   /// state, an anonymous shell before session cookies re-attach, or a challenge
   /// variant can all render `isLoggedIn: false` while the Cookie session is
   /// alive. The first anonymous sample therefore only arms one corroborating
-  /// reload; the verdict completes on the sample that survives it (see
-  /// `_corroborateAnonymous`).
+  /// reload; the verdict completes on an anonymous sample delivered under a
+  /// NEW navigation (see `_corroborateAnonymous` and `_anonymousArmedNavigation`).
   bool _anonymousCorroborationPending = false;
+
+  /// The navigation sequence the arming anonymous sample was read under. A
+  /// corroborating anonymous sample must arrive under a strictly greater
+  /// sequence — the reload actually navigated — otherwise the probe keeps
+  /// waiting and the deadline resolves `unavailable`.
+  int _anonymousArmedNavigation = 0;
 
   Future<WebSessionProbeResult> refresh() {
     final active = _completion;
@@ -160,10 +186,10 @@ final class WebSessionRefresher {
               ),
               getHtml: controller.getHtml,
             ),
-            onEvidence: (evidence) {
+            onEvidence: (evidence, navigation) {
               if (!_current(completion)) return;
               _log(
-                'classification=${evidence.classification} identitySource=${evidence.identitySource} csrfPresent=${evidence.csrf.isNotEmpty}',
+                'classification=${evidence.classification} identitySource=${evidence.identitySource} csrfPresent=${evidence.csrf.isNotEmpty} navSeq=$navigation',
               );
               if (evidence.csrf.isNotEmpty) {
                 unawaited(
@@ -188,13 +214,24 @@ final class WebSessionRefresher {
                 switch (webSessionProbeSampleDecision(
                   result,
                   corroborationPending: _anonymousCorroborationPending,
+                  evidenceNavigation: navigation,
+                  armedNavigation: _anonymousArmedNavigation,
                 )) {
                   case WebSessionProbeSampleDecision.corroborateAnonymous:
                     _anonymousCorroborationPending = true;
+                    _anonymousArmedNavigation = navigation;
                     _log(
-                      'anonymous_sample_unconfirmed event=reload_for_corroboration',
+                      'anonymous_sample_unconfirmed event=reload_for_corroboration navSeq=$navigation',
                     );
                     unawaited(_corroborateAnonymous(completion));
+                  case WebSessionProbeSampleDecision.wait:
+                    // The reload has not produced a new navigation yet: this
+                    // is still the stale document (its dedup key changed,
+                    // e.g. a rotated CSRF). Keep waiting; the deadline
+                    // resolves unavailable — never a logged-out verdict.
+                    _log(
+                      'anonymous_sample_same_navigation event=ignored navSeq=$navigation',
+                    );
                   case WebSessionProbeSampleDecision.complete:
                     unawaited(
                       _dispose(result, completion, evidence.classification),
@@ -281,6 +318,7 @@ final class WebSessionRefresher {
     _observer = null;
     _probeController = null;
     _anonymousCorroborationPending = false;
+    _anonymousArmedNavigation = 0;
     final headless = _headless;
     _headless = null;
     final completion = _completion;

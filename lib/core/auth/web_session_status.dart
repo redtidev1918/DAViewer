@@ -116,6 +116,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         unawaited(_ref.read(webSessionRefresherProvider).accountChanged());
         _lastSuccess = null;
         _lastRestrictionCheck = null;
+        _verifiedCredentialFingerprint = null;
         if (mounted) state = const WebSessionStatus();
         final epoch = _accountEpoch;
         if (next.$1 == true && next.$2.isNotEmpty) {
@@ -152,6 +153,15 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   int _credentialRevision = 0;
   String? _credentialFingerprint;
   int get credentialRevision => _credentialRevision;
+
+  /// The cookie-header fingerprint the last server-confirmed healthy verdict
+  /// was issued under. A credential rotation is *verified* when the live
+  /// header still matches this fingerprint: the verdict chain (bare probe or
+  /// real-browser probe) accepted exactly those credentials. Feed responses
+  /// fetched before such a rotation may be adopted; an unverified rotation
+  /// (restore, unexpected store change) keeps the conservative rejection.
+  String? _verifiedCredentialFingerprint;
+  String? get verifiedCredentialFingerprint => _verifiedCredentialFingerprint;
 
   int observeCredentials({required String cookieHeader, required String csrf}) {
     final fingerprint = cookieHeaderFingerprint('$cookieHeader\u0000$csrf');
@@ -337,7 +347,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
           );
           return;
         }
-        applyVerification(
+        final browserDecision = applyVerification(
           WebSessionEvidence(
             source: WebSessionEvidenceSource.realBrowserProbe,
             outcome: probe.outcome,
@@ -345,6 +355,14 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
             generation: generation,
           ),
         );
+        if (browserDecision.nextState == WebSessionStatusState.healthy) {
+          // The probe navigated the live store; record the credential set the
+          // server just accepted so a concurrent feed response can attribute
+          // the rotation to this verification.
+          final live = await _ref.read(webSessionProvider).cookieHeader();
+          if (!_isCurrent(generation)) return;
+          _verifiedCredentialFingerprint = cookieHeaderFingerprint(live);
+        }
         return;
       }
       // Restore the persisted snapshot if the live WebView store lost it
@@ -473,6 +491,14 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         }
       }
       if (decision.nextState == WebSessionStatusState.healthy) {
+        // Record the credential set this healthy verdict was issued under:
+        // for the plain path `confirmedCookies` equals the verified header
+        // (the credentials-superseded guard above rejected any rotation),
+        // for the escalated path it is the post-probe store the probe itself
+        // authenticated. Feed-side rotation adoption keys off this value.
+        _verifiedCredentialFingerprint = cookieHeaderFingerprint(
+          WebSession.cookieHeaderFrom(confirmedCookies),
+        );
         // Persist only a server-confirmed live cookie set. An unconfirmed
         // health check must never overwrite the snapshot: a degraded live
         // store during a WAF challenge can still carry a matching

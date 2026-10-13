@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../core/auth/auth_controller.dart';
 import '../../core/auth/personalized_session_status.dart';
 import '../../core/auth/web_session_controller.dart';
+import '../../core/auth/web_session_diagnostics.dart';
 import '../../core/auth/web_session_status.dart';
 
 import 'package:dakit_web/dakit_web.dart';
@@ -281,6 +282,15 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
         // A verdict may change while the feed is in flight. Do not commit
         // generic results after expiry or a switch to a different account.
         final currentHeader = await webSession.cookieHeader();
+        final credentialsUnchanged = currentHeader == cookieHeader;
+        // A rotation is adoptable only when the verdict chain has confirmed
+        // exactly the current credential set (probe/login verification).
+        // Unverified rotations (restore, unexpected store changes) keep the
+        // conservative `credentials_changed` rejection (review R2, REG-024).
+        final rotationVerified =
+            !credentialsUnchanged &&
+            cookieHeaderFingerprint(currentHeader) ==
+                statusOwner.verifiedCredentialFingerprint;
         final suspectedGroup = rfyCursorSignalsGenericFallback(page.nextCursor);
         final discardReason = personalizedResultDiscardReason(
           mounted: ref.mounted,
@@ -292,7 +302,7 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
           sameRequest: revision == requestRevision,
           healthy: ref.mounted && ref.read(webSessionStatusProvider).isHealthy,
           sameGeneration: generation == statusOwner.generation,
-          sameCredentials: currentHeader == cookieHeader,
+          sameCredentials: credentialsUnchanged || rotationVerified,
           generic: false,
         );
         final finalDiscardReason = ownershipLost() ?? discardReason;
@@ -300,7 +310,7 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
             finalDiscardReason != 'generic_fallback') {
           trace(
             'discarded',
-            'discardReason=$finalDiscardReason credentialsChanged=${currentHeader != cookieHeader}',
+            'discardReason=$finalDiscardReason credentialsChanged=${!credentialsUnchanged} rotationVerified=$rotationVerified',
           );
           throw const DAKitException(
             kind: DAKitFailureKind.network,

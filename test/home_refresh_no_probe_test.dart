@@ -299,9 +299,13 @@ void main() {
         await entered.future;
         cookies.csrfCookie = 'rotated';
         if (verifiedRotation) {
-          container
+          // A verified rotation: the verdict chain confirms the rotated
+          // credential set itself (R2). markHealthy alone would bump the
+          // generation; a forced check verifies the *credentials* without a
+          // generation change, exercising the fingerprint adoption path.
+          await container
               .read(webSessionStatusProvider.notifier)
-              .markHealthy(serverUsername: 'artist');
+              .check(force: true);
         }
         gate.complete();
         await pending;
@@ -318,7 +322,7 @@ void main() {
             'queued',
             'in_flight',
             'transport_succeeded',
-            'accepted',
+            verifiedRotation ? 'accepted' : 'discarded',
             'completed',
           ]),
         );
@@ -338,6 +342,14 @@ void main() {
           }
         }
         expect(traces.any((line) => line.contains('transportId=')), isTrue);
+        if (!verifiedRotation) {
+          expect(
+            traces.any(
+              (line) => line.contains('discardReason=credentials_changed'),
+            ),
+            isTrue,
+          );
+        }
         expect(rfy.calls, 1);
       },
     );
@@ -435,14 +447,35 @@ void main() {
     expect(container.read(artworkStoreProvider)['12345'], isNotNull);
   });
 
+  test('a verified same-generation cookie rotation during a feed request adopts its result', () async {
+    // RC3 (2026-10-14) + review R2: a same-generation rotation is adoptable
+    // only after the verdict chain confirms the rotated credential set
+    // itself (this app's own same-session probe navigation authenticates
+    // the new cookies). Discarding in-flight pages after such a verified
+    // rotation was self-inflicted pagination damage; an unverified rotation
+    // is still rejected (see the sibling test below).
+    final gate = Completer<void>();
+    final entered = Completer<void>();
+    final cookies = _FakeCookieManager();
+    final rfy = _RfyAdapter()
+      ..gate = gate.future
+      ..onFetch = entered.complete;
+    final container = feedContainer(rfy, _HomeProbeAdapter(), cookies: cookies);
+    final pending = container.read(personalizedFeedProvider.notifier).refresh();
+    await entered.future;
+    cookies.csrfCookie = 'rotated';
+    await container.read(webSessionStatusProvider.notifier).check(force: true);
+    gate.complete();
+    await pending;
+    expect(container.read(personalizedFeedProvider).items, hasLength(1));
+    expect(container.read(artworkStoreProvider)['12345'], isNotNull);
+  });
+
   test(
-    'a same-generation cookie rotation during a feed request adopts its result',
+    'an unverified same-generation cookie rotation still discards its result',
     () async {
-      // RC3 (2026-10-14): a same-generation rotation is the server (or this
-      // app's own same-session probe navigation) rotating cookies for the very
-      // session the request belongs to — no login, lockout or account change
-      // happened (those bump the generation and stay rejected). Discarding the
-      // in-flight page was self-inflicted pagination damage.
+      // Review R2 (2026-10-14): a rotation with no server confirmation of the
+      // new credential set must not bypass the response protection.
       final gate = Completer<void>();
       final entered = Completer<void>();
       final cookies = _FakeCookieManager();
@@ -461,8 +494,8 @@ void main() {
       cookies.csrfCookie = 'rotated';
       gate.complete();
       await pending;
-      expect(container.read(personalizedFeedProvider).items, hasLength(1));
-      expect(container.read(artworkStoreProvider)['12345'], isNotNull);
+      expect(container.read(personalizedFeedProvider).items, isEmpty);
+      expect(container.read(artworkStoreProvider)['12345'], isNull);
     },
   );
 
