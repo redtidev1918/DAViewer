@@ -100,7 +100,7 @@ Cookie 失效，真正付费的作品永远不会触发登录提醒。桥同样�
 - `unverified`：本地已有确认过的 WebView 会话，但一次纯 HTTP 探针无法确认，
   不是登出信号。
 
-服务端验证由 `WebSessionVerifier` 读取首页 `@publicSession.user.username`，
+服务端验证由 `WebSessionVerifier` 读取首页 `@@publicSession`（`isLoggedIn` + `user.username`），
 返回 `signedIn / anonymous / unavailable` 三态：只有首页确认了登录用户名才进入
 `healthy`；WAF 或非 200 响应进入 `unavailable` 并走退避，不会伪装成登录提醒。
 纯 HTTP 探针返回匿名而本地声明已登录时，改用真实浏览器探针（`web_session_refresher`）

@@ -175,7 +175,7 @@ lib/core/feed/artwork_feed_cache.dart
 当前 Headless WebView 主要检查：
 
 ```dart
-window.__INITIAL_STATE__['@publicSession']
+window.__INITIAL_STATE__['@@publicSession']
 ```
 
 并尝试获取：

@@ -98,7 +98,7 @@ Secure/HttpOnly），而不是折叠成 `name→value` 表：同名的 `.deviant
 `oauthSessionKnown=false` 是显式登出的权威证据：即使清理 token 时安全存储失败，
 下次冷启动也不会因为遗留 token 重新进入 `signedIn`。
 网页 Cookie 的可用性也由 DeviantArt 首页服务端验证
-（`@publicSession.user.username`），本地存在 Cookie 不等于会话有效。裸 HTTP
+（`@@publicSession.isLoggedIn` + `@@publicSession.user.username`），本地存在 Cookie 不等于会话有效。裸 HTTP
 首页探测可能被 WAF 干扰，但 `rfy/deviations` 成功**同样不是**健康证据：匿名
 Cookie 也能拿到 HTTP 200 的通用内容。匿名探测结果由真实 headless WebView
 (与登录相同的 Cookie 栈）仲裁：确认同一账号 → healthy；真实浏览器也匿名 →

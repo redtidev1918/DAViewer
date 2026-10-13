@@ -8,13 +8,17 @@ import 'web_session_verifier.dart';
 const browserSessionEvidenceScript = '''
 (function() {
   var state = window.__INITIAL_STATE__ || {};
-  var session = state['@publicSession'] || {};
+  // DeviantArt renders the session under the redux-style key `@@publicSession`
+  // (verified against the production home page); the single-@ spelling is only
+  // a legacy tolerance.
+  var session = state['@@publicSession'] || state['@publicSession'] || {};
   var user = session.user || {};
   var text = document.body ? document.body.innerText : '';
   return JSON.stringify({
     csrf: typeof window.__CSRF_TOKEN__ === 'string' ? window.__CSRF_TOKEN__ : '',
     username: typeof user.username === 'string' ? user.username : null,
-    initialized: !!state['@publicSession'],
+    loggedIn: typeof session.isLoggedIn === 'boolean' ? session.isLoggedIn : null,
+    initialized: !!(state['@@publicSession'] || state['@publicSession']),
     blocked: text.indexOf('Max challenge attempts exceeded') >= 0,
     challenge: !!document.querySelector('#px-captcha, #challenge-container'),
     origin: location.origin
@@ -25,6 +29,7 @@ const browserSessionEvidenceScript = '''
 final class BrowserSessionEvidence {
   const BrowserSessionEvidence({
     this.username,
+    this.loggedIn,
     this.csrf = '',
     this.initialized = false,
     this.blocked = false,
@@ -34,6 +39,10 @@ final class BrowserSessionEvidence {
   });
 
   final String? username;
+
+  /// The page's own `isLoggedIn` statement. `null` means the page did not
+  /// render the flag; `false` is an explicit server-signed-out answer.
+  final bool? loggedIn;
   final String csrf;
   final bool initialized;
   final bool blocked;
@@ -48,7 +57,7 @@ final class BrowserSessionEvidence {
       ? 'challenge'
       : parseFailed
       ? 'parse_failed'
-      : username == 'anonymous'
+      : loggedIn == false || username == 'anonymous'
       ? 'explicit_anonymous'
       : hasIdentity
       ? 'verified_identity'
@@ -67,6 +76,7 @@ final class BrowserSessionEvidence {
       }
       return BrowserSessionEvidence(
         username: (data['username'] as String?)?.trim(),
+        loggedIn: data['loggedIn'] is bool ? data['loggedIn'] as bool? : null,
         csrf: data['csrf'] as String? ?? '',
         initialized: data['initialized'] == true,
         blocked: data['blocked'] == true,

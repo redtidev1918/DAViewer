@@ -130,11 +130,11 @@ ProviderContainer _containerWith(
 }
 
 const _signedInHomeHtml =
-    '<script>window.__INITIAL_STATE__ = JSON.parse("{\\"@publicSession\\":{\\"user\\":{\\"username\\":\\"artist\\"}}}");</script>';
+    '<script>window.__INITIAL_STATE__ = JSON.parse("{\\"@@publicSession\\":{\\"isLoggedIn\\":true,\\"user\\":{\\"username\\":\\"artist\\"}}}");</script>';
 const _anonymousHomeHtml =
-    '<script>window.__INITIAL_STATE__ = JSON.parse("{\\"@publicSession\\":{\\"user\\":{\\"username\\":\\"anonymous\\"}}}");</script>';
+    '<script>window.__INITIAL_STATE__ = JSON.parse("{\\"@@publicSession\\":{\\"isLoggedIn\\":false,\\"user\\":{\\"username\\":\\"anonymous\\"}}}");</script>';
 const _otherUserHomeHtml =
-    '<script>window.__INITIAL_STATE__ = JSON.parse("{\\"@publicSession\\":{\\"user\\":{\\"username\\":\\"someone-else\\"}}}");</script>';
+    '<script>window.__INITIAL_STATE__ = JSON.parse("{\\"@@publicSession\\":{\\"isLoggedIn\\":true,\\"user\\":{\\"username\\":\\"someone-else\\"}}}");</script>';
 
 Future<ProviderContainer> _statusContainer(
   String homeHtml, {

@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:daviewer/core/auth/browser_session_observer.dart';
+import 'package:daviewer/core/auth/web_session_verifier.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('current document initializer can confirm identity after the global disappears', () async {
     final state = jsonEncode({
-      '@publicSession': {
+      '@@publicSession': {
+        'isLoggedIn': true,
         'user': {'username': 'artist'},
       },
     });
@@ -43,7 +45,8 @@ void main() {
     () async {
       var reads = 0;
       final state = jsonEncode({
-        '@publicSession': {
+        '@@publicSession': {
+          'isLoggedIn': true,
           'user': {'username': 'artist'},
         },
       });
@@ -61,6 +64,82 @@ void main() {
       expect(evidence.hasIdentity, isFalse);
     },
   );
+  group('production page shape (regression: key is @@publicSession)', () {
+    // Mirrors the real anonymous home page fetched 2026-10-13:
+    // "window.__INITIAL_STATE__ = JSON.parse(\"{\\\"@@publicSession\\\":
+    // {\\\"isLoggedIn\\\":false,...,\\\"user\\\":{...,\\\"username\\\":\\\"anonymous\\\"}}}\")"
+    test('real anonymous page reports explicit anonymous', () {
+      final evidence = BrowserSessionEvidence.decode(
+        jsonEncode({
+          'origin': 'https://www.deviantart.com',
+          'csrf': 'token',
+          'username': 'anonymous',
+          'loggedIn': false,
+          'initialized': true,
+        }),
+      );
+      expect(evidence.classification, 'explicit_anonymous');
+      expect(evidence.parseFailed, isFalse);
+    });
+    test('isLoggedIn=false without a username is still explicit anonymous', () {
+      final evidence = BrowserSessionEvidence.decode(
+        jsonEncode({
+          'origin': 'https://www.deviantart.com',
+          'csrf': 'token',
+          'username': null,
+          'loggedIn': false,
+          'initialized': true,
+        }),
+      );
+      expect(evidence.classification, 'explicit_anonymous');
+    });
+    test(
+      'isLoggedIn=true without a username stays unverified, not healthy',
+      () {
+        final evidence = BrowserSessionEvidence.decode(
+          jsonEncode({
+            'origin': 'https://www.deviantart.com',
+            'csrf': 'token',
+            'username': null,
+            'loggedIn': true,
+            'initialized': true,
+          }),
+        );
+        expect(evidence.classification, 'identity_pending');
+        expect(evidence.hasIdentity, isFalse);
+      },
+    );
+    test('legacy single-@ spelling still confirms identity', () {
+      final evidence = BrowserSessionEvidence.decode(
+        jsonEncode({
+          'origin': 'https://www.deviantart.com',
+          'csrf': 'token',
+          'username': 'artist',
+          'loggedIn': true,
+          'initialized': true,
+        }),
+      );
+      expect(evidence.classification, 'verified_identity');
+    });
+    test('document fallback parses the production escaped anonymous page', () async {
+      const productionHtml =
+          r'''<script>window.__INITIAL_STATE__ = JSON.parse("{\"@@publicSession\":{\"isLoggedIn\":false,\"csrfToken\":\"tok\",\"user\":{\"username\":\"anonymous\"}}}");</script>''';
+      expect(
+        WebSessionVerifier.pageUsernameFromInitialState(productionHtml),
+        'anonymous',
+      );
+      final evidence = await readBrowserSessionEvidence(
+        getUrl: () async => Uri.parse('https://www.deviantart.com/'),
+        evaluate: () async => jsonEncode({
+          'origin': 'https://www.deviantart.com',
+          'csrf': 'synthetic',
+        }),
+        getHtml: () async => productionHtml,
+      );
+      expect(evidence.username, 'anonymous');
+      expect(evidence.identitySource, 'document_initial_state');
+    });
+  });
   testWidgets('full navigation cannot confirm the previous document', (
     tester,
   ) async {
