@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  SDK_SHA: 2590cbec59e0193d231addc73b3373cbe2b9b88e
+  SDK_SHA: f489f529d7d103eaec27bb4dcc4dec53b134e0a6
   FLUTTER_VERSION: 3.47.1
 
 jobs:

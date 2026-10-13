@@ -13,10 +13,10 @@ dependencies:
   chewie: ^1.17.2
   crypto: ^3.0.3
   cupertino_icons: ^1.0.8
-  dakit_api: ^1.1.1
-  dakit_core: ^1.1.0
-  dakit_web: ^0.2.5
-  dakit_flutter: ^1.0.0
+  dakit_api: ^1.2.0
+  dakit_core: ^2.0.0
+  dakit_web: ^0.3.0
+  dakit_flutter: ^1.1.0
   dio: ^5.11.1
   flutter_cache_manager: ^3.4.5
   flutter_html: ^3.0.0
@@ -42,27 +42,7 @@ dev_dependencies:
 # changed PUB_HOSTED_URL forces) on the version the committed lock uses.
 dependency_overrides:
   html: 0.15.6
-  # Joint candidate only; replace with verified published SDK versions before release.
-  dakit_core:
-    git:
-      url: https://github.com/redtidev1918/DAKit.git
-      ref: 2590cbec59e0193d231addc73b3373cbe2b9b88e
-      path: packages/dakit_core
-  dakit_api:
-    git:
-      url: https://github.com/redtidev1918/DAKit.git
-      ref: 2590cbec59e0193d231addc73b3373cbe2b9b88e
-      path: packages/dakit_api
-  dakit_web:
-    git:
-      url: https://github.com/redtidev1918/DAKit.git
-      ref: 2590cbec59e0193d231addc73b3373cbe2b9b88e
-      path: packages/dakit_web
-  dakit_flutter:
-    git:
-      url: https://github.com/redtidev1918/DAKit.git
-      ref: 2590cbec59e0193d231addc73b3373cbe2b9b88e
-      path: packages/dakit_flutter
+
 
 flutter:
   uses-material-design: true

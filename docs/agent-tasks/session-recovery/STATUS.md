@@ -2,6 +2,17 @@
 
 ## 2026-10-13 current checkpoint (supersedes historical entries below)
 
+Publication completed: SDK PR #45 merged as
+`f489f529d7d103eaec27bb4dcc4dec53b134e0a6`; all four component tags point to it.
+Release 38340065798 SUCCESS; pub.dev verified core 2.0.0 / api 1.2.0 /
+web 0.3.0 / flutter 1.1.0. The earlier publication-blocked entries below are
+historical. DAViewer now uses these hosted package minimums, removes all four
+candidate Git overrides and uses pub.dev lock URLs/checksums (other package
+versions unchanged). Joint CI source pin updated to the exact publication SHA.
+Hosted-dependency analyze PASS; full 488 tests PASS. New CI/native candidate builds
+must run on the dependency-update commit; earlier artifacts are not this commit.
+App PR #96 remains Draft; no formal app release or original-device verification.
+
 - Active workspace: `C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer`;
   branch `codex/daviewer-sdk-integration`, source HEAD `43fe8bf635a842801d0b9edd06b06b2b8deb930f`.
 - Joint CI 38243805269 SUCCESS: SDK 262 / app 488 tests, Android/Windows/macOS
