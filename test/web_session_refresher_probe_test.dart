@@ -1,7 +1,34 @@
 import 'package:daviewer/core/auth/web_session_refresher.dart';
+import 'package:daviewer/core/auth/browser_session_observer.dart';
+import 'package:daviewer/core/auth/web_session_diagnostics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('page sampling binds identity to stable native credentials in the same transaction', () async {
+    final evidence = await readBrowserEvidenceWithCredentials(
+      cookieHeader: () async => 'auth=stable',
+      readPage: () async => const BrowserSessionEvidence(
+        username: 'artist',
+        csrf: 'csrf',
+        initialized: true,
+      ),
+    );
+    expect(evidence.username, 'artist');
+    expect(
+      evidence.credentialFingerprint,
+      cookieHeaderFingerprint('auth=stable'),
+    );
+  });
+  test('rotation during page sampling never authenticates the later credential set', () async {
+    var reads = 0;
+    final evidence = await readBrowserEvidenceWithCredentials(
+      cookieHeader: () async => reads++ == 0 ? 'auth=old' : 'auth=new',
+      readPage: () async =>
+          const BrowserSessionEvidence(username: 'artist', initialized: true),
+    );
+    expect(evidence.hasIdentity, isFalse);
+    expect(evidence.credentialFingerprint, isNull);
+  });
   group('webSessionProbeResultFromPage', () {
     test('a rendered username is confirmed', () {
       final result = webSessionProbeResultFromPage(
@@ -58,8 +85,8 @@ void main() {
         webSessionProbeSampleDecision(
           webSessionProbeResultFromPage(pageUsername: 'anonymous', csrf: 't'),
           corroborationPending: false,
-          evidenceNavigation: 0,
-          armedNavigation: 0,
+          evidenceDocument: 0,
+          armedDocument: 0,
         ),
         WebSessionProbeSampleDecision.corroborateAnonymous,
       );
@@ -72,8 +99,8 @@ void main() {
           webSessionProbeSampleDecision(
             webSessionProbeResultFromPage(pageUsername: 'anonymous', csrf: 't'),
             corroborationPending: true,
-            evidenceNavigation: 3,
-            armedNavigation: 1,
+            evidenceDocument: 3,
+            armedDocument: 1,
           ),
           WebSessionProbeSampleDecision.complete,
         );
@@ -91,8 +118,8 @@ void main() {
         webSessionProbeSampleDecision(
           webSessionProbeResultFromPage(pageUsername: 'anonymous', csrf: 't'),
           corroborationPending: true,
-          evidenceNavigation: 1,
-          armedNavigation: 1,
+          evidenceDocument: 1,
+          armedDocument: 1,
         ),
         WebSessionProbeSampleDecision.wait,
       );
@@ -100,8 +127,8 @@ void main() {
         webSessionProbeSampleDecision(
           webSessionProbeResultFromPage(pageUsername: 'anonymous', csrf: 't'),
           corroborationPending: true,
-          evidenceNavigation: 0,
-          armedNavigation: 1,
+          evidenceDocument: 0,
+          armedDocument: 1,
         ),
         WebSessionProbeSampleDecision.wait,
       );
@@ -115,8 +142,8 @@ void main() {
           webSessionProbeSampleDecision(
             webSessionProbeResultFromPage(pageUsername: 'artist', csrf: 't'),
             corroborationPending: pending,
-            evidenceNavigation: 0,
-            armedNavigation: 0,
+            evidenceDocument: 0,
+            armedDocument: 0,
           ),
           WebSessionProbeSampleDecision.complete,
         );
@@ -130,16 +157,16 @@ void main() {
       final first = webSessionProbeSampleDecision(
         webSessionProbeResultFromPage(pageUsername: 'anonymous', csrf: 't'),
         corroborationPending: pending,
-        evidenceNavigation: 0,
-        armedNavigation: 0,
+        evidenceDocument: 0,
+        armedDocument: 0,
       );
       expect(first, WebSessionProbeSampleDecision.corroborateAnonymous);
       pending = true; // the refresher arms the reload after that decision
       final second = webSessionProbeSampleDecision(
         webSessionProbeResultFromPage(pageUsername: 'artist', csrf: 't'),
         corroborationPending: pending,
-        evidenceNavigation: 2,
-        armedNavigation: 0,
+        evidenceDocument: 2,
+        armedDocument: 0,
       );
       expect(second, WebSessionProbeSampleDecision.complete);
     });

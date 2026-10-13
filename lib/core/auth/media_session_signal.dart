@@ -37,7 +37,18 @@ final class MediaSessionSignal {
     r'\b(?:status(?:code)?|response(?: code)?|http(?: error)?)[\s:=]*(401|403)\b',
     caseSensitive: false,
   );
-  static final RegExp _urlHostPattern = RegExp("(https?://[^/\\s'\"]+)");
+  static final RegExp _urlPattern = RegExp(
+    r'''https?://[^\s'"<>]+''',
+    caseSensitive: false,
+  );
+
+  /// The site hosts whose 401/403 may feed the global web-session verdict
+  /// chain. Resource hosts (wixmp.com, deviantart.net media subdomains)
+  /// answer for themselves and are deliberately absent.
+  static const Set<String> _siteHosts = <String>{
+    'deviantart.com',
+    'www.deviantart.com',
+  };
 
   /// Forwards [error] to the verdict chain only when it is an authentication
   /// rejection attributable to the DeviantArt site itself. Network failures,
@@ -71,26 +82,28 @@ final class MediaSessionSignal {
     return _httpStatusPattern.hasMatch(error.toString());
   }
 
-  /// An auth rejection that names a DeviantArt page host. Only site-host
-  /// rejections may feed the global web-session verdict chain; resource hosts
-  /// (wixmp.com and friends) answer for themselves and unattributable error
-  /// text proves nothing about the session.
+  /// An auth rejection that names a DeviantArt site host. The URL is extracted
+  /// from the error text and parsed with [Uri] before comparing `uri.host` —
+  /// a raw string comparison misattributes root domains, explicit ports and
+  /// mixed-case hosts. Unattributable errors prove nothing about the session.
   static bool isWebSessionAuthRejection(Object error) {
     if (!isAuthRejection(error)) return false;
-    final host = _hostOf(error);
-    if (host == null) return false;
-    final normalized = host.toLowerCase();
-    return normalized == 'deviantart.com' ||
-        normalized == 'www.deviantart.com' ||
-        normalized.endsWith('.deviantart.com');
+    final uri = _urlOf(error);
+    if (uri == null) return false;
+    final host = uri.host.toLowerCase();
+    if (host.isEmpty) return false;
+    return _siteHosts.contains(host) || host.endsWith('.deviantart.com');
   }
 
-  static String? _hostOf(Object error) {
+  static Uri? _urlOf(Object error) {
     // `uri` is inherited from dart:io HttpException; matching the concrete
     // cache-manager type avoids a direct dart:io import in this file.
     if (error is HttpExceptionWithStatus) {
-      return error.uri?.host;
+      return error.uri;
     }
-    return _urlHostPattern.firstMatch(error.toString())?.group(1);
+    final match = _urlPattern.firstMatch(error.toString());
+    if (match == null) return null;
+    final text = match.group(0)!.replaceFirst(RegExp(r'[),.;\]}]+$'), '');
+    return Uri.tryParse(text);
   }
 }

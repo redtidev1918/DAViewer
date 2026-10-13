@@ -47,7 +47,7 @@ v0.5.17）。任务书：`docs/agent-tasks/session-recovery/RUNTIME-STABILITY-SP
 
 | 修复 | 文件 | 内容 |
 |---|---|---|
-| F1 | `web_session_refresher.dart` | 探测 anonymous 佐证：首个 anonymous 样本只武装一次 reload 复核（`webSessionProbeSampleDecision` 三结果纯函数：complete / corroborate / wait）；复核结论必须来自**严格更新的导航序号**（`BrowserSessionObserver` 向消费方传递证据所属 navSeq）——`corroborationPending=true` 本身不证明新页面已加载，reload 未落地前的同文档重读（如 CSRF 轮换改变去重键）不完成探测，回落到期限 unavailable。confirmed 仍立即完成；真实登出第二次采样仍 anonymous，权威性保留 |
+| F1 | `web_session_refresher.dart` | 探测 anonymous 佐证：首个 anonymous 样本只武装一次 reload 复核（`webSessionProbeSampleDecision` 三结果纯函数：complete / corroborate / wait）；复核结论必须来自**严格更新的已提交主文档代际**（`BrowserSessionObserver` 向消费方传递证据所属 navSeq）——`corroborationPending=true` 本身不证明新页面已加载，reload 未落地前的同文档重读（如 CSRF 轮换改变去重键）不完成探测，回落到期限 unavailable。confirmed 仍立即完成；真实登出第二次采样仍 anonymous，权威性保留 |
 | F2 | `media_session_signal.dart` | 媒体信号主机归因：仅 deviantart.com 站点主机的 401/403 进入复核链；wixmp/CDN 与无法归因的错误文本不再触发全局复核；状态码正则收紧为需关键字前缀 |
 | F3 | `home_providers.dart` | group-2 游标不再置 degraded / 不再强制复核 / 不落个性化缓存；仅记录 `personalization=unknown` 诊断；横幅不再由弱证据触发 |
 | F4 | `web_session_status.dart` + `web_session_verdict.dart` | 空 Cookie + claimed-signed-in → unavailable（非 anonymous）；`localState/anonymous` 在 claimed 会话下 → unavailable；bareProbe 答案在凭据轮换后作废（credentials_superseded）；瞬态证据不推翻**未过期** healthy 租约（租约过期后照常转移） |
@@ -63,10 +63,11 @@ v0.5.17）。任务书：`docs/agent-tasks/session-recovery/RUNTIME-STABILITY-SP
 ## 测试
 
 - `web_session_refresher_probe_test.dart`：anonymous 佐证决策序列——首样本武装、
-  **新导航序号下**的复核样本才完成、reload 未落地（同/低导航序号）一律 wait
+  **新提交主文档下**的复核样本才完成、reload 未落地一律 wait
   （审查边界 1）、confirmed 立即完成、重定向中间态不能单样本登出。
 - `browser_session_observer_test.dart`：观察器向消费方传递证据所属导航序号，
-  序号仅在真实导航事件后前进（F1 接线证明）。
+  SPA History 只使旧读取失效，不推进主文档代际；重复 load-stop 也不推进。
+  原生 Headless 回调测试验证 reload 的 load-start/stop 后才完成匿名结论。
 - `media_session_signal_test.dart`：主机归因（DA 站点转发、wixmp/deviantart.net
   CDN 不转发、无 URL 不转发）；widget 级转发/抑制用例改用可归因错误。
 - `personalized_request_policy_test.dart` / `home_refresh_no_probe_test.dart`：
@@ -75,10 +76,12 @@ v0.5.17）。任务书：`docs/agent-tasks/session-recovery/RUNTIME-STABILITY-SP
   跨账号/代际拒绝保留。
 - `web_session_status_test.dart` / `web_session_verdict_policy_test.dart`：
   空本地 Cookie 不推翻 claimed 会话、凭据轮换作废旧复核答案、
-  **租约未过期保留 / 租约过期（时钟推进 6 分钟）后瞬态照常转移为 unavailable**
+  **租约未过期保留 / 租约过期（时钟推进 6 分钟）后凭据作废路径转为 unverified**
   （审查边界 3）、媒体 403 复用租约但不掩盖真实登出。
 - 全量：`dart format --set-exit-if-changed` 0 changed；`flutter analyze` 无问题；
-  `flutter test --dart-define=DAVIEWER_VERSION=0.5.17` **525 PASS**。
+  浏览器采样前后读取原生 Cookie，只有相同集合才把指纹附着到结果；交付时
+  再核对该指纹，禁止用稍后读到的 Cookie 为旧页面背书。持久化再次核对集合。
+  最终测试结果以 STATUS 最新检查点及对应提交 CI 为准；此前 525 PASS 为历史记录。
 
 ## 验收状态
 

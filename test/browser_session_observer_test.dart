@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:daviewer/core/auth/browser_session_observer.dart';
 import 'package:daviewer/core/auth/web_session_verifier.dart';
+import 'package:daviewer/core/auth/web_session_refresher.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -329,8 +330,7 @@ void main() {
           reads.add(completer);
           return completer.future;
         },
-        onEvidence: (_, navigationSequence) =>
-            delivered.add(navigationSequence),
+        onEvidence: (_, epoch) => delivered.add(epoch.committedDocument),
         onDeadline: () {},
       )..start();
 
@@ -342,13 +342,63 @@ void main() {
 
       // No navigation yet: a re-read of the same document (dedup reset by a
       // CSRF rotation) still reports the same sequence.
-      observer.navigationStarted();
+      observer.navigationStarted(loading: true);
       observer.navigationCommitted();
       await tester.pump(const Duration(milliseconds: 500));
       expect(reads, hasLength(2));
       reads[1].complete(const BrowserSessionEvidence(username: 'anonymous'));
       await tester.pump();
-      expect(delivered, [0, 2]);
+      expect(delivered, [0, 1]);
+      observer.dispose();
+    },
+  );
+
+  testWidgets(
+    'SPA/history and duplicate stops never corroborate anonymous without a new committed document',
+    (tester) async {
+      var armed = false;
+      var armedDocument = 0;
+      final decisions = <WebSessionProbeSampleDecision>[];
+      final observer = BrowserSessionObserver(
+        read: () async => const BrowserSessionEvidence(
+          username: 'anonymous',
+          initialized: true,
+          loggedIn: false,
+        ),
+        onEvidence: (page, epoch) {
+          final decision = webSessionProbeSampleDecision(
+            webSessionProbeResultFromPage(
+              pageUsername: page.username,
+              csrf: page.csrf,
+            ),
+            corroborationPending: armed,
+            evidenceDocument: epoch.committedDocument,
+            armedDocument: armedDocument,
+          );
+          decisions.add(decision);
+          if (decision == WebSessionProbeSampleDecision.corroborateAnonymous) {
+            armed = true;
+            armedDocument = epoch.committedDocument;
+          }
+        },
+        onDeadline: () {},
+      )..start();
+      await tester.pump();
+      observer.navigationStarted();
+      await observer.sample();
+      observer.navigationCommitted(); // A duplicate/stale stop, no new load.
+      await observer.sample();
+      expect(decisions, [
+        WebSessionProbeSampleDecision.corroborateAnonymous,
+        WebSessionProbeSampleDecision.wait,
+        WebSessionProbeSampleDecision.wait,
+      ]);
+      observer.navigationStarted(loading: true);
+      await observer.sample();
+      expect(decisions, hasLength(3));
+      observer.navigationCommitted();
+      await observer.sample();
+      expect(decisions.last, WebSessionProbeSampleDecision.complete);
       observer.dispose();
     },
   );

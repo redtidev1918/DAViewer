@@ -5,6 +5,7 @@ import 'package:daviewer/core/auth/web_session_refresher.dart'
     hide webSessionProbeProvider;
 import 'package:daviewer/core/auth/web_session_status.dart';
 import 'package:daviewer/core/auth/web_session_verifier.dart';
+import 'package:daviewer/core/auth/web_session_diagnostics.dart';
 import 'package:daviewer/core/data/web_session.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -301,6 +302,62 @@ void main() {
   });
 
   group('WebSessionStatusController.check server verification', () {
+    test('a later Cookie read cannot authenticate credentials absent from the browser transaction', () async {
+      final cookies = [
+        Cookie(name: 'userinfo', value: 'saved-user'),
+        Cookie(name: 'csrf', value: 'token'),
+      ];
+      final oldFingerprint = cookieHeaderFingerprint(
+        'userinfo=saved-user; csrf=token',
+      );
+      final container = _containerWith(
+        _CountingHtmlAdapter(_signedInHomeHtml),
+        cookies: cookies,
+        probe: () async {
+          cookies[1] = Cookie(name: 'csrf', value: 'unverified-later-store');
+          return WebSessionProbeResult.confirmed(
+            csrf: 'token',
+            username: 'artist',
+            credentialFingerprint: oldFingerprint,
+          );
+        },
+      );
+      addTearDown(container.dispose);
+      final owner = container.read(webSessionStatusProvider.notifier);
+      await owner.check(force: true, browser: true);
+      expect(container.read(webSessionStatusProvider).isHealthy, isFalse);
+      expect(owner.verifiedCredentialFingerprint, isNull);
+      expect(container.read(webSessionStatusProvider).needsLogin, isFalse);
+    });
+    test('credentials-superseded early return cannot preserve an expired healthy lease', () async {
+      var now = DateTime.now();
+      final gate = Completer<ResponseBody>();
+      final adapter = _GatedHtmlAdapter(gate);
+      final cookies = [
+        Cookie(name: 'userinfo', value: 'saved-user'),
+        Cookie(name: 'csrf', value: 'token'),
+      ];
+      final container = _containerWith(
+        adapter,
+        cookies: cookies,
+        now: () => now,
+      );
+      addTearDown(container.dispose);
+      final owner = container.read(webSessionStatusProvider.notifier);
+      owner.markHealthy(serverUsername: 'artist');
+      now = now.add(const Duration(minutes: 6));
+      final pending = owner.check(force: true);
+      await adapter.entered.future;
+      cookies[1] = Cookie(name: 'csrf', value: 'rotated');
+      gate.complete(ResponseBody.fromString(_signedInHomeHtml, 200));
+      await pending;
+      expect(
+        container.read(webSessionStatusProvider).state,
+        WebSessionStatusState.unverified,
+      );
+      expect(container.read(webSessionStatusProvider).needsLogin, isFalse);
+      expect(container.read(webSessionControllerProvider).username, 'artist');
+    });
     test(
       'empty Cookie reads retain only the existing bounded healthy lease',
       () async {
