@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.5.14](https://github.com/redtidev1918/DAViewer/compare/v0.5.13...v0.5.14) (2026-10-13)
+
+
+### Bug Fixes
+
+* **auth:** coordinate Android session recovery and RFY ownership ([8ddf041](https://github.com/redtidev1918/DAViewer/commit/8ddf04152f7d5dea134005a1b26e5dede638091b))
+* **auth:** integrate generation-safe SDK logout transactions ([43fe8bf](https://github.com/redtidev1918/DAViewer/commit/43fe8bf635a842801d0b9edd06b06b2b8deb930f))
+* **auth:** keep diagnostic flushes from aborting Android login callbacks ([3d62b45](https://github.com/redtidev1918/DAViewer/commit/3d62b45a0466fdf817b7d6a1bdccc47edb6385a6))
+* **auth:** observe async browser identity and preserve RFY request ownership ([2e1069d](https://github.com/redtidev1918/DAViewer/commit/2e1069df7f49c0aa58fd2bfbb9b5d49a2d1d76e4))
+* **auth:** release login synchronization after evidence deadline ([4d09fe8](https://github.com/redtidev1918/DAViewer/commit/4d09fe8011fb6053e9d7198b330008244ef7a6ad))
+* **auth:** release startup gate and stop unknown-session routing loop ([14797b3](https://github.com/redtidev1918/DAViewer/commit/14797b3aaccab0d9a33624cde2c85a568327edd7))
+* **deps:** adopt published SDK session reliability packages ([d4f1d7e](https://github.com/redtidev1918/DAViewer/commit/d4f1d7e1fe6ffeff6a72d94475ce5aece81cfa34))
+* **diagnostics:** export retained cold-start logs and identify candidate builds ([3c468a0](https://github.com/redtidev1918/DAViewer/commit/3c468a0d5cce6fd22c866eacf97d2746a6fea6c8))
+* **diagnostics:** redact nested OAuth redirects through SDK ([1d8ba3b](https://github.com/redtidev1918/DAViewer/commit/1d8ba3bff818b71bc235ef514e0495a968ba38ee))
+* integrate resilient SDK OAuth and RFY with startup and logout recovery ([71c45ae](https://github.com/redtidev1918/DAViewer/commit/71c45ae65481df8087763dd14499eb2a084c2bbc))
+* jointly validate SDK and application session recovery ([ad776de](https://github.com/redtidev1918/DAViewer/commit/ad776de2e27c0b724d0a48cee84f4db3ebc56163))
+* **platform:** give SDK exclusive Android OAuth callback ownership ([3d7d2d7](https://github.com/redtidev1918/DAViewer/commit/3d7d2d766956508b363adb85b126c87c8210fc3d))
+* **tools:** satisfy analyzer rules for session trace organizer ([6dfb442](https://github.com/redtidev1918/DAViewer/commit/6dfb442cc6023646f2e754f67f2b8748e4b068dd))
+
 ## [0.5.13](https://github.com/redtidev1918/DAViewer/compare/v0.5.12...v0.5.13) (2026-10-11)
 
 
