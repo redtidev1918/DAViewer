@@ -41,7 +41,8 @@
   `686474b39fd91d20c1db3ce5bf6216ed8ab05ec7638f904251e0d108a34e7141`);
   package `app.daviewer`, versionName 0.5.16, versionCode 228. Provenance JSON
   binds exact app/SDK SHAs above. Artifact id `11823612619`, run `38413948879`.
-  New release: PENDING.
+  Version PR #109 (`chore(main): release 0.5.17`) is open; this checkpoint is
+  included in its release branch. New release: PENDING (normal CI/artifact gates).
   Android pagination acceptance: PENDING
   (ADB has no attached device); user's v0.5.16 incident FAIL. Original Incident
   Verified remains PENDING. Do not claim real-device resolution from widgets.
