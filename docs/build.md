@@ -57,6 +57,13 @@ macOS 当前脚本执行 Flutter release 构建后压缩 `DAViewer.app`，没有
 
 ## 发布流程
 
+双仓库改动先以固定 SDK SHA 或忽略的本地 path override 联合验证。
+`SDK integration candidate` 验证 SDK 测试、文档与发布预检查，再运行应用全量测试
+并构建三平台候选包。Windows/macOS 会实际启动 Release 程序，检查源码版本、
+启动完成和离开 Splash；这不等于真实账号验收。正式发布前先确认 SDK 新版本
+在 pub.dev 可用，再移除候选 override、更新最低依赖和锁文件并重跑下游验证。
+构建脚本拒绝携带候选 Git override 的正式构建；三平台均记录准确源码 SHA。
+
 `.github/workflows/release.yml` 调用 ReleaseGraph；`.release-policy.yml` 选择 release-please 版本管理、三平台构建、资产检查和保留策略。PR 执行 dry-run，`main` 推送、定时任务和手动触发进入发布流程。当前工作流没有 `v*` tag 推送触发器。
 
 1. 通过 release-please 管理版本变更，核对 `pubspec.yaml` 与 `.release-please-manifest.json`。

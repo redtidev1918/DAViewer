@@ -38,8 +38,8 @@ void main() {
         'https://example.test/auth?token=SECRET123&foo=bar&csrf_token=CSRF';
     final redacted = LogRedactor.redact(line);
 
-    expect(redacted, contains('token=[redacted]'));
-    expect(redacted, contains('csrf_token=[redacted]'));
+    expect(redacted, contains('token=<redacted>'));
+    expect(redacted, contains('csrf_token=<redacted>'));
     expect(redacted, isNot(contains('SECRET123')));
     expect(redacted, isNot(contains('=CSRF')));
     expect(redacted, contains('foo=bar'));
@@ -54,6 +54,25 @@ void main() {
       LogRedactor.redact('Authorization: Bearer abc.def.ghi'),
       'Authorization: [redacted]',
     );
+  });
+
+  test('exported reports redact nested OAuth redirect parameters', () {
+    const nested =
+        'https://example.test/join?referer=https%3A%2F%2Fexample.test%2Fauth'
+        '%3Fstate%3DONE_TIME_NONCE%26code%3DAUTH_CODE%26scope%3Dbasic';
+    final redacted = LogRedactor.redactAll('load stop: $nested');
+    expect(redacted, isNot(contains('ONE_TIME_NONCE')));
+    expect(redacted, isNot(contains('AUTH_CODE')));
+    expect(redacted, contains('scope%3Dbasic'));
+    final report = Uri.decodeComponent(
+      ReportBuilder.issueUrl(
+        version: '0.5.13',
+        platform: 'Android',
+        logExcerpt: nested,
+      ),
+    );
+    expect(report, isNot(contains('ONE_TIME_NONCE')));
+    expect(report, isNot(contains('AUTH_CODE')));
   });
 
   test('redacts email addresses', () {
@@ -73,7 +92,7 @@ void main() {
     expect(url, contains('github.com/redtidev1918/DAViewer/issues/new'));
     expect(Uri.decodeComponent(url), contains('App version: 0.2.144'));
     expect(Uri.decodeComponent(url), contains('Platform: macOS'));
-    expect(Uri.decodeComponent(url), contains('token=[redacted]'));
+    expect(Uri.decodeComponent(url), contains('token=<redacted>'));
     expect(Uri.decodeComponent(url), isNot(contains('LEAKED')));
   });
 }

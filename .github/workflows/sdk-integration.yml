@@ -1,0 +1,131 @@
+name: SDK integration candidate
+
+on:
+  pull_request:
+    paths:
+      - 'lib/**'
+      - 'test/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - 'scripts/build-release'
+      - 'scripts/configure-sdk-integration.py'
+      - 'scripts/verify-desktop-startup.py'
+      - '.github/workflows/sdk-integration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdk-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SDK_SHA: f489f529d7d103eaec27bb4dcc4dec53b134e0a6
+  FLUTTER_VERSION: 3.47.1
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: redtidev1918/DAKit
+          ref: ${{ env.SDK_SHA }}
+          path: .joint-sdk
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Verify SDK workspace
+        working-directory: .joint-sdk
+        run: |
+          ./tool/verify.sh
+          dart run melos run graph
+          dart run melos run doc
+          dart run melos run publish:check
+      - name: Verify application with exact SDK source
+        shell: bash
+        run: |
+          python3 scripts/configure-sdk-integration.py .joint-sdk --sha "$SDK_SHA"
+          flutter pub get
+          flutter analyze --no-pub
+          dart format --output=none --set-exit-if-changed lib test
+          flutter test --no-pub --dart-define=DAVIEWER_VERSION=0.5.13
+
+  candidate:
+    needs: quality
+    # Signing is available only for trusted same-repository candidates.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        # Current WebView plugin requires the project's VS 2022 toolchain.
+        runner: [ubuntu-latest, windows-2022, macos-26]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: redtidev1918/DAKit
+          ref: ${{ env.SDK_SHA }}
+          path: .joint-sdk
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-java@v6
+        if: runner.os == 'Linux'
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Configure exact SDK source
+        shell: bash
+        run: python scripts/configure-sdk-integration.py .joint-sdk --sha "$SDK_SHA"
+      - name: Build candidate without publishing
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_PROPERTIES: ${{ secrets.KEYSTORE_PROPERTIES }}
+          RELEASE_VERSION: 0.5.13
+          DRY_RUN: 'true'
+          DAVIEWER_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [[ "$RUNNER_OS" == Linux && ( -z "$KEYSTORE_B64" || -z "$KEYSTORE_PROPERTIES" ) ]]; then
+            echo 'Production signing secrets required; no debug substitute.' >&2
+            exit 1
+          fi
+          bash scripts/build-release
+          cp sdk-integration-provenance.json dist/release/
+      - name: Verify desktop candidate startup
+        if: runner.os == 'Windows' || runner.os == 'macOS'
+        shell: bash
+        env:
+          EXPECTED_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            executable="$(cygpath -w "$PWD/build/windows/x64/runner/Release/daviewer.exe")"
+          else
+            # PRODUCT_NAME in Runner/Configs/AppInfo.xcconfig is DAViewer.
+            executable="$PWD/build/macos/Build/Products/Release/DAViewer.app/Contents/MacOS/DAViewer"
+          fi
+          python scripts/verify-desktop-startup.py --executable "$executable" \
+            --expected-revision "$EXPECTED_REVISION" \
+            --summary "dist/release/startup-smoke-$RUNNER_OS.json"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: sdk-integration-${{ runner.os }}-${{ github.event.pull_request.head.sha || github.sha }}
+          path: dist/release/*
+          if-no-files-found: error
+          retention-days: 14

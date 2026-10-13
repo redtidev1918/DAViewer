@@ -54,6 +54,7 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
   bool _loading = true;
   bool _closeAfterReport = false;
   bool _serverConfirmedWebSession = false;
+  bool _webVerificationDeadlineExceeded = false;
   bool _challengeBlocked = false;
   int _reportSeq = 0;
   int _navSeq = 0;
@@ -137,6 +138,37 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
         source: 'oauth_authorize',
       ),
     );
+  }
+
+  /// Detects the `dakit://oauth` OAuth callback on any navigation path and
+  /// hands it to the bridge. Some redirect chains (server-side 30x, history
+  /// restores) bypass [onLoadStart] via `shouldOverrideUrlLoading`, so every
+  /// navigation hook calls this; the bridge's `addCallback` is idempotent, so
+  /// a double delivery at worst reloads the home page once.
+  ///
+  /// Returns true when the URI was an OAuth callback (the caller must cancel
+  /// that navigation: the callback page has no reportable session state).
+  bool _handlePossibleOAuthCallback(
+    InAppWebViewController controller,
+    Uri? uri,
+  ) {
+    if (uri == null || uri.scheme != 'dakit' || uri.host != 'oauth') {
+      return false;
+    }
+    _bridge?.addCallback(uri);
+    _navSource = 'oauth_callback';
+    // Navigate back to the deviantart home page; its onLoadStop then
+    // reports the real web session (CSRF + login state). Do NOT read the
+    // session here — the callback page has no __INITIAL_STATE__.
+    unawaited(
+      _navigate(
+        () => controller.loadUrl(
+          urlRequest: URLRequest(url: WebUri(_homeUri.toString())),
+        ),
+        source: 'oauth_callback_home',
+      ),
+    );
+    return true;
   }
 
   Future<void> _navigate(
@@ -384,6 +416,20 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
           WidgetsBinding.instance.addPostFrameCallback(
             (_) => _closeScreen(reason: 'oauth_completed_after_web'),
           );
+        } else {
+          // A signed-in page may arrive before /whoami. Its earlier report is
+          // correctly rejected by the logout fence; resample the current
+          // document once the OAuth identity is known instead of waiting for
+          // a navigation or changed evidence that may never occur.
+          final observer = _sessionObserver;
+          _webVerificationDeadlineExceeded = false;
+          _reportSeq++;
+          observer?.navigationStarted();
+          if (observer?.isDisposed == true) {
+            observer?.restart();
+          } else {
+            unawaited(observer?.sample());
+          }
         }
       }
     });
@@ -444,6 +490,13 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                 ),
               if (_failedNavigation != null)
                 _LoginErrorBanner(message: s.loginBrowserOpenFailed),
+              if (_webVerificationDeadlineExceeded &&
+                  auth.oauthSignedIn &&
+                  auth.account != null)
+                _LoginErrorBanner(
+                  message:
+                      '${s.loginSuccess} ${s.recommendedSessionUnverified}',
+                ),
               if (auth.error != null)
                 _LoginErrorBanner(
                   message: friendlyLoginErrorMessage(auth.error!, s),
@@ -519,6 +572,18 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                                   'webview',
                                   'browser recoveryId=${_sessionStatus.recoveryId} host=visible completed reason=deadline',
                                 );
+                                if (!mounted || _serverConfirmedWebSession) {
+                                  return;
+                                }
+                                // Fence reports already awaiting a native read.
+                                // OAuth success remains valid, but the missing
+                                // Web identity is a recoverable verification
+                                // failure, not an endless success overlay.
+                                _reportSeq++;
+                                setState(() {
+                                  _closeAfterReport = false;
+                                  _webVerificationDeadlineExceeded = true;
+                                });
                               },
                             )..start();
                             final pending = _pendingAuthUri;
@@ -534,36 +599,30 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                           shouldOverrideUrlLoading:
                               (controller, navigationAction) async {
                                 final uri = navigationAction.request.url;
-                                if (uri != null &&
-                                    uri.scheme == 'dakit' &&
-                                    uri.host == 'oauth') {
-                                  _bridge?.addCallback(uri);
-                                  _navSource = 'oauth_callback';
-                                  // Navigate back to the deviantart home page; its onLoadStop then
-                                  // reports the real web session (CSRF + login state). Do NOT read
-                                  // the session here — the callback page has no __INITIAL_STATE__.
-                                  unawaited(
-                                    _navigate(
-                                      () => controller.loadUrl(
-                                        urlRequest: URLRequest(
-                                          url: WebUri(_homeUri.toString()),
-                                        ),
-                                      ),
-                                      source: 'oauth_callback_home',
-                                    ),
-                                  );
+                                if (_handlePossibleOAuthCallback(
+                                  controller,
+                                  uri,
+                                )) {
                                   return NavigationActionPolicy.CANCEL;
                                 }
                                 return NavigationActionPolicy.ALLOW;
                               },
                           onLoadStart: (controller, url) {
+                            if (_handlePossibleOAuthCallback(controller, url)) {
+                              return;
+                            }
                             _reportSeq++;
                             _sessionObserver?.navigationStarted(loading: true);
+                            if (_sessionObserver?.isDisposed == true &&
+                                !_serverConfirmedWebSession) {
+                              _webVerificationDeadlineExceeded = false;
+                              _sessionObserver?.restart();
+                            }
                             _navSeq += 1;
                             AppLogger.instance.info(
                               'webview',
                               'nav seq=$_navSeq event=load_start '
-                                  'source=$_navSource url=${url ?? '<null>'}',
+                                  'source=$_navSource path=${url?.path ?? '<null>'}',
                             );
                             // Any later load with no app action is a server redirect
                             // (for example PerimeterX looping /users/login).
@@ -574,7 +633,7 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                             _sessionObserver?.navigationCommitted();
                             AppLogger.instance.info(
                               'webview',
-                              'load stop: ${url ?? '<null>'}',
+                              'load stop path=${url?.path ?? '<null>'}',
                             );
                             if (mounted) setState(() => _loading = false);
                             // Report from any deviantart.com page. A sequence counter makes
@@ -586,6 +645,12 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                               unawaited(_detectChallenge(controller));
                               if (_sessionObserver?.isDisposed == true &&
                                   !_serverConfirmedWebSession) {
+                                if (mounted) {
+                                  setState(
+                                    () => _webVerificationDeadlineExceeded =
+                                        false,
+                                  );
+                                }
                                 _sessionObserver?.restart();
                               } else {
                                 unawaited(_sessionObserver?.sample());
@@ -593,10 +658,19 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                             }
                           },
                           onUpdateVisitedHistory: (controller, url, isReload) {
+                            if (_handlePossibleOAuthCallback(controller, url)) {
+                              return;
+                            }
                             _reportSeq++;
                             _sessionObserver?.navigationStarted();
                             if (_sessionObserver?.isDisposed == true &&
                                 !_serverConfirmedWebSession) {
+                              if (mounted) {
+                                setState(
+                                  () =>
+                                      _webVerificationDeadlineExceeded = false,
+                                );
+                              }
                               _sessionObserver?.restart();
                             } else {
                               unawaited(_sessionObserver?.sample());

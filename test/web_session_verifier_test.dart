@@ -28,6 +28,17 @@ final class _StatusAdapter implements HttpClientAdapter {
 }
 
 void main() {
+  test('shared SDK decoder accepts JavaScript escapes in session initializer', () {
+    const html =
+        r'''<script>window.__INITIAL_STATE__ = JSON.parse("{\"@publicSession\":{\"user\":{\"username\":\"artist\"}},\"title\":\"artist\'s work\"}");</script>''';
+    expect(WebSessionVerifier.pageUsernameFromInitialState(html), 'artist');
+  });
+  test('single-quoted initializer keeps explicit anonymous distinct from missing', () {
+    const html =
+        r'''<script>window.__INITIAL_STATE__ = JSON.parse('{"@publicSession":{"user":{"username":"anonymous"}}}');</script>''';
+    expect(WebSessionVerifier.pageUsernameFromInitialState(html), 'anonymous');
+    expect(WebSessionVerifier.pageUsernameFromInitialState('<html/>'), isNull);
+  });
   for (final fixture in [
     'window.__INITIAL_STATE__ = JSON.parse("broken");',
     'window.__INITIAL_STATE__ = JSON.parse("{}");',

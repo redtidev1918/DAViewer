@@ -1,5 +1,65 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-13 current checkpoint (supersedes historical entries below)
+
+LATEST USER DECISION: original-phone acceptance is no longer a merge/release gate.
+Proceed with integration, main merge, ReleaseGraph version PR and formal release
+after CI/artifact checks. Keep Original Incident Verified PENDING honestly; no
+old Draft/device hold below overrides this explicit 2026-10-13 instruction.
+Candidate d4f1d7e joint CI 38340996817 SUCCESS on all three platforms including
+desktop runtime smoke. APK artifact digest verified; production signing certificate
+matches v0.5.13. APK SHA256
+`fd790afc87065b87868e9bebda19ec27e016b9b583402060ef9d734372b1dfac`.
+API36 preserved-data install PASS; runtime revision d4f1d7e, startup ready=true,
+usable login and wrong-state callback rejection without route disposal PASS.
+Local APK: `D:\Android\setup\DAViewer-v0.5.13-session-recovery-d4f1d7e.apk`.
+Next: merge integration PR #97 into #96, then complete main PR/release checks.
+
+Publication completed: SDK PR #45 merged as
+`f489f529d7d103eaec27bb4dcc4dec53b134e0a6`; all four component tags point to it.
+Release 38340065798 SUCCESS; pub.dev verified core 2.0.0 / api 1.2.0 /
+web 0.3.0 / flutter 1.1.0. The earlier publication-blocked entries below are
+historical. DAViewer now uses these hosted package minimums, removes all four
+candidate Git overrides and uses pub.dev lock URLs/checksums (other package
+versions unchanged). Joint CI source pin updated to the exact publication SHA.
+Hosted-dependency analyze PASS; full 488 tests PASS. Standard CI 38340996834 PASS;
+joint quality 38340996817 PASS, native candidate builds running on d4f1d7e.
+Earlier artifacts are not this commit.
+App PR #96 remains Draft; no formal app release or original-device verification.
+
+- Active workspace: `C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer`;
+  branch `codex/daviewer-sdk-integration`, source HEAD `d4f1d7e1fe6ffeff6a72d94475ce5aece81cfa34`.
+- Joint CI 38243805269 SUCCESS: SDK 262 / app 488 tests, Android/Windows/macOS
+  builds and Windows/macOS startup smoke. Authenticated OAuth/RFY and original
+  retained-account phone scenario remain PENDING; old phone candidates FAILED.
+- Latest user-supplied AGENTS on 2026-10-13 explicitly retains the Draft/device
+  gate. PR #96 remains OPEN Draft. This supersedes the release-authority
+  interpretation recorded on 2026-10-12 below. Do not formally release the app.
+- SDK PRs 42/43/44/45 merged; published versions and source are recorded above.
+  Release 38254995130 initially failed CLI Latest audit; PR #45 and corrected
+  Latest metadata resolved publication. SDK analyze, 262 tests and native CI PASS.
+- Current app uses published SDK packages; joint workflow tests their exact source.
+  CN/EN authentication and build documentation updated. No application source edits
+  in this continuation. dist/release/startup-smoke-local.json is a local artifact,
+  excluded from this documentation commit.
+- Original stash and remote backup remain retained; main checkout dirty source
+  edits remain untouched. Do not apply old stash or reset either checkout.
+- Next: finish d4f1d7e candidate builds; verify artifact hash, signature and runtime
+  source; run preserved-data emulator startup/negative callback/diagnostics checks.
+  Preserve Draft gate and missing original phone evidence.
+- Candidate 43fe8bf rechecked 2026-10-13: APK SHA256
+  `7720b79cafafdc1c001d2ffa57dc5f5c15d65f26793090218a83eaa68420f63b`;
+  production certificate SHA256
+  `686474b39fd91d20c1db3ce5bf6216ed8ab05ec7638f904251e0d108a34e7141`.
+  Emulator API36 install -r PASS; buildRevision matches, startup ready=true,
+  routes to usable /web-login. Synthetic wrong-state native callback rejected and
+  stays /web-login; Settings and Logs/Diagnostics reachable. No live account used.
+  Private evidence: `D:\Android\setup\candidate-43fe8bf-{startup,callback}.log`
+  and startup/settings XML. Do not commit raw logs.
+- SDK CLI 0.4.2 Latest metadata corrected without changing tags/assets. Download
+  update 38339499090 and Pages deploy 38339512117 SUCCESS. SDK publication was
+  verified separately through OIDC runs and the pub.dev registry.
+
 ## Goal and non-negotiable acceptance
 
 Fix Android retained-account cold-start web-session recovery and duplicate RFY
@@ -50,6 +110,119 @@ Code/Release/Android/Original Incident verification must remain separate.
   SPEC.md is a verbatim copy; verify SHA256 against the source if available.
 
 ## Current phase
+
+### 2026-10-12 joint SDK integration (active; supersedes next-action list below)
+
+Latest user direction (2026-10-12): push, release, deploy and update documentation.
+Proceed through verified SDK publication and downstream release workflows; the
+earlier Draft hold is superseded by this release instruction. This authorization
+does not supply original-phone or authenticated-service evidence: Original Incident
+Verified remains PENDING and must be disclosed in release notes. No test result is
+upgraded by publication. Keep the release process reproducible and CI-gated.
+
+19:40 CST release continuation: SDK `2590cbec59e0193d231addc73b3373cbe2b9b88e`
+is pushed; CI 38240753370 passes **262 tests**, analyze and all native examples.
+It serializes full TokenStore transactions, bounds storage callers while retaining
+the actual I/O queue, preserves valid same-generation late writes, and fences
+token generation before pending PKCE cleanup. DAViewer now starts this composite
+logout before its first await and removes duplicate SDK cleanup/retry that could
+clear a later authorization. New delayed-failure/new-authorization regression PASS.
+App exact SDK pin/lock updated; full **488 tests PASS**, analyze PASS. Earlier
+3d7d2d7 CI 38240761940 passes three builds and Windows/macOS startup smoke, but
+uses older SDK feec94f. New exact-source joint CI still required before publication.
+User requested push/release/deployment/documentation. Preserve original-device
+verification as PENDING; do not claim these automated runs prove live OAuth/RFY.
+
+Follow-up native audit: joint CI 38218485367 on app 1d8ba3b / SDK feec94f passed
+quality and all three native builds. Desktop CI now also runs each owned Release
+binary with a 30s startup/revision/route gate and uploads only an allowlisted JSON
+summary. Script tested on Windows 96eec26: PASS, 1.552s (expected revision local);
+exit/timeout/private-log negative checks PASS. Await new exact-SHA runtime CI.
+Android active wrong-state synthetic callback: SDK rejected with state_mismatch,
+but Flutter's built-in deep-link router simultaneously redirected /callback -> /
+and disposed login reason=route_removed, hiding the useful error. APK 643f3c1
+evidence is private under D:\Android\setup\joint-643-active-negative-callback.*.
+Android host now disables flutter_deeplinking_enabled so DAKit's app_links source
+owns callback delivery. Official configuration reference:
+https://docs.flutter.dev/release/breaking-changes/deep-links-flag-change.
+This proves competing route handling; successful live token exchange remains
+unverified. Native negative-path recheck is required in replacement APK.
+SDK public-session race separately reproduced: issued save A / logout / save B /
+late A -> obsolete clear deleted B. The same DAViewer coordinator normally blocks
+B while A is active, so do not label this the phone root cause. Upstream is fixing
+complete storage transaction serialization and bounded caller errors while keeping
+the actual native I/O tail fenced. Timeouts alone must not delete valid credentials.
+Do not merge SDK #42 or publish until new source and joint tests pass.
+
+Final failure-path review after 1d8ba3b: OAuth success followed by missing Web
+identity could leave the success overlay forever after observer deadline. Now
+deadline releases the overlay with a precise OAuth-success/Web-unverified message,
+fences late native reads, preserves OAuth/Cookie, and permits refresh verification.
+No error is shown while OAuth login is still normally pending. Account arrival
+or real navigation restarts bounded evidence observation; confirmed refresh
+automatically closes and triggers exactly one RFY. New widget regression exercises
+deadline, late valid evidence rejection, no data removal, and refresh recovery.
+Full suite **487 PASS**, analyze PASS, all 211 lib/test files format PASS, diff PASS.
+SDK complete suite **251 PASS**; docs-only SDK d4d7b3 CI passes all native builds.
+Windows 96eec26 artifact ZIP digest verified; host process startup logged ready=true,
+usable login route and native WebView dispatch with live listener (known signed-out
+state). This earlier Windows build logged buildRevision=local; build script now
+embeds exact source SHA on Windows/macOS as well as Android. New candidate builds
+must be checked on the following commit. No live OAuth/device acceptance is claimed.
+
+Latest checkpoint: integration branch `codex/daviewer-sdk-integration`, previous
+HEAD `96eec26032b1e5fd1aad33fb380af659e90a92a5`; the next commit contains the
+redaction follow-up. Exact SDK pin is now `feec94f09c1f6b12628a099fe374e6ebafb3e9df`.
+Full app regression **486 PASS**, analyze PASS, changed-source format PASS.
+Two initial failures were old placeholder assertions (`[redacted]` versus SDK
+`<redacted>`); corrected assertions retain secret-absence/non-secret preservation.
+SDK feec94f CI 38217602856 PASS. Joint CI 38216761322 on app 96eec26 / SDK bbf52bd
+PASS: SDK graph/docs/four publish dry-runs, app quality, production-signed Android,
+Windows 2022 and macOS builds. These older builds do not contain this redaction fix.
+Signed 643f3c1 emulator upgrade reached usable login/Settings/diagnostics; observed
+authorize dispatch with live bridge listener. No authenticated service account was
+available. An encoded nested OAuth `state` in navigation diagnostics escaped the
+old app redactor; raw logs stay private. SDK now owns reusable percent-encoded
+protocol redaction; app navigation logs record paths only and exports use the SDK
+redactor. New exact-SHA build and emulator verification are required before APK
+delivery. All original phone acceptance and formal release gates remain PENDING;
+12aaeac/3d62b45 FAIL unchanged. Stash and external main edits remain preserved.
+
+Read SDK-INTEGRATION.md for both exact repository revisions, source ownership,
+upstream reproduced defects and joint release sequence. Latest SDK implementation
+bbf52bd: **245 full tests PASS**, analyze/format/diff PASS; four publish dry-runs
+zero warnings. SDK 7004b7a (docs only after bbf52bd) CI 38214466356 PASS including
+Android, Windows/MSIX and macOS example builds. Draft PR #42 remains unmerged.
+DAViewer isolated integration on base 14797b3: **485 full tests PASS**, analyze PASS,
+changed-source format/diff PASS after all startup/logout/Web-first fixes. Main
+checkout advanced to aead827 and has another session's uncommitted edits: preserve.
+Candidate pubspec/lock reproducibly pin four Git packages to bbf52bd; no local path
+override is committed. Build rejects these Git overrides for non-dry-run release;
+replace with verified published versions following upstream release.
+Android API36 emulator upgraded to signed 14797b3 and reached Home/Settings in
+known anonymous/logout state. Authenticated OAuth/RFY and original phone evidence
+remain PENDING. New joint CI/candidate workflow prepared; builds not yet verified.
+Local Windows first build failed because native WebView requires missing NuGet CLI.
+Downloaded the Microsoft-signed official CLI (Authenticode Valid); retry with its
+directory on PATH. SDK/platform initialization timeouts are bounded and optional
+pre-runApp reads now catch exceptions too. Next: save/push this source checkpoint,
+run exact-SHA joint CI and signed three-platform candidate builds, inspect and run
+candidate autonomously. No merge or formal release yet; previous phone FAIL unchanged.
+
+Implementation 71c45ae was merged with the existing docs-only aead827 checkpoint
+in isolated branch HEAD 643f3c1; main checkout's uncommitted work remains untouched.
+Integration Draft PR #97 targets the PR #96 branch, not main. CI 38215587099 PASS;
+joint run 38215587214 quality/Android production-signed/macOS PASS, Windows FAIL
+(VS 2026 removed the experimental coroutine header used by the pinned WebView
+plugin). Change joint runner to the existing Windows 2022 release toolchain and
+rerun before claiming complete build verification. No package/source workaround.
+Local Windows NuGet installed successfully, but ATL installation exited 5007;
+local native build remains blocked by missing ATL and source codepage 936 warnings.
+SDK core/api/web API docs generated; local Flutter-package dartdoc failed in its
+doc-import stripping with RangeError, not package analyze. Add Linux graph/docs/
+publish preflight to joint CI; no SDK merge/publish until that gate is checked.
+Android candidate 643f3c1 download/signature/provenance/smoke is the next action;
+it contains fixed SDK bbf52bd. It is a candidate, not accepted original-incident evidence.
 
 ### 2026-10-12 13:54 cross-platform takeover checkpoint (session 3)
 

@@ -10,6 +10,8 @@ The active long-term task is Android personalized-feed session recovery and RFY
 request ownership. Read `docs/agent-tasks/session-recovery/SPEC.md` and
 `docs/agent-tasks/session-recovery/STATUS.md` before starting/resuming work and
 after context compaction. Verify actual Git status, HEAD and stash before edits.
+The authorized joint DAKit scope and integration checkpoints are in
+`docs/agent-tasks/session-recovery/SDK-INTEGRATION.md`; read it when present.
 
 Keep this task primary through compiler, dependency, SDK, proxy and emulator
 subtasks. Do not restart completed work or blindly apply the retained old stash.
@@ -23,6 +25,8 @@ without real retained-account Android evidence. These navigation rules remain
 active until completion; archive/remove their temporary pointers afterward using
 repository maintenance conventions.
 
-PR #96 must remain draft/pending acceptance. The 12aaeac login and 3d62b45 startup
-candidates FAILED on the incident phone; replacement acceptance is pending. Do not merge or publish a formal release
-before their device results; distinguish later branch changes from that APK.
+The user explicitly removed the original-phone acceptance release gate on
+2026-10-13. After CI and artifact checks, proceed with PR integration, merge and
+formal publication. Original Incident Verified remains PENDING until evidence
+exists; disclose that limit without blocking publication. The 12aaeac login and
+3d62b45 startup candidates FAILED. Preserve exact SDK/app dependencies and evidence.
