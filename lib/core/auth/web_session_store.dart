@@ -99,6 +99,7 @@ final class WebSessionStore {
     bool? isLoggedIn,
     String? username,
     List<PersistedWebCookie>? cookies,
+    bool Function()? isCurrent,
   }) => _queue(
     () => _performUpdate((map) {
       if (csrf != null) map['csrf'] = csrf;
@@ -109,7 +110,7 @@ final class WebSessionStore {
           for (final cookie in cookies) cookie.toJson(),
         ];
       }
-    }),
+    }, isCurrent: isCurrent),
   );
 
   /// The only path that removes the persisted Cookie credentials. Callers must
@@ -126,10 +127,13 @@ final class WebSessionStore {
   }
 
   Future<void> _performUpdate(
-    void Function(Map<String, Object?>) mutate,
-  ) async {
+    void Function(Map<String, Object?>) mutate, {
+    bool Function()? isCurrent,
+  }) async {
     try {
+      if (isCurrent != null && !isCurrent()) return;
       final map = await _readRaw();
+      if (isCurrent != null && !isCurrent()) return;
       mutate(map);
       await _save(jsonEncode(map));
       await _removeLegacy(await _file());

@@ -1,0 +1,7 @@
+=== adb devices check for candidate 14797b3 delivery ===
+local time: 2026-10-12T12:21:06.9552272+08:00
+command: D:\Android\Sdk\platform-tools\adb.exe devices -l
+
+List of devices attached
+emulator-5554          device product:sdk_gphone64_x86_64 model:sdk_gphone64_x86_64 device:emu64xa transport_id:4
+

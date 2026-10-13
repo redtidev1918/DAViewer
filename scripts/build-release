@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Fixed SDK Git overrides are allowed for jointly tested candidates only.
+if grep -A 25 '^dependency_overrides:' pubspec.yaml | grep -q 'packages/dakit_'; then
+  if [ "${DRY_RUN:-false}" != true ]; then
+    echo 'Replace candidate SDK overrides with verified published versions before release.' >&2
+    exit 1
+  fi
+fi
+
 rm -rf dist/release && mkdir -p dist/release
 for attempt in 1 2 3 4 5; do flutter pub get && break || { test "$attempt" = 5 && exit 1; sleep 15; }; done
 case "$RUNNER_OS" in
@@ -8,11 +16,11 @@ case "$RUNNER_OS" in
     if [ -n "${KEYSTORE_B64:-}" ] && [ -n "${KEYSTORE_PROPERTIES:-}" ]; then
       echo "$KEYSTORE_B64" | base64 --decode > android/app/upload-keystore.p12
       printf '%s' "$KEYSTORE_PROPERTIES" > android/key.properties
-      flutter build apk --release --dart-define="DAVIEWER_VERSION=$RELEASE_VERSION"
+      flutter build apk --release --dart-define="DAVIEWER_VERSION=$RELEASE_VERSION" --dart-define="DAVIEWER_REVISION=${DAVIEWER_SOURCE_SHA:-${GITHUB_SHA:-local}}"
       cp build/app/outputs/flutter-apk/app-release.apk "dist/release/DAViewer-v$RELEASE_VERSION.apk"
     elif [ "${DRY_RUN:-false}" = true ]; then
       echo "Signing secret unavailable in pull request; building an unsigned dry-run APK."
-      flutter build apk --debug --dart-define="DAVIEWER_VERSION=$RELEASE_VERSION"
+      flutter build apk --debug --dart-define="DAVIEWER_VERSION=$RELEASE_VERSION" --dart-define="DAVIEWER_REVISION=${DAVIEWER_SOURCE_SHA:-${GITHUB_SHA:-local}}"
       cp build/app/outputs/flutter-apk/app-debug.apk "dist/release/DAViewer-v$RELEASE_VERSION.apk"
     else
       echo "KEYSTORE_B64/KEYSTORE_PROPERTIES are required for release APK builds" >&2
@@ -20,12 +28,12 @@ case "$RUNNER_OS" in
     fi
     ;;
   macOS)
-    flutter build macos --release --dart-define="DAVIEWER_VERSION=$RELEASE_VERSION"
+    flutter build macos --release --dart-define="DAVIEWER_VERSION=$RELEASE_VERSION" --dart-define="DAVIEWER_REVISION=${DAVIEWER_SOURCE_SHA:-${GITHUB_SHA:-local}}"
     (cd build/macos/Build/Products/Release && zip -r -y "DAViewer-v$RELEASE_VERSION-macos-unsigned-preview.zip" DAViewer.app)
     cp "build/macos/Build/Products/Release/DAViewer-v$RELEASE_VERSION-macos-unsigned-preview.zip" dist/release/
     ;;
   Windows)
-    flutter build windows --release --dart-define="DAVIEWER_VERSION=$RELEASE_VERSION"
+    flutter build windows --release --dart-define="DAVIEWER_VERSION=$RELEASE_VERSION" --dart-define="DAVIEWER_REVISION=${DAVIEWER_SOURCE_SHA:-${GITHUB_SHA:-local}}"
     powershell -Command "Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath 'dist/release/DAViewer-v$RELEASE_VERSION-windows.zip'"
     ;;
 esac

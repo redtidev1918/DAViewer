@@ -1,0 +1,14 @@
+=== s3 item 3/4: embedded buildRevision (DAVIEWER_REVISION via --dart-define) ===
+time: 2026-10-12T13:16:15.8023549+08:00
+command: PowerShell ZipFile read lib/<abi>/libapp.so, Latin-1 byte-exact IndexOf of SHA strings
+candidate: D:\Android\setup\candidate-14797b3\release\DAViewer-v0.5.13.apk
+lib/arm64-v8a/libapp.so: current revision 14797b3aaccab0d9a33624cde2c85a568327edd7 found=True index=466716
+lib/arm64-v8a/libapp.so: old candidate 12aaeac79534914327e9969dea7342e9819b5601 found=False index=-1
+lib/arm64-v8a/libapp.so: old candidate 3d62b45a0466fdf817b7d6a1bdccc47edb6385a6 found=False index=-1
+lib/armeabi-v7a/libapp.so: current revision 14797b3aaccab0d9a33624cde2c85a568327edd7 found=True index=2952538
+lib/armeabi-v7a/libapp.so: old candidate 12aaeac79534914327e9969dea7342e9819b5601 found=False index=-1
+lib/armeabi-v7a/libapp.so: old candidate 3d62b45a0466fdf817b7d6a1bdccc47edb6385a6 found=False index=-1
+lib/x86_64/libapp.so: current revision 14797b3aaccab0d9a33624cde2c85a568327edd7 found=True index=466857
+lib/x86_64/libapp.so: old candidate 12aaeac79534914327e9969dea7342e9819b5601 found=False index=-1
+lib/x86_64/libapp.so: old candidate 3d62b45a0466fdf817b7d6a1bdccc47edb6385a6 found=False index=-1
+expected: current revision found in every ABI; both old candidate SHAs absent

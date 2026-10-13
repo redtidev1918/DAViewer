@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' hide DiagnosticLevel;
 import 'package:path_provider/path_provider.dart';
 
 import 'crash_marker.dart';
+import 'log_redactor.dart';
 
 /// Level-filtered, file-backed logger that also implements DAKit's
 /// [DiagnosticSink] so every OAuth/network/transfer diagnostic event is
@@ -19,7 +20,11 @@ import 'crash_marker.dart';
 /// logger.error('network', 'request failed', error, stackTrace);
 /// ```
 final class AppLogger implements DiagnosticSink {
-  AppLogger._(this._file, this._directory);
+  AppLogger._(this._file, this._directory) {
+    // File-open/stream errors also complete done with an error, independently
+    // of flush. Observe it immediately so diagnostics never add an uncaught error.
+    unawaited(_file.done.then<void>((_) {}).catchError(_reportFileFailure));
+  }
 
   static AppLogger? _instance;
 
@@ -38,21 +43,59 @@ final class AppLogger implements DiagnosticSink {
   final Directory _directory;
   final IOSink _file;
   int _errorCount = 0;
+  Future<void> _flushTail = Future<void>.value();
+  bool _disposed = false;
+  Future<void>? _disposeFuture;
+
+  /// Maximum time any single initialization stage may take before the logger
+  /// falls back to the console-only sink. Startup must never stall or crash
+  /// before runApp because the path provider or the filesystem is slow or
+  /// broken.
+  static const _initTimeout = Duration(seconds: 5);
 
   static Future<AppLogger> initialize({String? fileName}) async {
     if (_instance case final existing?) return existing;
-    final support = await getApplicationSupportDirectory();
-    final logsDir = Directory('${support.path}${Platform.pathSeparator}logs');
-    await logsDir.create(recursive: true);
-    final name =
-        fileName ??
-        'daviewer-${DateTime.now().toIso8601String().replaceAll(':', '-')}.log';
-    final file = File('${logsDir.path}${Platform.pathSeparator}$name');
-    final sink = file.openWrite(mode: FileMode.append);
-    final logger = AppLogger._(sink, logsDir);
-    _instance = logger;
-    logger.info('app', 'logger initialized: $name');
-    return logger;
+    try {
+      final support = await getApplicationSupportDirectory().timeout(
+        _initTimeout,
+      );
+      final logsDir = Directory('${support.path}${Platform.pathSeparator}logs');
+      await logsDir.create(recursive: true).timeout(_initTimeout);
+      final name =
+          fileName ??
+          'daviewer-${DateTime.now().toIso8601String().replaceAll(':', '-')}.log';
+      final file = File('${logsDir.path}${Platform.pathSeparator}$name');
+      final sink = file.openWrite(mode: FileMode.append);
+      final logger = AppLogger._(sink, logsDir);
+      _instance = logger;
+      logger.info('app', 'logger initialized: $name');
+      logger.info(
+        'app',
+        'buildRevision=${const String.fromEnvironment('DAVIEWER_REVISION', defaultValue: 'local')}',
+      );
+      await logger.flush().timeout(_initTimeout);
+      return logger;
+    } on Object catch (error, stack) {
+      debugPrint('[logger] initialize failed: ${error.runtimeType}');
+      // Logger setup must never crash the app before runApp: fall back to the
+      // console-only sink so diagnostics still flow.
+      final fallback = AppLogger._(NullSink(), Directory.systemTemp);
+      fallback.warning(
+        'app',
+        'logger initialize failed; using console-only fallback',
+        error,
+        stack,
+      );
+      _instance = fallback;
+      return fallback;
+    }
+  }
+
+  /// Resets the singleton so tests can exercise a fresh [initialize].
+  @visibleForTesting
+  static void resetForTest() {
+    _instance = null;
+    _fallback = null;
   }
 
   /// Directory containing rotated log files (exposed for UI/debugging).
@@ -104,7 +147,7 @@ final class AppLogger implements DiagnosticSink {
       stack: stack,
     );
     debugPrint(line);
-    _file.writeln(line);
+    _enqueueLine(line);
     if (level == DiagnosticLevel.error) _errorCount += 1;
   }
 
@@ -124,7 +167,7 @@ final class AppLogger implements DiagnosticSink {
       message: '${event.code}$elapsed$attrs ${event.message}',
     );
     debugPrint(line);
-    _file.writeln(line);
+    _enqueueLine(line);
     if (event.level == DiagnosticLevel.error) _errorCount += 1;
   }
 
@@ -141,13 +184,43 @@ final class AppLogger implements DiagnosticSink {
     );
     if (error != null) buffer.write(' | error=$error');
     if (stack != null) buffer.write('\n$stack');
-    return buffer.toString();
+    return LogRedactor.redactAll(buffer.toString());
   }
 
-  Future<void> dispose() async {
-    await _file.flush();
-    await _file.close();
-    if (identical(_instance, this)) _instance = null;
+  /// Writes and flushes must share one queue. IOSink forbids writes while its
+  /// flush is bound to a stream; serializing only flushes can throw from a
+  /// logging call and abort the OAuth/WebView callback being diagnosed.
+  void _enqueueLine(String line) {
+    if (_disposed) return;
+    _flushTail = _flushTail
+        .then((_) async {
+          _file.writeln(line);
+          await _file.flush();
+        })
+        .catchError(_reportFileFailure);
+  }
+
+  static void _reportFileFailure(Object error) {
+    // Do not include the exception text: filesystem paths may be sensitive.
+    debugPrint('[logger] file write unavailable: ${error.runtimeType}');
+  }
+
+  /// Barrier for all previously queued writes, including their flushes.
+  /// Abrupt OS kills may still lose the last pending write.
+  Future<void> flush() => _flushTail;
+
+  Future<void> dispose() => _disposeFuture ??= _close();
+
+  Future<void> _close() async {
+    _disposed = true;
+    try {
+      await flush();
+      await _file.close();
+    } on Object catch (error) {
+      _reportFileFailure(error);
+    } finally {
+      if (identical(_instance, this)) _instance = null;
+    }
   }
 }
 

@@ -46,6 +46,9 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
     DateTime Function()? now,
     List<Duration>? paginationBackoff,
     this.sessionContextKey,
+    this.onRequestStarted,
+    this.cancelRequests,
+    this.cancelRequest,
   }) : _now = now ?? DateTime.now,
        _paginationBackoff =
            paginationBackoff ??
@@ -66,6 +69,9 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
   /// since" — a rotated Cookie must refetch even though the page count is
   /// unchanged. `null` (feeds without a web session) disables the check.
   final Future<String> Function()? sessionContextKey;
+  final void Function(String reason)? onRequestStarted;
+  final void Function(String reason)? cancelRequests;
+  final void Function(PageRequest request, String reason)? cancelRequest;
 
   final Future<Page<Artwork>> Function(PageRequest request) _fetch;
 
@@ -127,12 +133,15 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
         .timeout(
           requestTimeout,
           onTimeout: () {
-            // Drop the in-flight entry so a retry after backoff starts a fresh
-            // request. The abandoned request is not cancelled (no cancel token is
-            // threaded through _fetch); its connection is reclaimed when dio's own
-            // timeout or the OS closes it. ponytail: single shared timeout; per-feed
-            // cancellation tokens if abandoned requests accumulate.
+            // Cancel only this page. An old pagination deadline must not cancel
+            // a newer first-page owner running concurrently.
             gate.cancel(key);
+            final cancel = cancelRequest;
+            if (cancel != null) {
+              cancel(request, 'request_timeout');
+            } else {
+              cancelRequests?.call('request_timeout');
+            }
             throw const DAKitException(
               kind: DAKitFailureKind.network,
               code: 'feed.request.timeout',
@@ -166,13 +175,15 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
         if (!mounted || live == _firstPageContextKey) return;
       }
     }
-    return _runFirstPageFetch();
+    return _runFirstPageFetch(
+      reason: _firstPageFetched ? 'cookie_context_changed' : 'initial_load',
+    );
   }
 
   /// Starts a new first-page fetch unconditionally, for an explicit user
   /// gesture (pull-to-refresh, reload) that expects fresh content even though
   /// the current page already loaded.
-  Future<void> forceRefresh() => _runFirstPageFetch();
+  Future<void> forceRefresh() => _runFirstPageFetch(reason: 'user_refresh');
 
   /// Seeds the feed with a persisted first page so a cold start can render
   /// the last good content while the refresh runs. The pending refresh (the
@@ -202,12 +213,13 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
     if (!staleContent && !failedInitialLoad) {
       return;
     }
-    await refresh();
+    await _runFirstPageFetch(reason: 'session_recovered');
   }
 
-  Future<void> _runFirstPageFetch() {
+  Future<void> _runFirstPageFetch({String reason = 'initial_load'}) {
     final active = _activeFirstPageFetch;
     if (active != null) return active;
+    onRequestStarted?.call(reason);
     late final Future<void> tracked;
     tracked = _performFirstPageFetch().whenComplete(() {
       if (identical(_activeFirstPageFetch, tracked)) {
@@ -280,6 +292,7 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
     if (_inPaginationBackoff) return;
     final revision = _revision;
     final cursor = state.nextCursor;
+    onRequestStarted?.call('pagination');
     state = ArtworkFeedState(
       items: state.items,
       nextCursor: state.nextCursor,
@@ -322,6 +335,13 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
   /// updates in place without a spinner flicker (e.g. when the app resumes).
   Future<void> refreshSilently() async {
     if (!mounted || state.isLoading) return;
-    await _runFirstPageFetch();
+    await _runFirstPageFetch(reason: 'resume_refresh');
+  }
+
+  @override
+  void dispose() {
+    _revision++;
+    cancelRequests?.call('provider_disposed');
+    super.dispose();
   }
 }

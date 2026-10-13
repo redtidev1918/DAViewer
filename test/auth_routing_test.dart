@@ -20,6 +20,27 @@ void main() {
   });
 
   test(
+    'unknown auth after deadline never redirects recovery routes to splash',
+    () {
+      for (final route in [
+        '/',
+        '/settings',
+        '/settings/diagnostics',
+        '/web-login',
+      ]) {
+        expect(
+          authRedirect(AuthStatus.unknown, route, startupReady: true),
+          isNull,
+        );
+      }
+      expect(
+        authRedirect(AuthStatus.unknown, '/favourites', startupReady: true),
+        '/',
+      );
+    },
+  );
+
+  test(
     'a signed-in user may open the login WebView to restore the web session',
     () {
       // The WebLoginScreen establishes the web Cookie/CSRF session as well as

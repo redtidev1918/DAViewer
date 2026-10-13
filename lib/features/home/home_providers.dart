@@ -19,6 +19,7 @@ import 'package:dakit_web/dakit_web.dart';
 import '../../core/diagnostics/app_logger.dart';
 import '../../core/feed/artwork_feed_cache.dart';
 import '../../core/feed/artwork_feed_controller.dart';
+import '../../core/feed/personalized_request_policy.dart';
 import '../../core/runtime/runtime_provider.dart';
 import '../artwork/artwork_access.dart';
 import '../artwork/artwork_store.dart';
@@ -38,265 +39,381 @@ final feedCacheDirectoryProvider = Provider<Directory?>((ref) => null);
 ///
 /// A persisted session can be stale after a restart, so a failed fetch refreshes
 /// the CSRF once from the stored cookies before giving up.
-final personalizedFeedProvider =
-    StateNotifierProvider<ArtworkFeedController, ArtworkFeedState>((ref) {
-      final providerId = ++_personalizedProviderSeq;
-      AppLogger.instance.info(
-        'home',
-        'personalized provider created id=$providerId',
-      );
-      final runtime = ref.watch(runtimeProvider);
-      // Request execution reads the current cookie snapshot; it must not make
-      // the feed provider lifecycle depend on browser-session churn (csrf,
-      // cookie refresh, metadata).
-      final webSession = ref.read(webSessionProvider);
-      ref.watch(
-        webSessionControllerProvider.select(personalizedFeedSessionIdentity),
-      );
-      var requestRevision = 0;
-      final controller = ArtworkFeedController(
-        (request) async {
-          final revision = request.cursor == null
-              ? ++requestRevision
-              : requestRevision;
-          final requestId = 'rfy-${++_personalizedRequestSeq}';
-          AppLogger.instance.info(
-            'home',
-            'personalized feed fetch '
-                'request=$requestId '
-                'reason=${request.cursor == null ? 'initial_or_refresh' : 'pagination'} '
-                'cursor=${request.cursor ?? 'initial'}',
+final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, ArtworkFeedState>((
+  ref,
+) {
+  final providerId = ++_personalizedProviderSeq;
+  AppLogger.instance.info(
+    'home',
+    'personalized provider created id=$providerId',
+  );
+  final runtime = ref.watch(runtimeProvider);
+  // Request execution reads the current cookie snapshot; it must not make
+  // the feed provider lifecycle depend on browser-session churn (csrf,
+  // cookie refresh, metadata).
+  final webSession = ref.read(webSessionProvider);
+  ref.watch(
+    webSessionControllerProvider.select(personalizedFeedSessionIdentity),
+  );
+  var requestRevision = 0;
+  var triggerReason = 'initial_load';
+  final pendingTokens = <CancelToken>{};
+  final requestTokens = Map<PageRequest, CancelToken>.identity();
+  void cancelRequests(String reason) {
+    for (final token in pendingTokens.toList()) {
+      token.cancel(reason);
+    }
+  }
+
+  ref.onDispose(() => cancelRequests('provider_disposed'));
+  final controller = ArtworkFeedController(
+    (request) async {
+      final revision = request.cursor == null
+          ? ++requestRevision
+          : requestRevision;
+      final requestId = 'rfy-${++_personalizedRequestSeq}';
+      final token = CancelToken();
+      pendingTokens.add(token);
+      requestTokens[request] = token;
+      final statusOwner = ref.read(webSessionStatusProvider.notifier);
+      final epoch = statusOwner.accountEpoch;
+      final reason = triggerReason;
+      var recoveryId = statusOwner.recoveryId;
+      var sessionGeneration = statusOwner.generation;
+      var credentialRevision = statusOwner.credentialRevision;
+      String? terminalOutcome;
+      void trace(String phase, [String detail = '']) {
+        if (phase == 'accepted' || phase == 'discarded' || phase == 'failed') {
+          terminalOutcome = phase;
+        }
+        AppLogger.instance.info(
+          'home',
+          'rfy requestId=$requestId provider=$providerId recoveryId=$recoveryId accountEpoch=$epoch sessionGeneration=$sessionGeneration credentialRevision=$credentialRevision triggerReason=$reason phase=$phase $detail',
+        );
+      }
+
+      String? ownershipLost() {
+        if (epoch != statusOwner.accountEpoch) return 'account_changed';
+        if (!ref.mounted) return 'provider_disposed';
+        if (revision != requestRevision) return 'newer_request_won';
+        if (token.isCancelled) {
+          return token.cancelError?.error?.toString() ?? 'request_cancelled';
+        }
+        return null;
+      }
+
+      void requireOwnership() {
+        final lost = ownershipLost();
+        if (lost == null) return;
+        trace('discarded', 'discardReason=$lost');
+        throw const DAKitException(
+          kind: DAKitFailureKind.network,
+          code: 'rfy.session.superseded',
+          message: 'The recommendation request was superseded.',
+        );
+      }
+
+      trace('created');
+      trace('queued', 'waitingFor=session_verification');
+      try {
+        AppLogger.instance.info(
+          'home',
+          'personalized feed fetch '
+              'request=$requestId '
+              'reason=$reason '
+              'cursor=${request.cursor ?? 'initial'}',
+        );
+        final dio = runtime.dio;
+        if (dio == null) {
+          throw const DAKitException(
+            kind: DAKitFailureKind.configuration,
+            code: 'app.runtime.dio',
+            message: 'The network layer is not available.',
           );
-          final dio = runtime.dio;
-          if (dio == null) {
-            throw const DAKitException(
-              kind: DAKitFailureKind.configuration,
-              code: 'app.runtime.dio',
-              message: 'The network layer is not available.',
-            );
-          }
-          // A local identity is only a candidate. Require a recent server
-          // confirmation; check() reuses its healthy lease for five minutes.
-          final webSessionState = ref.read(webSessionControllerProvider);
-          if (webSessionState.isLoggedIn != true ||
-              webSessionState.username.trim().isEmpty) {
-            AppLogger.instance.warning(
-              'home',
-              'web session not confirmed; showing web-session notice',
-            );
-            throw const DAKitException(
-              kind: DAKitFailureKind.authentication,
-              code: 'web.session.unavailable',
-              message:
-                  'The personalized feed requires a signed-in web session.',
-            );
-          }
-          AppLogger.instance.info(
+        }
+        // A local identity is only a candidate. Require a recent server
+        // confirmation; check() reuses its healthy lease for five minutes.
+        final webSessionState = ref.read(webSessionControllerProvider);
+        if (webSessionState.isLoggedIn != true ||
+            webSessionState.username.trim().isEmpty) {
+          AppLogger.instance.warning(
             'home',
-            'web session candidate: ${webSessionState.username}',
+            'web session not confirmed; showing web-session notice',
           );
-          // rfy answers HTTP 200 with generic content even for a dead Cookie,
-          // so the authoritative session verdict — not the rfy status code —
-          // decides whether the fetch may run at all. Otherwise the user sees
-          // "每日精选"-style generic items silently masquerade as personalized
-          // recommendations.
-          if (!ref.read(webSessionStatusProvider).needsLogin) {
-            final currentHeader = await webSession.cookieHeader();
+          throw const DAKitException(
+            kind: DAKitFailureKind.authentication,
+            code: 'web.session.unavailable',
+            message: 'The personalized feed requires a signed-in web session.',
+          );
+        }
+        AppLogger.instance.info(
+          'home',
+          'web session candidate: ${webSessionState.username}',
+        );
+        // rfy answers HTTP 200 with generic content even for a dead Cookie,
+        // so the authoritative session verdict — not the rfy status code —
+        // decides whether the fetch may run at all. Otherwise the user sees
+        // "每日精选"-style generic items silently masquerade as personalized
+        // recommendations.
+        if (!ref.read(webSessionStatusProvider).needsLogin) {
+          final currentHeader = await webSession.cookieHeader();
+          requireOwnership();
+          await ref
+              .read(webSessionStatusProvider.notifier)
+              .check(
+                force: ref
+                    .read(personalizedSessionStatusProvider.notifier)
+                    .cookieChanged(currentHeader),
+              );
+        }
+        requireOwnership();
+        final verdict = ref.read(webSessionStatusProvider);
+        if (verdict.needsLogin) {
+          AppLogger.instance.warning(
+            'home',
+            'rfy skipped: web session verdict ${verdict.state.name} '
+                'claimed=${webSessionState.username}',
+          );
+          throw const DAKitException(
+            kind: DAKitFailureKind.authentication,
+            code: 'web.session.unavailable',
+            message: 'The personalized feed requires a signed-in web session.',
+          );
+        }
+        if (!verdict.isHealthy) {
+          throw const DAKitException(
+            kind: DAKitFailureKind.network,
+            code: 'rfy.session.unverified',
+            message: 'The personalized web session could not be confirmed.',
+          );
+        }
+        var csrf = ref.read(webSessionControllerProvider).csrf;
+        var cookieHeader = await webSession.cookieHeader();
+        requireOwnership();
+        recoveryId = statusOwner.recoveryId;
+        sessionGeneration = statusOwner.generation;
+        credentialRevision = statusOwner.observeCredentials(
+          cookieHeader: cookieHeader,
+          csrf: csrf,
+        );
+        trace('queued');
+        var generation = ref.read(webSessionStatusProvider.notifier).generation;
+        var page = await _tryFetchRfy(
+          dio,
+          csrf,
+          cookieHeader,
+          request,
+          requestId: requestId,
+          cancelToken: token,
+          attempt: 1,
+          trace: trace,
+        );
+        if (page == null) {
+          // An app update can clear the live WebView cookie store even though
+          // the persisted snapshot and OAuth identity survive. The startup
+          // restore may have raced WebView readiness, so retry it before the
+          // headless CSRF refresh.
+          if (cookieHeader.isEmpty) {
             await ref
-                .read(webSessionStatusProvider.notifier)
-                .check(
-                  force: ref
-                      .read(personalizedSessionStatusProvider.notifier)
-                      .cookieChanged(currentHeader),
-                );
+                .read(webSessionControllerProvider.notifier)
+                .restorePersistedCookies();
+            cookieHeader = await webSession.cookieHeader();
+            requireOwnership();
           }
-          if (!ref.mounted) {
-            throw const DAKitException(
-              kind: DAKitFailureKind.network,
-              code: 'rfy.session.superseded',
-              message: 'The recommendation request was superseded.',
-            );
-          }
-          final verdict = ref.read(webSessionStatusProvider);
-          if (verdict.needsLogin) {
-            AppLogger.instance.warning(
-              'home',
-              'rfy skipped: web session verdict ${verdict.state.name} '
-                  'claimed=${webSessionState.username}',
-            );
-            throw const DAKitException(
-              kind: DAKitFailureKind.authentication,
-              code: 'web.session.unavailable',
-              message:
-                  'The personalized feed requires a signed-in web session.',
-            );
-          }
-          if (!verdict.isHealthy) {
+          // Stale session after a restart: re-read the CSRF from the persisted
+          // cookies (headless page load) and retry once. This only refreshes
+          // the request context; the real-browser probe never writes an auth
+          // verdict from inside a feed retry (REG-010).
+          await ref
+              .read(webSessionStatusProvider.notifier)
+              .check(force: true, browser: true);
+          requireOwnership();
+          if (!ref.read(webSessionStatusProvider).isHealthy) {
+            trace('discarded', 'discardReason=session_superseded');
             throw const DAKitException(
               kind: DAKitFailureKind.network,
               code: 'rfy.session.unverified',
               message: 'The personalized web session could not be confirmed.',
             );
           }
-          var csrf = ref.read(webSessionControllerProvider).csrf;
-          var cookieHeader = await webSession.cookieHeader();
-          final generation = ref
-              .read(webSessionStatusProvider.notifier)
-              .generation;
-          var page = await _tryFetchRfy(
+          csrf = ref.read(webSessionControllerProvider).csrf;
+          cookieHeader = await webSession.cookieHeader();
+          requireOwnership();
+          recoveryId = statusOwner.recoveryId;
+          generation = sessionGeneration = statusOwner.generation;
+          credentialRevision = statusOwner.observeCredentials(
+            cookieHeader: cookieHeader,
+            csrf: csrf,
+          );
+          trace('queued', 'transportReason=retry_after_failure');
+          page = await _tryFetchRfy(
             dio,
             csrf,
             cookieHeader,
             request,
             requestId: requestId,
+            cancelToken: token,
+            attempt: 2,
+            trace: trace,
           );
-          if (page == null) {
-            // An app update can clear the live WebView cookie store even though
-            // the persisted snapshot and OAuth identity survive. The startup
-            // restore may have raced WebView readiness, so retry it before the
-            // headless CSRF refresh.
-            if (cookieHeader.isEmpty) {
-              await ref
-                  .read(webSessionControllerProvider.notifier)
-                  .restorePersistedCookies();
-              cookieHeader = await webSession.cookieHeader();
-            }
-            // Stale session after a restart: re-read the CSRF from the persisted
-            // cookies (headless page load) and retry once. This only refreshes
-            // the request context; the real-browser probe never writes an auth
-            // verdict from inside a feed retry (REG-010).
-            await ref.read(webSessionProbeProvider)();
-            csrf = ref.read(webSessionControllerProvider).csrf;
-            cookieHeader = await webSession.cookieHeader();
-            page = await _tryFetchRfy(
-              dio,
-              csrf,
-              cookieHeader,
-              request,
-              requestId: requestId,
-            );
-          }
-          if (page == null) {
-            AppLogger.instance.warning(
-              'home',
-              'rfy feed unavailable after retry request=$requestId '
-                  'verdict=${ref.read(webSessionStatusProvider).state.name} '
-                  'claimed=${webSessionState.username}',
-            );
-            // The retry already refreshed the request context. A still-failing
-            // rfy request is a feed failure (WAF/proxy/CSRF), not a login
-            // verdict: only the authoritative session chain may produce the
-            // login prompt, so this must not carry web.session.unavailable.
-            throw const DAKitException(
-              kind: DAKitFailureKind.network,
-              code: 'rfy.feed.unavailable',
-              message: 'Recommendations are temporarily unavailable.',
-            );
-          }
-
-          // A verdict may change while the feed is in flight. Do not commit
-          // generic results after expiry or a switch to a different account.
-          final currentHeader = await webSession.cookieHeader();
-          if (!ref.mounted ||
-              revision != requestRevision ||
-              currentHeader != cookieHeader ||
-              generation !=
-                  ref.read(webSessionStatusProvider.notifier).generation ||
-              !ref.read(webSessionStatusProvider).isHealthy ||
-              ref.read(webSessionControllerProvider).username !=
-                  webSessionState.username) {
-            throw const DAKitException(
-              kind: DAKitFailureKind.network,
-              code: 'rfy.session.unverified',
-              message: 'The personalized web session could not be confirmed.',
-            );
-          }
-          final degraded = rfyCursorSignalsGenericFallback(page.nextCursor);
-          ref
-              .read(personalizedSessionStatusProvider.notifier)
-              .observe(
-                cookieHeader: cookieHeader,
-                degraded: degraded,
-                generation: generation,
-              );
-          if (degraded) {
-            AppLogger.instance.warning(
-              'home',
-              'rfy generic fallback rejected source=vespa_content_group_2 '
-                  'generation=$generation',
-            );
-            // Preserve the capability incident even if a home probe confirms the
-            // username again. Only a usable feed or explicit recovery clears it.
-            await ref
-                .read(webSessionStatusProvider.notifier)
-                .recheckAfterWebSignal('rfy-generic-fallback');
-            throw const DAKitException(
-              kind: DAKitFailureKind.network,
-              code: 'rfy.session.degraded',
-              message: 'Recommendations returned a generic fallback signal.',
-            );
-          }
-          ref.read(artworkStoreProvider.notifier).putAll(page.items);
-          AppLogger.instance.info(
-            'home',
-            'personalized feed accepted items=${page.items.length} '
-                'request=$requestId generation=$generation',
-          );
-          // Persist the first page for the next cold start. Fire-and-forget:
-          // storage latency must never delay the feed, and a failed save only
-          // costs the next start its cached preview.
-          if (request.cursor == null) {
-            unawaited(
-              _persistPersonalizedFeedCache(
-                ref,
-                webSessionState.username,
-                page.items,
-              ),
-            );
-          }
-          return page;
-        },
-        requestTimeout: const Duration(seconds: 60),
-        autoLoad: false,
-        // Identity of the session context this page belongs to: a rotated CSRF or
-        // Cookie means an already-loaded first page is stale, so an explicit
-        // refresh must fetch again instead of being treated as a duplicate.
-        sessionContextKey: () async => feedSessionContextKey(
-          csrf: ref.read(webSessionControllerProvider).csrf,
-          cookieHeader: await webSession.cookieHeader(),
-        ),
-      );
-      // The live first page starts immediately: the cache is a best-effort
-      // preview for the cold-start skeleton, never a prerequisite, so storage
-      // latency (or a platform without a support directory) cannot delay it.
-      unawaited(controller.refresh());
-      // autoLoad stays off so the cache gets a chance to seed the list before
-      // the fetch resolves; hydration is a no-op once content exists.
-      final cacheIdentity = ref.read(
-        webSessionControllerProvider.select(personalizedFeedSessionIdentity),
-      );
-      if (cacheIdentity.$1 == true && cacheIdentity.$2.trim().isNotEmpty) {
-        unawaited(
-          _hydratePersonalizedFeedFromCache(
-            ref,
-            controller,
-            cacheIdentity.$2.trim(),
-          ),
-        );
-      }
-      ref.listen(webSessionStatusProvider, (previous, next) {
-        if (previous?.isHealthy == false && next.isHealthy) {
-          // Verification can recover after the initial feed attempt stopped.
-          // Resume it once; a healthy-to-healthy update never reloads the list.
-          unawaited(controller.recoverInitialPage());
         }
-      });
-      AppLogger.instance.info(
-        'home',
-        'personalized controller created provider=$providerId',
-      );
-      return controller;
-    });
+        if (page == null) {
+          AppLogger.instance.warning(
+            'home',
+            'rfy feed unavailable after retry request=$requestId '
+                'verdict=${ref.read(webSessionStatusProvider).state.name} '
+                'claimed=${webSessionState.username}',
+          );
+          // The retry already refreshed the request context. A still-failing
+          // rfy request is a feed failure (WAF/proxy/CSRF), not a login
+          // verdict: only the authoritative session chain may produce the
+          // login prompt, so this must not carry web.session.unavailable.
+          throw const DAKitException(
+            kind: DAKitFailureKind.network,
+            code: 'rfy.feed.unavailable',
+            message: 'Recommendations are temporarily unavailable.',
+          );
+        }
+
+        // A verdict may change while the feed is in flight. Do not commit
+        // generic results after expiry or a switch to a different account.
+        final currentHeader = await webSession.cookieHeader();
+        final degraded = rfyCursorSignalsGenericFallback(page.nextCursor);
+        final discardReason = personalizedResultDiscardReason(
+          mounted: ref.mounted,
+          sameAccount:
+              ref.mounted &&
+              ref.read(webSessionControllerProvider).username ==
+                  webSessionState.username,
+          sameEpoch: epoch == statusOwner.accountEpoch,
+          sameRequest: revision == requestRevision,
+          healthy: ref.mounted && ref.read(webSessionStatusProvider).isHealthy,
+          sameGeneration: generation == statusOwner.generation,
+          sameCredentials: currentHeader == cookieHeader,
+          generic: degraded,
+        );
+        final finalDiscardReason = ownershipLost() ?? discardReason;
+        if (finalDiscardReason != null &&
+            finalDiscardReason != 'generic_fallback') {
+          trace(
+            'discarded',
+            'discardReason=$finalDiscardReason credentialsChanged=${currentHeader != cookieHeader}',
+          );
+          throw const DAKitException(
+            kind: DAKitFailureKind.network,
+            code: 'rfy.session.unverified',
+            message: 'The personalized web session could not be confirmed.',
+          );
+        }
+        trace(
+          'validated',
+          'credentialsChanged=${currentHeader != cookieHeader}',
+        );
+        ref
+            .read(personalizedSessionStatusProvider.notifier)
+            .observe(
+              cookieHeader: cookieHeader,
+              degraded: degraded,
+              generation: statusOwner.generation,
+            );
+        if (degraded) {
+          trace('discarded', 'discardReason=generic_fallback');
+          AppLogger.instance.warning(
+            'home',
+            'rfy generic fallback rejected source=vespa_content_group_2 '
+                'generation=$generation',
+          );
+          // Preserve the capability incident even if a home probe confirms the
+          // username again. Only a usable feed or explicit recovery clears it.
+          await ref
+              .read(webSessionStatusProvider.notifier)
+              .recheckAfterWebSignal('rfy-generic-fallback');
+          throw const DAKitException(
+            kind: DAKitFailureKind.network,
+            code: 'rfy.session.degraded',
+            message: 'Recommendations returned a generic fallback signal.',
+          );
+        }
+        ref.read(artworkStoreProvider.notifier).putAll(page.items);
+        trace('accepted', 'items=${page.items.length}');
+        AppLogger.instance.info(
+          'home',
+          'personalized feed accepted items=${page.items.length} '
+              'request=$requestId generation=$generation',
+        );
+        // Persist the first page for the next cold start. Fire-and-forget:
+        // storage latency must never delay the feed, and a failed save only
+        // costs the next start its cached preview.
+        if (request.cursor == null) {
+          unawaited(
+            _persistPersonalizedFeedCache(
+              ref,
+              webSessionState.username,
+              page.items,
+            ),
+          );
+        }
+        return page;
+      } on Object catch (error) {
+        if (terminalOutcome == null) {
+          final lost = ownershipLost();
+          if (lost != null) {
+            trace('discarded', 'discardReason=$lost');
+          } else {
+            trace('failed', 'failureReason=${classifyFeedFetchError(error)}');
+          }
+        }
+        rethrow;
+      } finally {
+        pendingTokens.remove(token);
+        requestTokens.remove(request);
+        trace('completed', 'outcome=${terminalOutcome ?? 'unknown'}');
+      }
+    },
+    requestTimeout: const Duration(seconds: 60),
+    autoLoad: false,
+    onRequestStarted: (reason) => triggerReason = reason,
+    cancelRequests: cancelRequests,
+    cancelRequest: (request, reason) => requestTokens[request]?.cancel(reason),
+    // Identity of the session context this page belongs to: a rotated CSRF or
+    // Cookie means an already-loaded first page is stale, so an explicit
+    // refresh must fetch again instead of being treated as a duplicate.
+    sessionContextKey: () async => feedSessionContextKey(
+      csrf: ref.read(webSessionControllerProvider).csrf,
+      cookieHeader: await webSession.cookieHeader(),
+    ),
+  );
+  // The live first page starts immediately: the cache is a best-effort
+  // preview for the cold-start skeleton, never a prerequisite, so storage
+  // latency (or a platform without a support directory) cannot delay it.
+  unawaited(controller.refresh());
+  // autoLoad stays off so the cache gets a chance to seed the list before
+  // the fetch resolves; hydration is a no-op once content exists.
+  final cacheIdentity = ref.read(
+    webSessionControllerProvider.select(personalizedFeedSessionIdentity),
+  );
+  if (cacheIdentity.$1 == true && cacheIdentity.$2.trim().isNotEmpty) {
+    unawaited(
+      _hydratePersonalizedFeedFromCache(
+        ref,
+        controller,
+        cacheIdentity.$2.trim(),
+      ),
+    );
+  }
+  ref.listen(webSessionStatusProvider, (previous, next) {
+    if (previous?.isHealthy == false && next.isHealthy) {
+      // Verification can recover after the initial feed attempt stopped.
+      // Resume it once; a healthy-to-healthy update never reloads the list.
+      unawaited(controller.recoverInitialPage());
+    }
+  });
+  AppLogger.instance.info(
+    'home',
+    'personalized controller created provider=$providerId',
+  );
+  return controller;
+});
 
 /// Only account identity changes should rebuild the recommendation feed.
 ///
@@ -316,6 +433,9 @@ Future<Page<Artwork>?> _tryFetchRfy(
   String cookieHeader,
   PageRequest request, {
   required String requestId,
+  required CancelToken cancelToken,
+  required int attempt,
+  required void Function(String phase, String detail) trace,
 }) async {
   final logger = AppLogger.instance;
   if (csrf.isEmpty || cookieHeader.isEmpty) {
@@ -329,10 +449,18 @@ Future<Page<Artwork>?> _tryFetchRfy(
   }
   final stopwatch = Stopwatch()..start();
   try {
+    trace(
+      'in_flight',
+      'transportId=$requestId-t$attempt transportReason=${attempt == 1 ? 'owner_request' : 'retry_after_failure'} cursor=${request.cursor == null ? 'initial' : 'pagination'}',
+    );
+    // The SDK owns protocol/DTO parsing; the app retains physical request
+    // ownership and recovery. Disable the SDK's optional CSRF refresh retry.
     final page = await RfyFeedFetcher(dio).fetch(
-      cookieHeader: cookieHeader,
       csrfToken: csrf,
+      cookieHeader: cookieHeader,
       cursor: request.cursor,
+      cancelToken: cancelToken,
+      retryInvalidCsrf: false,
     );
     // DeviantArt gates paid/blocked works by serving blurred Wix transforms
     // (e.g. `blur_30`) rather than an explicit feed field, so `gated` alone
@@ -347,9 +475,9 @@ Future<Page<Artwork>?> _tryFetchRfy(
             asset.uri.toString().contains('blur_'),
       );
     }).length;
-    logger.info(
-      'home',
-      'rfy transport success elapsedMs=${stopwatch.elapsedMilliseconds} '
+    trace(
+      'transport_succeeded',
+      'transportId=$requestId-t$attempt elapsedMs=${stopwatch.elapsedMilliseconds} '
           'cursor=${request.cursor ?? 'initial'} '
           'items=${page.items.length} '
           'gated=${page.items.where((a) => artworkViewLock(a) != null).length} '
@@ -358,6 +486,14 @@ Future<Page<Artwork>?> _tryFetchRfy(
     );
     return page;
   } on Object catch (error, stack) {
+    if (cancelToken.isCancelled) {
+      trace('transport_cancelled', 'transportId=$requestId-t$attempt');
+      rethrow;
+    }
+    trace(
+      'transport_failed',
+      'transportId=$requestId-t$attempt failureReason=${classifyFeedFetchError(error)}',
+    );
     logger.warning(
       'home',
       'personalized feed failure '

@@ -11,6 +11,7 @@ import 'core/downloads/shared_storage_saver.dart';
 import 'core/l10n/app_strings.dart';
 import 'core/runtime/app_runtime.dart';
 import 'core/runtime/runtime_provider.dart';
+import 'core/runtime/startup_stage.dart';
 import 'core/settings/app_preferences.dart';
 import 'core/theme/theme_mode_provider.dart';
 
@@ -58,7 +59,13 @@ Future<void> main() async {
   installGlobalErrorHandlers(logger);
   logger.info('app', 'DAViewer starting');
   // Detect whether the previous run ended with an uncaught error (local only).
-  final crashedLastSession = await CrashMarker.consume();
+  // Startup-critical awaits are bounded: a wedged plugin channel must not
+  // block the app before runApp.
+  final crashedLastSession = await runOptionalStartupStage(
+    stage: 'crash_marker',
+    operation: CrashMarker.consume,
+    fallback: false,
+  );
 
   final runtime = await AppRuntime.create();
   _sharedStorageSaver = SharedStorageSaver(
@@ -73,7 +80,11 @@ Future<void> main() async {
 
   // Restore persisted preferences so language and theme survive a restart
   // without flashing the defaults.
-  final preferences = await AppPreferences.load();
+  final preferences = await runOptionalStartupStage(
+    stage: 'preferences',
+    operation: AppPreferences.load,
+    fallback: const <String, String>{},
+  );
   final initialLanguage = preferences['language'] == 'en'
       ? AppLanguage.en
       : AppLanguage.zh;

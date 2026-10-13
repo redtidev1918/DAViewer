@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../core/auth/auth_controller.dart';
 import '../core/auth/auth_state.dart';
 import '../core/auth/web_session_status.dart';
+import '../core/diagnostics/app_logger.dart';
 import '../core/l10n/app_strings.dart';
 import '../shared/route_observer.dart';
 import '../shared/widgets/app_notice_host.dart';
@@ -166,11 +167,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         return null;
       }
       final auth = ref.read(authControllerProvider);
-      return authRedirect(
+      final redirect = authRedirect(
         auth.status,
         state.matchedLocation,
         startupReady: ref.read(webSessionReadyProvider),
       );
+      AppLogger.instance.info(
+        'startup',
+        'route=${state.matchedLocation} target=${redirect ?? 'stay'} ready=${ref.read(webSessionReadyProvider)} oauth=${auth.status.name}',
+      );
+      return redirect;
     },
   );
 
@@ -228,7 +234,11 @@ String? authRedirect(
     // (e.g. Keychain/webview restore after an update). Move to Home instead
     // of leaving a permanent black splash; a later signed-in transition
     // refreshes the router again.
-    return startupReady && location == '/splash' ? '/' : '/splash';
+    if (!startupReady) return '/splash';
+    if (location == '/splash') return '/';
+    // A timed-out restore stays unknown. Keep recovery routes reachable after
+    // leaving Splash; redirecting Home back to Splash creates a startup loop.
+    return isSignedOutRoute(location) ? null : '/';
   }
   if (status == AuthStatus.signedIn && location == '/splash') {
     return '/';

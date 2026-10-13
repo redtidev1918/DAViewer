@@ -1,0 +1,10 @@
+=== s3 item 4/4: file SHA256 of source artifact and delivered copy ===
+time: 2026-10-12T13:16:17.3541276+08:00
+command: Get-FileHash -Algorithm SHA256 <path> ; (Get-Item <path>).Length
+--- D:\Android\setup\candidate-14797b3\release\DAViewer-v0.5.13.apk ---
+c801132bde1da095bdf30f32286500f21824ff5e421e003c0fcc3ad016af4412
+length: 67445302 bytes
+--- D:\Android\setup\DAViewer-v0.5.13-session-recovery-14797b3.apk ---
+c801132bde1da095bdf30f32286500f21824ff5e421e003c0fcc3ad016af4412
+length: 67445302 bytes
+expected: source and delivered hashes identical

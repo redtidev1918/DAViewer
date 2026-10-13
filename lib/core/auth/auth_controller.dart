@@ -127,6 +127,10 @@ final class AuthController extends StateNotifier<AuthState> {
               stack,
             );
           }
+          // Record the signed-out verdict in state: leaving it `unknown`
+          // routes the app into /web-login even though the user explicitly
+          // logged out last session.
+          state = const AuthState(status: AuthStatus.signedOut);
           _initializing = false;
           return;
         }
@@ -288,8 +292,32 @@ final class AuthController extends StateNotifier<AuthState> {
     );
     try {
       _log.info('auth', 'login: starting OAuth authorize');
-      await runtime.oauth!.authorize();
+      // Bounded authorize: a WebView/plugin that never returns the callback
+      // must not leave the login flow spinning forever. Five minutes covers
+      // password entry and 2FA; on timeout the transaction is cancelled and
+      // the abandoned future is swallowed.
+      final authorize = runtime.oauth!.authorize();
+      try {
+        await authorize.timeout(const Duration(minutes: 5));
+      } on TimeoutException {
+        if (!_isCurrentEpoch(epoch)) return;
+        _log.warning(
+          'auth',
+          'login: OAuth authorize timed out after 5min; abandoning',
+        );
+        await _cancelPendingBestEffort(runtime, 'authorize_timeout');
+        // The abandoned authorize future may still complete (or fail) later;
+        // observe it silently so it cannot become an unhandled error.
+        unawaited(authorize.then((_) {}, onError: (Object _) {}));
+        state = AuthState(
+          status: AuthStatus.signedOut,
+          error: TimeoutException('OAuth login timed out'),
+        );
+        return;
+      }
+      if (!_isCurrentEpoch(epoch)) return;
       await AppPreferences.saveOAuthSessionKnown(true);
+      if (!_isCurrentEpoch(epoch)) return;
       _log.info('auth', 'login: authorize returned, loading account');
       await _loadAccount(runtime, epoch: epoch);
     } on DAKitException catch (error) {
@@ -307,7 +335,7 @@ final class AuthController extends StateNotifier<AuthState> {
       _log.error('auth', 'OAuth login failed (unexpected)', error, stack);
       state = AuthState(status: AuthStatus.signedOut, error: error);
     } finally {
-      _loggingIn = false;
+      if (_isCurrentEpoch(epoch)) _loggingIn = false;
     }
   }
 
@@ -318,18 +346,7 @@ final class AuthController extends StateNotifier<AuthState> {
     _authEpoch += 1;
     final runtime = _runtime;
     final active = _loginOperation;
-    if (runtime.oauth != null) {
-      try {
-        await runtime.oauth!.authorization.cancelPending();
-      } on Object catch (error, stack) {
-        _log.warning(
-          'auth',
-          'could not cancel pending OAuth login',
-          error,
-          stack,
-        );
-      }
-    }
+    await _cancelPendingBestEffort(runtime, 'cancel_login');
     if (active != null) {
       try {
         await active.timeout(const Duration(seconds: 2));
@@ -352,28 +369,57 @@ final class AuthController extends StateNotifier<AuthState> {
     // the user back in on the next launch.
     _authEpoch += 1;
     state = const AuthState(status: AuthStatus.signedOut);
+    // Fence Web/RFY work immediately, before network revocation can stall.
+    final webClear = _ref
+        .read(webSessionControllerProvider.notifier)
+        .clear()
+        .catchError((Object error) {
+          _log.warning(
+            'auth',
+            'logout: web session clear failed errorType=${error.runtimeType}',
+          );
+        });
+    // Start the SDK composite logout now: its token generation fence must not
+    // wait for preferences, Cookie I/O, or pending PKCE storage cleanup.
+    final oauthCleanup = _logoutOAuthBestEffort(runtime);
     await AppPreferences.saveOAuthSessionKnown(false);
+    await webClear;
+    await oauthCleanup;
+  }
+
+  Future<void> _logoutOAuthBestEffort(AppRuntime runtime) async {
     if (runtime.isConfigured && runtime.oauth != null) {
       try {
         _log.info('auth', 'logout: revoking oauth session');
         await runtime.oauth!.logout(revoke: true);
       } on Object catch (error, stack) {
         _log.warning('auth', 'logout: revocation failed', error, stack);
-        // Clear the session directly so the next authorize starts clean.
-        try {
-          await runtime.oauth!.session.logout(revoke: false);
-        } on Object catch (error2, stack2) {
-          _log.warning('auth', 'logout: token clear failed', error2, stack2);
-        }
+        // The SDK has already scheduled generation-safe cleanup in finally.
+        // A second logout here could erase a newer authorization that began
+        // after this operation's bounded native-storage failure.
       }
     }
-    // Clear the embedded web session too (cookies + snapshot + state).
+  }
+
+  Future<void> _cancelPendingBestEffort(
+    AppRuntime runtime,
+    String reason,
+  ) async {
+    final oauth = runtime.oauth;
+    if (oauth == null) return;
     try {
-      await runtime.webViewProxyManager?.cookieManager.deleteAllCookies();
+      // The SDK signals cancellation immediately and owns the bounded,
+      // generation-safe pending-store cleanup. The application owns its UI
+      // and Web/RFY fence, not a second timeout for that SDK operation.
+      await oauth.authorization.cancelPending();
     } on Object catch (error, stack) {
-      _log.warning('auth', 'logout: web cookie clear failed', error, stack);
+      _log.warning(
+        'auth',
+        'pending cleanup deferred reason=$reason',
+        error,
+        stack,
+      );
     }
-    await _ref.read(webSessionControllerProvider.notifier).clear();
   }
 
   /// Starts the background account profile load once and memoizes its future,
@@ -385,6 +431,8 @@ final class AuthController extends StateNotifier<AuthState> {
   /// Completes when the initial account profile load settles (account loaded,
   /// or the load failed and signed-in state has no account).
   Future<void> get accountLoad => _accountLoad ?? Future<void>.value();
+
+  Future<void> reloadAccount() => _loadAccount(_runtime, epoch: _authEpoch);
 
   Future<void> _loadAccount(AppRuntime runtime, {int? epoch}) async {
     final activeEpoch = epoch ?? _authEpoch;
@@ -407,11 +455,11 @@ final class AuthController extends StateNotifier<AuthState> {
       _log.error('auth', 'account load failed', error, stack);
       // Tokens are still valid even if the profile fetch failed; stay signed
       // in with an unknown profile instead of forcing a logout.
-      state = const AuthState(status: AuthStatus.signedIn);
+      state = AuthState(status: AuthStatus.signedIn, error: error);
     } on Object catch (error, stack) {
       if (!_isCurrentEpoch(activeEpoch)) return;
       _log.error('auth', 'account load failed', error, stack);
-      state = const AuthState(status: AuthStatus.signedIn);
+      state = AuthState(status: AuthStatus.signedIn, error: error);
     }
   }
 

@@ -1,0 +1,2 @@
+# Preserve the user's complete task attachment verbatim, including CRLF.
+docs/agent-tasks/session-recovery/SPEC.md -text whitespace=cr-at-eol

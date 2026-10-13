@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
@@ -97,7 +99,31 @@ WebSessionStatusState emptyLiveCookieStatus({
     : WebSessionStatusState.unavailable;
 
 final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
-  WebSessionStatusController(this._ref) : super(const WebSessionStatus());
+  WebSessionStatusController(this._ref) : super(const WebSessionStatus()) {
+    _ref.listen(
+      webSessionControllerProvider.select(
+        (web) => (web.isLoggedIn, web.username.trim().toLowerCase()),
+      ),
+      (previous, next) {
+        if (previous == next) return;
+        _accountEpoch++;
+        _generation++;
+        _activeCheck = null;
+        unawaited(_ref.read(webSessionRefresherProvider).accountChanged());
+        _lastSuccess = null;
+        _lastRestrictionCheck = null;
+        if (mounted) state = const WebSessionStatus();
+        final epoch = _accountEpoch;
+        if (next.$1 == true && next.$2.isNotEmpty) {
+          scheduleMicrotask(() {
+            if (mounted && _ref.mounted && epoch == _accountEpoch) {
+              unawaited(check());
+            }
+          });
+        }
+      },
+    );
+  }
 
   final Ref _ref;
 
@@ -113,6 +139,39 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   int _failures = 0;
   int _generation = 0;
   Future<void>? _activeCheck;
+  int _accountEpoch = 0;
+  int _recoverySequence = 0;
+  String _recoveryId = 'none';
+  int get accountEpoch => _accountEpoch;
+  String get recoveryId => _recoveryId;
+  int _credentialRevision = 0;
+  String? _credentialFingerprint;
+  int get credentialRevision => _credentialRevision;
+
+  int observeCredentials({required String cookieHeader, required String csrf}) {
+    final fingerprint = cookieHeaderFingerprint('$cookieHeader\u0000$csrf');
+    if (fingerprint != _credentialFingerprint) {
+      _credentialFingerprint = fingerprint;
+      _credentialRevision++;
+    }
+    return _credentialRevision;
+  }
+
+  bool _interactive = false;
+
+  void beginInteractiveRecovery() {
+    _interactive = true;
+    _generation++;
+    _activeCheck = null;
+    _recoveryId = 'recovery-${++_recoverySequence}';
+    state = const WebSessionStatus(state: WebSessionStatusState.unverified);
+    AppLogger.instance.info(
+      'auth',
+      'recovery interactive recoveryId=$_recoveryId accountEpoch=$_accountEpoch',
+    );
+  }
+
+  void endInteractiveRecovery() => _interactive = false;
 
   /// Explicit login/lockout supersedes recommendation requests too.
   int get generation => _generation;
@@ -125,7 +184,13 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   Future<void> recheckAfterWebSignal(String source) async {
     if (state.isLocked || state.inCooldown || state.needsLogin) return;
     final active = _activeCheck;
-    if (active != null) return active;
+    if (active != null) {
+      AppLogger.instance.info(
+        'auth',
+        'recovery joined recoveryId=$_recoveryId accountEpoch=$_accountEpoch',
+      );
+      return active;
+    }
     final now = DateTime.now();
     final previous = _lastRestrictionCheck;
     if (previous != null &&
@@ -142,7 +207,8 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
 
   /// Verifies the web session through the HTTP and real-browser evidence chain.
   /// Normal checks reuse recent success and respect transient backoff.
-  Future<void> check({bool force = false}) async {
+  Future<void> check({bool force = false, bool browser = false}) async {
+    if (_interactive) return;
     final active = _activeCheck;
     if (active != null) return active;
     final last = _lastSuccess;
@@ -155,17 +221,30 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     if (!force && state.inCooldown) return;
 
     final generation = _generation;
-    late final Future<void> tracked;
-    tracked = _performCheck(force: force, generation: generation).whenComplete(
-      () {
-        if (identical(_activeCheck, tracked)) _activeCheck = null;
-      },
+    _recoveryId = 'recovery-${++_recoverySequence}';
+    final recoveryId = _recoveryId;
+    final epoch = _accountEpoch;
+    AppLogger.instance.info(
+      'auth',
+      'recovery created recoveryId=$_recoveryId accountEpoch=$_accountEpoch sessionGeneration=$generation force=$force',
     );
+    late final Future<void> tracked;
+    tracked =
+        _performCheck(
+          force: force,
+          generation: generation,
+          recoveryId: recoveryId,
+          accountEpoch: epoch,
+          browser: browser,
+        ).whenComplete(() {
+          if (identical(_activeCheck, tracked)) _activeCheck = null;
+        });
     _activeCheck = tracked;
     return tracked;
   }
 
-  bool _isCurrent(int generation) => generation == _generation;
+  bool _isCurrent(int generation) =>
+      mounted && _ref.mounted && generation == _generation;
 
   /// The only entry point that turns evidence into a verdict. Everything the
   /// controller (or a future coordinator) learns about the session must pass
@@ -173,7 +252,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   /// be bypassed. Returns the resolved decision; an escalated decision asks
   /// the caller to collect real-browser evidence and apply it in turn.
   WebSessionVerdictDecision applyVerification(WebSessionEvidence evidence) {
-    if (evidence.generation != _generation) {
+    if (!_isCurrent(evidence.generation)) {
       AppLogger.instance.info(
         'auth',
         'verification result discarded: source=${evidence.source.name} '
@@ -227,8 +306,38 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   Future<void> _performCheck({
     required bool force,
     required int generation,
+    required String recoveryId,
+    required int accountEpoch,
+    bool browser = false,
   }) async {
     try {
+      if (browser) {
+        // A transport-context refresh observes the live browser store, without
+        // waiting on optional persistence or re-injecting saved credentials.
+        _ref.read(webSessionRefresherProvider).recoveryId = recoveryId;
+        final probe = await _ref.read(webSessionProbeProvider)();
+        if (!_isCurrent(generation)) return;
+        final last = _lastSuccess;
+        if (probe.outcome == WebSessionProbeOutcome.unavailable &&
+            state.isHealthy &&
+            last != null &&
+            DateTime.now().difference(last) < _cacheDuration) {
+          AppLogger.instance.info(
+            'auth',
+            'recovery inconclusive recoveryId=$recoveryId retained=healthy_lease',
+          );
+          return;
+        }
+        applyVerification(
+          WebSessionEvidence(
+            source: WebSessionEvidenceSource.realBrowserProbe,
+            outcome: probe.outcome,
+            username: probe.username,
+            generation: generation,
+          ),
+        );
+        return;
+      }
       // Restore the persisted snapshot if the live WebView store lost it
       // (for example after an app update), before asking the server.
       await _ref
@@ -283,9 +392,11 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       // whether that session is still who the server thinks it is, but a bare
       // HTTP probe is not a real browser: an anonymous/unavailable answer must
       // never downgrade a WebView-confirmed session.
-      final verification = await _ref
-          .read(webSessionVerifierProvider)
-          .verify(cookieHeader: cookieHeader);
+      final verification = browser
+          ? const WebSessionVerification.unavailable()
+          : await _ref
+                .read(webSessionVerifierProvider)
+                .verify(cookieHeader: cookieHeader);
       // A newer login/lockout superseded this check; never let a stale answer
       // overwrite the newer session state.
       if (!_isCurrent(generation)) return;
@@ -306,6 +417,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       );
       var confirmedCookies = cookies;
       if (decision.escalateToRealBrowser) {
+        _ref.read(webSessionRefresherProvider).recoveryId = recoveryId;
         final after = await webSession.snapshot(
           source: 'check-after-unconfirmed',
         );
@@ -356,6 +468,11 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       }
     } on Object {
       if (_isCurrent(generation)) _setUnavailable(source: 'check-error');
+    } finally {
+      AppLogger.instance.info(
+        'auth',
+        'recovery completed recoveryId=$recoveryId accountEpoch=$accountEpoch sessionGeneration=$generation current=$_generation state=${mounted ? state.state.name : 'disposed'}',
+      );
     }
   }
 
@@ -374,13 +491,14 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     _lastSuccess = DateTime.now();
     _lastRestrictionCheck = null;
     _failures = 0;
-    final next = WebSessionStatus(
-      state: WebSessionStatusState.healthy,
-      serverUsername: serverUsername,
-      lastCheckedAt: DateTime.now(),
+    applyVerification(
+      WebSessionEvidence(
+        source: WebSessionEvidenceSource.webLogin,
+        outcome: WebSessionProbeOutcome.confirmed,
+        username: serverUsername,
+        generation: _generation,
+      ),
     );
-    _logTransition(next, 'web-login');
-    state = next;
   }
 
   void _setEmptyLiveCookieState({required int persistedCount}) {
@@ -399,7 +517,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     AppLogger.instance.info(
       'auth',
       'web session state: ${state.state.name} -> ${next.state.name} '
-          'source=$source generation=$_generation '
+          'source=$source generation=$_generation recoveryId=$_recoveryId accountEpoch=$_accountEpoch '
           'claimed=${claimed.isEmpty ? '-' : claimed} '
           'server=${next.serverUsername.isEmpty ? '-' : next.serverUsername}'
           '${cooldown == null ? '' : ' cooldown=$cooldown'}',

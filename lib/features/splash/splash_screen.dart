@@ -6,9 +6,36 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/auth/auth_controller.dart';
 import '../../core/auth/web_session_controller.dart';
 import '../../core/auth/web_session_status.dart';
+import '../../core/diagnostics/app_logger.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/network/proxy_controller.dart';
 import '../../core/runtime/runtime_provider.dart';
+
+/// Application-owned bootstrap: leaving Splash does not cancel a late restore,
+/// and rebuilding/re-entering Splash joins the same operation.
+final startupRestoreProvider = Provider<Future<void> Function()>((ref) {
+  Future<void>? operation;
+  Future<void> restore() async {
+    final auth = ref.read(authControllerProvider.notifier);
+    final web = ref.read(webSessionControllerProvider.notifier);
+    AppLogger.instance.info('startup', 'stage=oauth_restore event=start');
+    try {
+      await auth.initialize();
+      AppLogger.instance.info('startup', 'stage=oauth_restore event=complete');
+    } on Object catch (error) {
+      AppLogger.instance.warning(
+        'startup',
+        'stage=oauth_restore event=failed errorType=${error.runtimeType}',
+      );
+    }
+    if (!ref.mounted) return;
+    AppLogger.instance.info('startup', 'stage=cookie_restore event=start');
+    await web.initialize();
+    AppLogger.instance.info('startup', 'stage=cookie_restore event=complete');
+  }
+
+  return () => operation ??= restore();
+});
 
 final class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -23,17 +50,28 @@ final class _SplashScreenState extends ConsumerState<SplashScreen> {
   ProxyController? _proxyController;
   String? _connectivityStatus;
   int _connectivityEpoch = 0;
+  Timer? _startupDeadline;
+  bool _started = false;
+  bool _finished = false;
+  String _startupStage = 'scheduled';
 
   @override
   void initState() {
     super.initState();
     _proxyController = ref.read(runtimeProvider).proxyController;
     _proxyController?.addListener(_onProxyChanged);
+    // Independent of every awaited Future, including a circular restore wait.
+    _startupDeadline = Timer(_startupTimeout, () => _finishStartup('deadline'));
+    AppLogger.instance.info(
+      'startup',
+      'splash created deadlineMs=${_startupTimeout.inMilliseconds}',
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) => _initialize());
   }
 
   @override
   void dispose() {
+    _startupDeadline?.cancel();
     _proxyController?.removeListener(_onProxyChanged);
     super.dispose();
   }
@@ -45,36 +83,46 @@ final class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _initialize() async {
-    if (!mounted) return;
+    if (!mounted || _started) return;
+    _started = true;
     unawaited(_checkConnectivity());
-    // A startup restore that hangs (e.g. after an update while Keychain,
-    // secure storage or the WebView proxy bridge is slow) must never leave
-    // the splash screen black forever. Once the bounded budget expires the
-    // router moves on; background restore can still complete later.
     try {
-      await ref
-          .read(authControllerProvider.notifier)
-          .initialize()
-          .timeout(_startupTimeout);
-    } on Object {
-      // Continue to Home; authRedirect treats an unknown-but-ready state
-      // as signed-out-facing instead of trapping the app on splash.
+      _startupStage = 'restore_pending';
+      await ref.read(startupRestoreProvider)();
+      _startupStage = 'restore_complete';
+    } on Object catch (error) {
+      AppLogger.instance.warning(
+        'startup',
+        'stage=$_startupStage event=failed errorType=${error.runtimeType}',
+      );
+    } finally {
+      _finishStartup('restore_finished');
     }
-    try {
-      // Restore the persisted web session (Cookie/CSRF state) so the
-      // personalized feed is available without signing in again.
-      await ref
-          .read(webSessionControllerProvider.notifier)
-          .initialize()
-          .timeout(_startupTimeout);
-    } on Object {
-      // Best effort; the web-session notice will ask for login.
-    }
-    if (mounted) {
+  }
+
+  void _finishStartup(String reason) {
+    if (mounted && !_finished) {
+      _finished = true;
+      _startupDeadline?.cancel();
+      AppLogger.instance.info(
+        'startup',
+        'ready=true reason=$reason stage=$_startupStage',
+      );
       ref.read(webSessionReadyProvider.notifier).state = true;
       // Startup owns the first verification trigger. UI hosts only render the
       // resulting verdict (REG-010): no widget mounts its own probe.
-      unawaited(ref.read(webSessionStatusProvider.notifier).check());
+      unawaited(_checkSession());
+    }
+  }
+
+  Future<void> _checkSession() async {
+    try {
+      await ref.read(webSessionStatusProvider.notifier).check();
+    } on Object catch (error) {
+      AppLogger.instance.warning(
+        'startup',
+        'verification failed errorType=${error.runtimeType}',
+      );
     }
   }
 
@@ -88,7 +136,8 @@ final class _SplashScreenState extends ConsumerState<SplashScreen> {
     _setConnectivityStatus(
       strings(ref.read(appLanguageProvider)).splashCheckingConnection,
     );
-    final result = await proxy.testConnection();
+    final result = await _testConnection(proxy);
+    if (result == null) return;
     if (!mounted || epoch != _connectivityEpoch) return;
     final s = strings(ref.read(appLanguageProvider));
     if (result.isSuccess) {
@@ -104,6 +153,18 @@ final class _SplashScreenState extends ConsumerState<SplashScreen> {
           ? s.splashDirectBlocked
           : s.splashProxyUnreachable(address),
     );
+  }
+
+  Future<ProxyCheckResult?> _testConnection(ProxyController proxy) async {
+    try {
+      return await proxy.testConnection();
+    } on Object catch (error) {
+      AppLogger.instance.warning(
+        'startup',
+        'connectivity failed errorType=${error.runtimeType}',
+      );
+      return null;
+    }
   }
 
   void _setConnectivityStatus(String status) {

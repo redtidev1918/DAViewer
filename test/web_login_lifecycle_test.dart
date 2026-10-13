@@ -1,14 +1,32 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:dakit_flutter/dakit_flutter.dart';
+import 'package:daviewer/core/auth/auth_controller.dart';
+import 'package:daviewer/core/auth/auth_state.dart';
+import 'package:daviewer/core/auth/web_session_controller.dart';
+import 'package:daviewer/core/auth/web_session_store.dart';
+import 'package:daviewer/core/auth/web_session_status.dart';
+import 'package:daviewer/core/data/web_session.dart' as web;
 import 'package:daviewer/core/auth/webview_oauth_bridge.dart';
 import 'package:daviewer/core/diagnostics/app_logger.dart';
+import 'package:daviewer/core/l10n/app_strings.dart';
 import 'package:daviewer/core/runtime/app_runtime.dart';
 import 'package:daviewer/core/runtime/runtime_provider.dart';
 import 'package:daviewer/features/web_login/web_login_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:dio/dio.dart';
+import 'package:daviewer/features/home/home_providers.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+
+final _sharedTransfers = BackgroundTransferManager(
+  diagnostics: AppLogger.instance,
+);
 
 final class _LifecyclePlatform extends InAppWebViewPlatform {
   int controllerCreateCalls = 0;
@@ -16,6 +34,14 @@ final class _LifecyclePlatform extends InAppWebViewPlatform {
   InAppWebViewController? controller;
   PlatformInAppWebViewWidgetCreationParams? params;
   final Set<String> _activatedKeys = <String>{};
+  bool challenge = true;
+  String? username;
+  WebUri url = WebUri('https://www.deviantart.com/users/login');
+  final launches = <Uri>[];
+  bool failAuthorize = false;
+  bool failHome = false;
+  Completer<void>? evidenceGate;
+  bool evidenceReadStarted = false;
 
   bool activateOnce(Key? key) {
     final id = key?.toString() ?? '<none>';
@@ -52,6 +78,112 @@ final class _LifecyclePlatform extends InAppWebViewPlatform {
     params.onLoadStop?.call(
       controller,
       WebUri('https://www.deviantart.com/users/login'),
+    );
+  }
+}
+
+final class _LoginTokens implements TokenStore {
+  AuthTokens? value;
+  @override
+  Future<void> clear() async => value = null;
+  @override
+  Future<AuthTokens?> read() async => value;
+  @override
+  Future<void> write(AuthTokens tokens) async => value = tokens;
+}
+
+final class _LoginPending implements PendingAuthorizationStore {
+  PendingAuthorization? value;
+  @override
+  Future<void> clear() async => value = null;
+  @override
+  Future<PendingAuthorization?> read() async => value;
+  @override
+  Future<void> write(PendingAuthorization pending) async => value = pending;
+}
+
+final class _LoginEndpoint implements OAuthEndpoint {
+  int exchanges = 0;
+  @override
+  Future<Map<String, Object?>> postForm(
+    Uri endpoint,
+    Map<String, String> form,
+  ) async {
+    if (form['grant_type'] == 'authorization_code') {
+      exchanges++;
+      expect(form['code_verifier'], isNotEmpty);
+      expect(form['code'], 'synthetic-code');
+      return {
+        'access_token': 'synthetic-new-token',
+        'refresh_token': 'synthetic-new-refresh',
+        'token_type': 'Bearer',
+        'expires_in': 3600,
+      };
+    }
+    return {};
+  }
+}
+
+final class _LoginCookies extends Fake implements CookieManager {
+  final values = <String, String>{
+    'userinfo': '{"username":"artist"}',
+    'auth': 'old',
+  };
+  @override
+  Future<bool> deleteAllCookies() async {
+    values.clear();
+    return true;
+  }
+
+  @override
+  Future<List<Cookie>> getCookies({
+    required WebUri url,
+    InAppWebViewController? webViewController,
+    InAppWebViewController? iosBelow11WebViewController,
+  }) async => [
+    for (final entry in values.entries)
+      Cookie(name: entry.key, value: entry.value),
+  ];
+}
+
+final class _LoginAdapter implements HttpClientAdapter {
+  int rfyCalls = 0;
+  @override
+  void close({bool force = false}) {}
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    Object response;
+    if (options.uri.path.endsWith('/user/whoami')) {
+      response = {
+        'userid': 'synthetic-user',
+        'username': 'artist',
+        'usericon': 'https://example.test/icon.png',
+      };
+    } else if (options.uri.path.endsWith('/rfy/deviations')) {
+      rfyCalls++;
+      response = {
+        'deviations': [
+          {
+            'deviationId': 12345,
+            'title': 'Synthetic art',
+            'author': {'username': 'artist'},
+            'url': 'https://www.deviantart.com/artist/art/test-12345',
+          },
+        ],
+      };
+    } else {
+      response = {};
+    }
+    return ResponseBody.fromString(
+      jsonEncode(response),
+      200,
+      headers: {
+        Headers.contentTypeHeader: ['application/json'],
+      },
     );
   }
 }
@@ -97,10 +229,50 @@ final class _LifecycleController extends PlatformInAppWebViewController {
     required String source,
     ContentWorld? contentWorld,
   }) async {
+    if (source.contains('JSON.stringify')) {
+      final gate = platform.evidenceGate;
+      if (gate != null) {
+        platform.evidenceReadStarted = true;
+        await gate.future;
+      }
+      return jsonEncode({
+        'origin': 'https://www.deviantart.com',
+        'csrf': 'synthetic-csrf',
+        'username': platform.username,
+        'initialized': platform.username != null,
+        'challenge': platform.challenge,
+      });
+    }
     if (source.contains('document.body')) {
-      return 'Max challenge attempts exceeded';
+      return platform.challenge ? 'Max challenge attempts exceeded' : '';
     }
     return '{"csrf":"fake-token"}';
+  }
+
+  @override
+  Future<WebUri?> getUrl() async => platform.url;
+
+  @override
+  Future<String?> getHtml() async => '<html></html>';
+
+  @override
+  Future<void> loadUrl({
+    required URLRequest urlRequest,
+    WebUri? allowingReadAccessTo,
+    Uri? iosAllowingReadAccessTo,
+  }) async {
+    if ((platform.failAuthorize &&
+            urlRequest.url!.path == '/oauth2/authorize') ||
+        (platform.failHome && urlRequest.url!.path == '/')) {
+      platform.failAuthorize = false;
+      platform.failHome = false;
+      throw PlatformException(
+        code: 'native_load_failed',
+        message: 'synthetic-private-query',
+      );
+    }
+    platform.url = urlRequest.url!;
+    platform.launches.add(platform.url.uriValue);
   }
 
   @override
@@ -109,7 +281,408 @@ final class _LifecycleController extends PlatformInAppWebViewController {
   }
 }
 
+void registerLogoutLoginTest(String failure) {
+  testWidgets(
+    'explicit logout then PKCE login restores account, closes and owns one RFY: $failure',
+    (tester) async {
+      final directory = (await tester.runAsync(
+        () => Directory.systemTemp.createTemp('daviewer-login-'),
+      ))!;
+      const paths = MethodChannel('plugins.flutter.io/path_provider');
+      const secure = MethodChannel(
+        'plugins.it_nomads.com/flutter_secure_storage',
+      );
+      final values = <String, String>{};
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(paths, (_) async => directory.path);
+      messenger.setMockMethodCallHandler(secure, (call) async {
+        final args = call.arguments as Map;
+        if (call.method == 'read') return values[args['key']];
+        if (call.method == 'write') values[args['key']] = args['value'];
+        if (call.method == 'delete') values.remove(args['key']);
+        return null;
+      });
+      final logger = (await tester.runAsync(
+        () => AppLogger.initialize(fileName: 'login.log'),
+      ))!;
+      final bridge = WebViewOAuthBridge();
+      final tokens = _LoginTokens();
+      final endpoint = _LoginEndpoint();
+      final oauth = DAKitOAuthClient(
+        config: OAuthConfig(
+          clientId: 'synthetic-client',
+          redirectUri: Uri.parse('dakit://oauth/callback'),
+        ),
+        tokenStore: tokens,
+        pendingStore: _LoginPending(),
+        launcher: bridge,
+        callbacks: bridge.callbacks,
+        endpoint: endpoint,
+        diagnostics: logger,
+      );
+      final adapter = _LoginAdapter();
+      final dio = Dio()..httpClientAdapter = adapter;
+      final cookies = _LoginCookies();
+      final runtime = AppRuntime(
+        clientId: 'synthetic-client',
+        oauth: oauth,
+        transport: OfficialApiClient(
+          session: oauth.session,
+          dio: dio,
+          diagnostics: logger,
+        ),
+        transfers: _sharedTransfers,
+        dio: dio,
+        webViewOAuthBridge: bridge,
+      );
+      final container = ProviderContainer(
+        overrides: [
+          runtimeProvider.overrideWithValue(runtime),
+          webSessionProvider.overrideWithValue(web.WebSession(() => cookies)),
+          webSessionControllerProvider.overrideWith(
+            (ref) => WebSessionController(
+              ref,
+              store: WebSessionStore(directoryFactory: () async => directory),
+              cookieManager: () => cookies,
+            ),
+          ),
+        ],
+      );
+      addTearDown(() async {
+        await _runWithWidgetMicrotasks(
+          tester,
+          oauth.authorization.cancelPending,
+        );
+        await tester.pump(const Duration(milliseconds: 5));
+        await tester.runAsync(() async {
+          container.dispose();
+          await bridge.dispose();
+          await logger.dispose();
+          messenger.setMockMethodCallHandler(paths, null);
+          messenger.setMockMethodCallHandler(secure, null);
+          await directory.delete(recursive: true);
+        });
+      });
+      final auth = container.read(authControllerProvider.notifier);
+      // Settle constructor microtasks in the widget zone before awaiting
+      // real filesystem work in runAsync. SDK persistence is serialized.
+      await tester.pump();
+      await oauth.session.save(
+        AuthTokens(
+          accessToken: 'synthetic-old-token',
+          tokenType: 'Bearer',
+          refreshToken: 'synthetic-old-refresh',
+          expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        ),
+      );
+      auth.state = const AuthState(status: AuthStatus.signedIn);
+      await _runWithWidgetMicrotasks(tester, auth.logout);
+      expect(auth.state.oauthSignedIn, isFalse);
+      expect(tokens.value, isNull);
+      expect(cookies.values, isEmpty);
+      final platform = _LifecyclePlatform()
+        ..challenge = false
+        ..failAuthorize = failure == 'authorize'
+        ..failHome = failure == 'home';
+      InAppWebViewPlatform.instance = platform;
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            navigatorKey: navigator,
+            home: const Scaffold(body: Text('home')),
+          ),
+        ),
+      );
+      unawaited(
+        navigator.currentState!.push(
+          MaterialPageRoute<void>(builder: (_) => const WebLoginScreen()),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump();
+      // Real I/O/logger flushes interleave with the OAuth and platform callbacks.
+      await tester.runAsync(() async {
+        for (var i = 0; i < 100 && platform.launches.isEmpty; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
+      });
+      await tester.pump();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      });
+      await tester.pump();
+      if (failure == 'authorize') {
+        await tester.pump(const Duration(milliseconds: 350));
+        expect(
+          find.text(
+            strings(container.read(appLanguageProvider)).loginBrowserOpenFailed,
+          ),
+          findsOneWidget,
+        );
+        expect(endpoint.exchanges, 0);
+        final refresh = find.descendant(
+          of: find.byType(AppBar),
+          matching: find.byIcon(Icons.refresh),
+        );
+        await tester.tap(refresh);
+        await tester.pump();
+      }
+      expect(platform.launches, hasLength(1));
+      final authorize = platform.launches.single;
+      expect(authorize.path, '/oauth2/authorize');
+      expect(
+        platform.params!.initialSettings!.useShouldOverrideUrlLoading,
+        isTrue,
+      );
+      final callback = Uri(
+        scheme: 'dakit',
+        host: 'oauth',
+        path: '/callback',
+        queryParameters: {
+          'state': authorize.queryParameters['state']!,
+          'code': 'synthetic-code',
+        },
+      );
+      if (failure == 'web_unconfirmed') {
+        // The browser observation budget may expire while the user is still
+        // entering credentials. That is not failed post-OAuth verification.
+        await tester.pump(const Duration(seconds: 21));
+        final s = strings(container.read(appLanguageProvider));
+        expect(auth.state.oauthSignedIn, isFalse);
+        expect(find.text(s.recommendedSessionUnverified), findsNothing);
+        expect(
+          find.text('${s.loginSuccess} ${s.recommendedSessionUnverified}'),
+          findsNothing,
+        );
+        expect(find.text(s.syncingAfterLogin), findsNothing);
+      }
+      if (failure == 'web_first') {
+        cookies.values.addAll({
+          'userinfo': '{"username":"artist"}',
+          'auth': 'synthetic-cookie',
+        });
+        platform.username = 'artist';
+        platform.url = WebUri('https://www.deviantart.com/');
+        platform.params!.onLoadStop!(platform.controller!, platform.url);
+        await tester.pump(const Duration(milliseconds: 10));
+        await tester.runAsync(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        });
+        expect(
+          container.read(webSessionControllerProvider).isLoggedIn,
+          isFalse,
+        );
+      }
+      await tester.runAsync(() async {
+        final policy = await platform.params!.shouldOverrideUrlLoading!(
+          platform.controller!,
+          NavigationAction(
+            request: URLRequest(url: WebUri(callback.toString())),
+            isForMainFrame: true,
+          ),
+        );
+        expect(policy, NavigationActionPolicy.CANCEL);
+        for (var i = 0; i < 100 && auth.state.account == null; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
+      });
+      for (var i = 0; i < 100 && auth.state.account == null; i++) {
+        await tester.pump(const Duration(milliseconds: 5));
+        await tester.runAsync(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        });
+      }
+      expect(endpoint.exchanges, 1);
+      expect(auth.state.account?.username, 'artist');
+      expect(auth.state.oauthSignedIn, isTrue);
+      await tester.pump();
+      if (failure == 'web_unconfirmed') {
+        final s = strings(container.read(appLanguageProvider));
+        expect(find.text(s.syncingAfterLogin), findsOneWidget);
+        final pendingEvidence = Completer<void>();
+        platform.evidenceGate = pendingEvidence;
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pump();
+        expect(platform.evidenceReadStarted, isTrue);
+        await tester.pump(const Duration(seconds: 21));
+        expect(find.text(s.syncingAfterLogin), findsNothing);
+        expect(
+          find.text('${s.loginSuccess} ${s.recommendedSessionUnverified}'),
+          findsOneWidget,
+        );
+        expect(auth.state.oauthSignedIn, isTrue);
+        expect(tokens.value, isNotNull);
+        expect(adapter.rfyCalls, 0);
+        expect(cookies.values, isEmpty);
+        // A native read completing after the observation window is stale.
+        // It must not close the login route or initiate RFY. Keep the new
+        // Cookies intact; only a fresh document observation can accept them.
+        cookies.values.addAll({
+          'userinfo': '{"username":"artist"}',
+          'auth': 'synthetic-cookie',
+        });
+        platform.username = 'artist';
+        pendingEvidence.complete();
+        await tester.pump(const Duration(milliseconds: 10));
+        expect(find.byType(WebLoginScreen), findsOneWidget);
+        expect(
+          container.read(webSessionStatusProvider).state,
+          isNot(WebSessionStatusState.healthy),
+        );
+        expect(adapter.rfyCalls, 0);
+        expect(cookies.values['auth'], 'synthetic-cookie');
+        final refresh = find.descendant(
+          of: find.byType(AppBar),
+          matching: find.byIcon(Icons.refresh),
+        );
+        await tester.tap(refresh);
+        await tester.pump();
+        expect(platform.reloadCalls, 1);
+        expect(endpoint.exchanges, 1);
+      }
+      if (failure == 'home') {
+        await tester.pump(const Duration(milliseconds: 350));
+        expect(
+          find.text(
+            strings(container.read(appLanguageProvider)).loginBrowserOpenFailed,
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.text(strings(container.read(appLanguageProvider)).loginSuccess),
+          findsNothing,
+        );
+        expect(platform.url.path, '/oauth2/authorize');
+        final refresh = find.descendant(
+          of: find.byType(AppBar),
+          matching: find.byIcon(Icons.refresh),
+        );
+        await tester.tap(refresh);
+        await tester.pump();
+        expect(platform.url.path, '/');
+        expect(endpoint.exchanges, 1);
+      }
+      if (failure != 'web_first') {
+        expect(
+          find.byType(WebLoginScreen),
+          findsOneWidget,
+        ); // OAuth alone cannot close
+        cookies.values.addAll({
+          'userinfo': '{"username":"artist"}',
+          'auth': 'synthetic-cookie',
+        });
+        platform.username = 'artist';
+        platform.url = WebUri('https://www.deviantart.com/');
+        platform.params!.onLoadStop!(platform.controller!, platform.url);
+      }
+      await tester.runAsync(() async {
+        for (
+          var i = 0;
+          i < 100 &&
+              container.read(webSessionControllerProvider).isLoggedIn != true;
+          i++
+        ) {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
+      });
+      for (
+        var i = 0;
+        i < 100 &&
+            container.read(webSessionStatusProvider).state !=
+                WebSessionStatusState.healthy;
+        i++
+      ) {
+        await tester.pump(const Duration(milliseconds: 5));
+        await tester.runAsync(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        });
+      }
+      await tester.pumpAndSettle();
+      expect(find.byType(WebLoginScreen), findsNothing);
+      expect(
+        container.read(webSessionStatusProvider).state,
+        WebSessionStatusState.healthy,
+      );
+      container.read(personalizedFeedProvider.notifier);
+      for (
+        var i = 0;
+        i < 100 && container.read(personalizedFeedProvider).items.isEmpty;
+        i++
+      ) {
+        await tester.pump(const Duration(milliseconds: 5));
+        await tester.runAsync(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        });
+      }
+      expect(adapter.rfyCalls, 1);
+      expect(container.read(personalizedFeedProvider).items, hasLength(1));
+      var flushed = false;
+      unawaited(logger.flush().then((_) => flushed = true));
+      for (var i = 0; i < 1000 && !flushed; i++) {
+        await tester.pump(const Duration(milliseconds: 5));
+        await tester.runAsync(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        });
+      }
+      expect(flushed, isTrue);
+      final log = await tester.runAsync(
+        () => File('${logger.logsDirectory}/login.log').readAsString(),
+      );
+      expect(
+        log,
+        contains('authorize dispatched target=embedded listener=true'),
+      );
+      expect(log, contains('callback received path=/callback'));
+      expect(log, contains('oauth.callback.validated'));
+      expect(log, contains('oauth.session.saved'));
+      expect(log, contains('reason=login_completed'));
+      expect(log, contains('phase=accepted'));
+      if (failure == 'authorize' || failure == 'home') {
+        expect(log, contains('navigation failed source=oauth_'));
+        expect(log, isNot(contains('synthetic-private-query')));
+      }
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+}
+
+Future<void> _runWithWidgetMicrotasks(
+  WidgetTester tester,
+  Future<void> Function() action,
+) async {
+  late Future<void> operation;
+  await tester.runAsync(() async {
+    operation = action();
+  });
+  var settled = false;
+  Object? failure;
+  unawaited(
+    operation.then(
+      (_) => settled = true,
+      onError: (Object error) {
+        failure = error;
+        settled = true;
+      },
+    ),
+  );
+  // Native/filesystem futures use real I/O; SDK persistence queues also carry
+  // widget-zone continuations. Advance both without blocking the widget zone
+  // inside an awaited runAsync action.
+  for (var i = 0; i < 1000 && !settled; i++) {
+    await tester.pump(const Duration(milliseconds: 5));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 5)),
+    );
+  }
+  expect(settled, isTrue, reason: 'the mixed I/O/widget operation must settle');
+  if (failure != null) throw failure!;
+}
+
 void main() {
+  registerLogoutLoginTest('none');
   testWidgets(
     'rebuild and challenge banner never recreate or reload the WebView',
     (tester) async {
@@ -121,7 +694,7 @@ void main() {
         clientId: '',
         oauth: null,
         transport: null,
-        transfers: BackgroundTransferManager(diagnostics: AppLogger.instance),
+        transfers: _sharedTransfers,
         webViewOAuthBridge: WebViewOAuthBridge(),
       );
 

@@ -22,15 +22,46 @@ Choose **Sign in or create an account** and authorize on DeviantArt's official p
 
 See [Networking and proxy](networking.md) for WebView coverage. The sections below describe implementation and recovery rules.
 
+## Android recovery transaction (2026-10-12)
+
+The original Android incident still fails on v0.5.13. Source inspection confirms that HTTP parse failures were mapped to anonymous and CSRF-only headless observations could terminate early. The specific reason rfy-4 was discarded remains a device hypothesis.
+
+`WebSessionStatusController` owns recovery transactions, account epochs, generation guards and single-flight checks. Cookie restoration coalesces callers and fills missing cookies without replacing live rotations. OAuth, CSRF and cookies are candidates, never independent authentication proof.
+
+Both browser hosts use `BrowserSessionObserver`: load/history events and bounded sampling collect same-origin page identity through asynchronous initialization. Events never extend the original 20-second headless deadline. Explicit anonymous is distinct from missing or malformed state. Interactive recovery stops the hidden host and navigates a visible host with the same native Cookie Store. Native headless-to-visible conversion is supported by the plugin documentation but remains untested on the incident device; the implementation uses explicit navigation instead.
+
+`ArtworkFeedController` owns first-page requests. RFY uses DAKit's cancellable single-attempt public fetcher, disabling its implicit HTTP CSRF retry. Account epoch, ownership, health and generic-fallback checks decide acceptance. A newly verified same-account context may adopt a non-generic earlier response. An unverified cookie rotation remains conservatively rejected with an explicit reason. Cache behavior stays independent.
+
+Diagnostics exports the latest 20 launch files, up to 512 KiB per launch, with redaction and visible truncation markers. The 120-line display is only a preview. Serialized flushing reduces loss on force-stop, though an abrupt kill can still lose the final write. Candidate APKs record buildRevision; signing and the commit SHA must be checked before in-place upgrade.
+
+Existing status names remain compatible: healthy=verified, unverified/unavailable=inconclusive, anonymous=explicit signed-out evidence, locked=blocked. Recovery and interaction are transaction phases. See [REG-021](../regressions/021-android-session-recovery.md) for test evidence and device acceptance.
+
 ## One-entry sign-in contract
+
+Android disables `flutter_deeplinking_enabled` because DAKit's `app_links`
+source owns native OAuth callbacks. Duplicate Flutter routing can remove the
+login page early. Native and WebView callbacks feed the same PKCE transaction;
+a website home page alone is not OAuth success.
+
+If OAuth/account loading succeeds but Web identity observation expires, the sync
+overlay is released with an unverified-Web-session message. OAuth and cookies
+remain intact. Refresh starts another bounded window; late old-window evidence
+cannot close the page or request the feed.
+
+DAKit owns token/PKCE storage and protocol parsing. Token writes, generation checks
+and obsolete cleanup share one serialized transaction. Timeouts do not release
+unfinished native I/O or erase valid same-generation late writes. App logout starts
+SDK fencing before host I/O and never retries old cleanup against a new account.
+RFY uses the public SDK fetcher with the owner's `CancelToken` and
+`retryInvalidCsrf: false`, replacing the app's duplicate Dio/DTO implementation.
 
 The app exposes one **Sign in or create an account** action, which opens the
 embedded login screen:
 
 1. DAKit creates one OAuth/PKCE transaction.
-2. DAViewer loads the official login page in its embedded WebView with a desktop
-   User-Agent, because DeviantArt's mobile login page omits the Google and Apple
-   one-click buttons the desktop page offers.
+2. DAViewer loads the official login page in its embedded WebView. Android uses
+   its native WebView User-Agent; desktop platforms use the desktop User-Agent.
+   Available provider buttons depend on the page served by DeviantArt.
 3. DeviantArt's page owns account sign-in, registration, password recovery, and
    every provider it currently offers (DeviantArt, Google, Apple, Facebook).
    There is no separate "social login" route in the app.
@@ -44,8 +75,8 @@ earlier visit and starts a fresh PKCE flow. A user who only refreshed the web
 Cookie must never leave the official-API pages behind in a signed-out state.
 
 The app does not simulate a provider-button click, embed a password form, copy
-cookies out of a system browser, or inspect human-verification DOM. It does set
-a desktop User-Agent so the full desktop login page is served. Google, Apple, or
+cookies out of a system browser, or solve human-verification challenges. Android
+retains its native browser identity; desktop uses a desktop User-Agent. Google, Apple, or
 Facebook may still show their own account or CAPTCHA checks inside the WebView;
 those are the providers' pages and are not bypassed by the app.
 
@@ -70,10 +101,9 @@ file. Storage errors preserve existing credentials for retry; the app never
 falls back to writing plaintext. Until migration succeeds, treat the old file
 as a sign-in credential and do not copy or publish it.
 
-One embedded login establishes both sessions. The WebView reports the web
-session (CSRF token and the `userinfo` cookie) only after the OAuth callback has
-navigated back to the DeviantArt home page, so the app never records a
-signed-out web session from the anonymous login page.
+Web identity may arrive before the OAuth account; account arrival resamples the
+current document without requiring another navigation. CSRF and cookies alone
+never prove a healthy session, and old account generations cannot replace it.
 
 Cookie snapshots preserve each cookie's domain, path, expiry, Secure, and
 HttpOnly metadata. Same-name cookies on different domains remain separate and
@@ -127,12 +157,10 @@ the real headless WebView (the same Cookie stack as login): same account →
 healthy; the real browser also anonymous → anonymous and a re-login prompt;
 real-browser probe failure → stays unverified, never a silent downgrade.
 
-The headless probe judges **navigation convergence**, not a single load stop
-(see [REG-018](../regressions/018-headless-webview-second-navigation.md)): the
-challenge page's first `onLoadStop` only counts as "inconclusive" and writes no
-verdict; the page is sampled when the post-challenge JavaScript navigation
-stops again. If the stop limit (3) is reached without a decidable page the probe
-reports unavailable (→ unverified) and **never** anonymous.
+The headless probe uses the shared observer's bounded window rather than a
+three-load-stop counter. Challenge, missing and initializing identity remain
+inconclusive. Expiry without trusted identity returns unavailable (unverified),
+never anonymous.
 
 The personalized feed's first page has one owner (see
 [REG-019](../regressions/019-first-page-request-ownership.md)): verification

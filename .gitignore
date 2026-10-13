@@ -31,6 +31,9 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
+pubspec_overrides.yaml
+.joint-sdk/
+sdk-integration-provenance.json
 /build/
 /coverage/
 
@@ -77,3 +80,6 @@ session.json
 *.session
 *.git-credentials
 session-*/
+!docs/agent-tasks/session-recovery/
+!docs/agent-tasks/session-recovery/SPEC.md
+!docs/agent-tasks/session-recovery/STATUS.md
