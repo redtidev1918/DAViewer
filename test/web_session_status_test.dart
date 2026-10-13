@@ -302,6 +302,24 @@ void main() {
   });
 
   group('WebSessionStatusController.check server verification', () {
+    test('corroborated browser logout with empty native credentials remains authoritative', () async {
+      final container = _containerWith(
+        _CountingHtmlAdapter(_anonymousHomeHtml),
+        cookies: [],
+        probe: () async => WebSessionProbeResult.anonymous(
+          credentialFingerprint: cookieHeaderFingerprint(''),
+        ),
+      );
+      addTearDown(container.dispose);
+      final owner = container.read(webSessionStatusProvider.notifier);
+      owner.markHealthy(serverUsername: 'artist');
+      await owner.check(force: true, browser: true);
+      expect(container.read(webSessionStatusProvider).needsLogin, isTrue);
+      expect(
+        container.read(webSessionStatusProvider).state,
+        WebSessionStatusState.anonymous,
+      );
+    });
     test('a later Cookie read cannot authenticate credentials absent from the browser transaction', () async {
       final cookies = [
         Cookie(name: 'userinfo', value: 'saved-user'),
