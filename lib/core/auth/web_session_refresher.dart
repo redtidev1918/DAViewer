@@ -44,6 +44,27 @@ WebSessionProbeResult webSessionProbeResultFromPage({
   return WebSessionProbeResult.confirmed(csrf: csrf, username: username);
 }
 
+/// What a probe transaction should do with one identity-bearing page sample.
+enum WebSessionProbeSampleDecision { complete, corroborateAnonymous }
+
+/// A first anonymous sample is weak evidence: a redirect intermediate state,
+/// an anonymous shell before session cookies re-attach, or a challenge
+/// variant can all render `isLoggedIn: false` while the Cookie session is
+/// alive. The first anonymous sample arms one corroborating reload instead of
+/// completing the probe; the sample that survives the reload decides. A
+/// confirmed sample always completes immediately, so a live session is never
+/// delayed by the anonymous guard (invariant 2 stays intact).
+WebSessionProbeSampleDecision webSessionProbeSampleDecision(
+  WebSessionProbeResult result, {
+  required bool corroborationPending,
+}) {
+  if (result.outcome == WebSessionProbeOutcome.anonymous &&
+      !corroborationPending) {
+    return WebSessionProbeSampleDecision.corroborateAnonymous;
+  }
+  return WebSessionProbeSampleDecision.complete;
+}
+
 final webSessionRefresherProvider = Provider<WebSessionRefresher>((ref) {
   final host = WebSessionRefresher(ref);
   ref.onDispose(
@@ -63,6 +84,7 @@ final class WebSessionRefresher {
   WebSessionRefresher(this._ref);
   final Ref _ref;
   HeadlessInAppWebView? _headless;
+  InAppWebViewController? _probeController;
   BrowserSessionObserver? _observer;
   Timer? _timeout;
   Completer<WebSessionProbeResult>? _completion;
@@ -70,6 +92,14 @@ final class WebSessionRefresher {
   String recoveryId = 'metadata';
   String _activeRecoveryId = 'metadata';
   int _activeIdentityEpoch = 0;
+
+  /// A single anonymous page sample is weak evidence: a redirect intermediate
+  /// state, an anonymous shell before session cookies re-attach, or a challenge
+  /// variant can all render `isLoggedIn: false` while the Cookie session is
+  /// alive. The first anonymous sample therefore only arms one corroborating
+  /// reload; the verdict completes on the sample that survives it (see
+  /// `_corroborateAnonymous`).
+  bool _anonymousCorroborationPending = false;
 
   Future<WebSessionProbeResult> refresh() {
     final active = _completion;
@@ -121,6 +151,7 @@ final class WebSessionRefresher {
         ),
         onWebViewCreated: (controller) {
           if (!_current(completion)) return;
+          _probeController = controller;
           _observer = BrowserSessionObserver(
             read: () => readBrowserSessionEvidence(
               getUrl: () async => (await controller.getUrl())?.uriValue,
@@ -150,16 +181,25 @@ final class WebSessionRefresher {
               if (evidence.blocked) {
                 unawaited(_dispose(null, completion, 'blocked'));
               } else if (!evidence.challenge && evidence.hasIdentity) {
-                unawaited(
-                  _dispose(
-                    webSessionProbeResultFromPage(
-                      pageUsername: evidence.username,
-                      csrf: evidence.csrf,
-                    ),
-                    completion,
-                    evidence.classification,
-                  ),
+                final result = webSessionProbeResultFromPage(
+                  pageUsername: evidence.username,
+                  csrf: evidence.csrf,
                 );
+                switch (webSessionProbeSampleDecision(
+                  result,
+                  corroborationPending: _anonymousCorroborationPending,
+                )) {
+                  case WebSessionProbeSampleDecision.corroborateAnonymous:
+                    _anonymousCorroborationPending = true;
+                    _log(
+                      'anonymous_sample_unconfirmed event=reload_for_corroboration',
+                    );
+                    unawaited(_corroborateAnonymous(completion));
+                  case WebSessionProbeSampleDecision.complete:
+                    unawaited(
+                      _dispose(result, completion, evidence.classification),
+                    );
+                }
               }
             },
             onDeadline: () =>
@@ -205,6 +245,27 @@ final class WebSessionRefresher {
   /// A new account must never join a browser belonging to the old account.
   Future<void> accountChanged() => _dispose(null, null, 'account_changed');
 
+  /// Reloads the page once so a second, independent page load can corroborate
+  /// (or refute) a first anonymous sample. The observer keeps running across
+  /// the reload: a signed-in sample completes `confirmed` immediately, a second
+  /// anonymous sample completes `anonymous`, and anything else falls to the
+  /// original transaction deadline as `unavailable` — never a logged-out
+  /// verdict from missing evidence.
+  Future<void> _corroborateAnonymous(
+    Completer<WebSessionProbeResult> completion,
+  ) async {
+    try {
+      await _probeController?.reload();
+    } on Object {
+      if (_current(completion)) {
+        _log('anonymous_corroboration_reload_failed');
+      }
+      // Without a navigation the observer's deduplicated sampler may stay
+      // silent; the transaction deadline then resolves `unavailable`, which
+      // is the required inconclusive outcome.
+    }
+  }
+
   Future<void> _dispose([
     WebSessionProbeResult? result,
     Completer<WebSessionProbeResult>? expected,
@@ -218,6 +279,8 @@ final class WebSessionRefresher {
     _timeout = null;
     _observer?.dispose();
     _observer = null;
+    _probeController = null;
+    _anonymousCorroborationPending = false;
     final headless = _headless;
     _headless = null;
     final completion = _completion;

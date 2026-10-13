@@ -81,6 +81,7 @@ final class _GatedHtmlAdapter implements HttpClientAdapter {
   _GatedHtmlAdapter(this.completer);
 
   final Completer<ResponseBody> completer;
+  final entered = Completer<void>();
 
   @override
   void close({bool force = false}) {}
@@ -90,22 +91,31 @@ final class _GatedHtmlAdapter implements HttpClientAdapter {
     RequestOptions options,
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
-  ) => completer.future;
+  ) {
+    if (!entered.isCompleted) entered.complete();
+    return completer.future;
+  }
 }
 
 ProviderContainer _containerWith(
   HttpClientAdapter adapter, {
   Future<WebSessionProbeResult> Function()? probe,
+  List<Cookie>? cookies,
+  DateTime Function()? now,
 }) {
   final container = ProviderContainer(
     retry: (_, _) => null,
     overrides: <Override>[
+      if (now != null) webSessionClockProvider.overrideWithValue(now),
       webSessionProvider.overrideWithValue(
         WebSession(
-          () => _FakeCookieManager(<Cookie>[
-            Cookie(name: 'userinfo', value: 'saved-user'),
-            Cookie(name: 'csrf', value: 'token'),
-          ]),
+          () => _FakeCookieManager(
+            cookies ??
+                <Cookie>[
+                  Cookie(name: 'userinfo', value: 'saved-user'),
+                  Cookie(name: 'csrf', value: 'token'),
+                ],
+          ),
         ),
       ),
       webSessionControllerProvider.overrideWith(
@@ -291,6 +301,54 @@ void main() {
   });
 
   group('WebSessionStatusController.check server verification', () {
+    test(
+      'empty Cookie reads retain only the existing bounded healthy lease',
+      () async {
+        var now = DateTime.now();
+        final adapter = _CountingHtmlAdapter(_signedInHomeHtml);
+        final container = _containerWith(adapter, cookies: [], now: () => now);
+        addTearDown(container.dispose);
+        final owner = container.read(webSessionStatusProvider.notifier);
+        owner.markHealthy(serverUsername: 'artist');
+        final confirmedAt = container
+            .read(webSessionStatusProvider)
+            .lastCheckedAt;
+        await owner.check(force: true);
+        expect(container.read(webSessionStatusProvider).isHealthy, isTrue);
+        expect(
+          container.read(webSessionStatusProvider).lastCheckedAt,
+          confirmedAt,
+        );
+        now = now.add(const Duration(minutes: 6));
+        await owner.check(force: true);
+        expect(
+          container.read(webSessionStatusProvider).state,
+          WebSessionStatusState.unavailable,
+        );
+        expect(container.read(webSessionStatusProvider).needsLogin, isFalse);
+        expect(container.read(webSessionControllerProvider).username, 'artist');
+        expect(adapter.calls, 0);
+      },
+    );
+
+    test(
+      'media 403 reuses the lease but does not conceal real browser logout',
+      () async {
+        final adapter = _CountingHtmlAdapter(_anonymousHomeHtml);
+        final container = _containerWith(
+          adapter,
+          probe: () async => const WebSessionProbeResult.anonymous(),
+        );
+        addTearDown(container.dispose);
+        final owner = container.read(webSessionStatusProvider.notifier);
+        owner.markHealthy(serverUsername: 'artist');
+        await owner.recheckAfterWebSignal('media-image-403');
+        expect(adapter.calls, 0);
+        expect(container.read(webSessionStatusProvider).isHealthy, isTrue);
+        await owner.check(force: true, source: 'explicit-verification');
+        expect(container.read(webSessionStatusProvider).needsLogin, isTrue);
+      },
+    );
     test(
       'marks healthy only when the server confirms the claimed user',
       () async {
@@ -513,9 +571,35 @@ void main() {
 
         expect(
           container.read(webSessionStatusProvider).state,
-          WebSessionStatusState.unverified,
+          WebSessionStatusState.healthy,
         );
         expect(container.read(webSessionStatusProvider).needsLogin, isFalse);
+      },
+    );
+
+    test(
+      'credential rotation discards old HTTP logout evidence before escalation',
+      () async {
+        final gate = Completer<ResponseBody>();
+        final adapter = _GatedHtmlAdapter(gate);
+        var browserCalls = 0;
+        final container = _containerWith(
+          adapter,
+          probe: () async {
+            browserCalls++;
+            return const WebSessionProbeResult.anonymous();
+          },
+        );
+        addTearDown(container.dispose);
+        final controller = container.read(webSessionStatusProvider.notifier);
+        controller.markHealthy(serverUsername: 'artist');
+        final pending = controller.check(force: true);
+        await adapter.entered.future;
+        controller.observeCredentials(cookieHeader: 'rotated', csrf: 'rotated');
+        gate.complete(ResponseBody.fromString(_anonymousHomeHtml, 200));
+        await pending;
+        expect(browserCalls, 0);
+        expect(container.read(webSessionStatusProvider).isHealthy, isTrue);
       },
     );
 

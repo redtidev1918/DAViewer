@@ -149,9 +149,12 @@ WebSessionVerdictDecision resolveWebSessionVerdict({
         case WebSessionProbeOutcome.confirmed:
           return const WebSessionVerdictDecision.keep();
         case WebSessionProbeOutcome.anonymous:
-          // No usable cookie header / no claimed identity.
-          return const WebSessionVerdictDecision.transition(
-            WebSessionStatusState.anonymous,
+          // Local absence is not a server logout answer. Cookie reads and
+          // snapshot restoration can fail while the claimed account survives.
+          return WebSessionVerdictDecision.transition(
+            !claimedSignedIn && current == WebSessionStatusState.unknown
+                ? WebSessionStatusState.anonymous
+                : WebSessionStatusState.unavailable,
           );
         case WebSessionProbeOutcome.unavailable:
           return const WebSessionVerdictDecision.transition(

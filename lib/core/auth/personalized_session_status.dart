@@ -6,6 +6,8 @@ import '../diagnostics/app_logger.dart';
 import 'web_session_diagnostics.dart';
 import 'web_session_status.dart';
 
+/// Usable means RFY returned an accepted page, not that the website's
+/// personalization algorithm has been independently confirmed.
 enum PersonalizedSessionPhase { unknown, usable, degraded }
 
 /// Recommendation access is separate from website identity. An HTTP 200 or a
@@ -106,7 +108,7 @@ String? rfyCursorStructureTrace(String? cursor) {
     if (value is! Map) return 'shape=${value.runtimeType}';
     final keys = value.keys.whereType<String>().toList()..sort();
     final group = value['vespa_content_group'];
-    return 'keys=${keys.join('|')} group=$group';
+    return 'keys=${keys.where((key) => RegExp(r"^[a-zA-Z_]{1,48}$").hasMatch(key)).take(12).join('|')} group=${group is num ? group : 'unknown'}';
   } on Object {
     return null;
   }

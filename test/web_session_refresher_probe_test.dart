@@ -51,4 +51,57 @@ void main() {
       expect(result.outcome, WebSessionProbeOutcome.anonymous);
     });
   });
+
+  group('webSessionProbeSampleDecision (anonymous corroboration, RC2)', () {
+    test('a first anonymous sample arms a corroborating reload', () {
+      expect(
+        webSessionProbeSampleDecision(
+          webSessionProbeResultFromPage(pageUsername: 'anonymous', csrf: 't'),
+          corroborationPending: false,
+        ),
+        WebSessionProbeSampleDecision.corroborateAnonymous,
+      );
+    });
+
+    test('an anonymous sample surviving the reload completes the probe', () {
+      expect(
+        webSessionProbeSampleDecision(
+          webSessionProbeResultFromPage(pageUsername: 'anonymous', csrf: 't'),
+          corroborationPending: true,
+        ),
+        WebSessionProbeSampleDecision.complete,
+      );
+    });
+
+    test('a confirmed sample completes immediately, even mid-corroboration', () {
+      // The reload after a first anonymous sample lands signed-in: the session
+      // is alive, so the probe must not wait for anything else (invariant 2).
+      for (final pending in <bool>[false, true]) {
+        expect(
+          webSessionProbeSampleDecision(
+            webSessionProbeResultFromPage(pageUsername: 'artist', csrf: 't'),
+            corroborationPending: pending,
+          ),
+          WebSessionProbeSampleDecision.complete,
+        );
+      }
+    });
+
+    test('a redirect intermediate state cannot log out on one sample', () {
+      // Sequence: anonymous (redirect shell) -> confirmed (settled page).
+      // The decision reducer must never complete anonymous from sample one.
+      var pending = false;
+      final first = webSessionProbeSampleDecision(
+        webSessionProbeResultFromPage(pageUsername: 'anonymous', csrf: 't'),
+        corroborationPending: pending,
+      );
+      expect(first, WebSessionProbeSampleDecision.corroborateAnonymous);
+      pending = true; // the refresher arms the reload after that decision
+      final second = webSessionProbeSampleDecision(
+        webSessionProbeResultFromPage(pageUsername: 'artist', csrf: 't'),
+        corroborationPending: pending,
+      );
+      expect(second, WebSessionProbeSampleDecision.complete);
+    });
+  });
 }

@@ -180,7 +180,7 @@ void main() {
       }
     });
 
-    test('local state anonymous (no usable cookies) is anonymous', () {
+    test('local empty cookies cannot invalidate a claimed session', () {
       final decision = resolveWebSessionVerdict(
         current: WebSessionStatusState.healthy,
         evidence: evidence(
@@ -190,7 +190,7 @@ void main() {
         claimedUsername: 'artist',
         claimedSignedIn: true,
       );
-      expect(decision.nextState, WebSessionStatusState.anonymous);
+      expect(decision.nextState, WebSessionStatusState.unavailable);
     });
   });
 }

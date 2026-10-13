@@ -20,6 +20,9 @@ export 'session_state.dart' show webSessionProvider;
 /// "web session healthy" — the health verdict lives exclusively in
 /// [webSessionStatusProvider] and is produced by the verification chain.
 final webSessionReadyProvider = StateProvider<bool>((ref) => false);
+final webSessionClockProvider = Provider<DateTime Function()>(
+  (ref) => DateTime.now,
+);
 
 /// Single source of truth for the DeviantArt web session.
 enum WebSessionStatusState {
@@ -94,7 +97,8 @@ final webSessionProbeProvider =
     );
 WebSessionStatusState emptyLiveCookieStatus({
   required int persistedCookieCount,
-}) => persistedCookieCount == 0
+  bool claimedSignedIn = false,
+}) => persistedCookieCount == 0 && !claimedSignedIn
     ? WebSessionStatusState.anonymous
     : WebSessionStatusState.unavailable;
 
@@ -126,6 +130,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   }
 
   final Ref _ref;
+  DateTime _now() => _ref.read(webSessionClockProvider)();
 
   static const Duration _cacheDuration = Duration(minutes: 5);
   static const List<Duration> _backoff = <Duration>[
@@ -191,7 +196,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       );
       return active;
     }
-    final now = DateTime.now();
+    final now = _now();
     final previous = _lastRestrictionCheck;
     if (previous != null &&
         now.difference(previous) < const Duration(seconds: 30)) {
@@ -202,12 +207,16 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       'auth',
       'web verification requested source=$source',
     );
-    await check(force: true);
+    await check(force: !source.startsWith('media-'), source: source);
   }
 
   /// Verifies the web session through the HTTP and real-browser evidence chain.
   /// Normal checks reuse recent success and respect transient backoff.
-  Future<void> check({bool force = false, bool browser = false}) async {
+  Future<void> check({
+    bool force = false,
+    bool browser = false,
+    String source = 'session-check',
+  }) async {
     if (_interactive) return;
     final active = _activeCheck;
     if (active != null) return active;
@@ -215,7 +224,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     if (!force &&
         last != null &&
         state.isHealthy &&
-        DateTime.now().difference(last) < _cacheDuration) {
+        _now().difference(last) < _cacheDuration) {
       return;
     }
     if (!force && state.inCooldown) return;
@@ -226,7 +235,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     final epoch = _accountEpoch;
     AppLogger.instance.info(
       'auth',
-      'recovery created recoveryId=$_recoveryId accountEpoch=$_accountEpoch sessionGeneration=$generation force=$force',
+      'recovery created eventId=$_recoveryId recoveryId=$_recoveryId accountEpoch=$_accountEpoch sessionGeneration=$generation credentialRevision=$_credentialRevision triggerSource=$source force=$force',
     );
     late final Future<void> tracked;
     tracked =
@@ -277,12 +286,12 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     if (nextState != null) {
       switch (nextState) {
         case WebSessionStatusState.healthy:
-          _lastSuccess = DateTime.now();
+          _lastSuccess = _now();
           _failures = 0;
           final next = WebSessionStatus(
             state: nextState,
             serverUsername: decision.serverUsername,
-            lastCheckedAt: DateTime.now(),
+            lastCheckedAt: _now(),
           );
           _logTransition(next, evidence.source.name);
           state = next;
@@ -321,7 +330,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         if (probe.outcome == WebSessionProbeOutcome.unavailable &&
             state.isHealthy &&
             last != null &&
-            DateTime.now().difference(last) < _cacheDuration) {
+            _now().difference(last) < _cacheDuration) {
           AppLogger.instance.info(
             'auth',
             'recovery inconclusive recoveryId=$recoveryId retained=healthy_lease',
@@ -387,6 +396,8 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       }
       final before = await webSession.snapshot(source: 'check-before-verify');
       AppLogger.instance.info('auth', before.logLine());
+      final verificationCredentialRevision = _credentialRevision;
+      final verificationCsrf = _ref.read(webSessionControllerProvider).csrf;
       // The persisted snapshot only exists because a previous session was
       // confirmed during an actual WebView login. The home page answer decides
       // whether that session is still who the server thinks it is, but a bare
@@ -400,6 +411,19 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       // A newer login/lockout superseded this check; never let a stale answer
       // overwrite the newer session state.
       if (!_isCurrent(generation)) return;
+      final currentHeader = await webSession.cookieHeader();
+      if (!_isCurrent(generation)) return;
+      if (verificationCredentialRevision != _credentialRevision ||
+          verificationCsrf != _ref.read(webSessionControllerProvider).csrf ||
+          currentHeader != cookieHeader) {
+        AppLogger.instance.info(
+          'auth',
+          'recovery discarded recoveryId=$recoveryId accountEpoch=$accountEpoch '
+              'sessionGeneration=$generation credentialRevision=$_credentialRevision '
+              'evidenceSource=bareProbe decisionReason=credentials_superseded',
+        );
+        return;
+      }
       var decision = applyVerification(
         WebSessionEvidence(
           source: WebSessionEvidenceSource.bareProbe,
@@ -488,7 +512,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
 
   void markHealthy({required String serverUsername}) {
     _generation++;
-    _lastSuccess = DateTime.now();
+    _lastSuccess = _now();
     _lastRestrictionCheck = null;
     _failures = 0;
     applyVerification(
@@ -502,7 +526,12 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   }
 
   void _setEmptyLiveCookieState({required int persistedCount}) {
-    if (persistedCount == 0) {
+    final claimed = _ref.read(webSessionControllerProvider).isLoggedIn == true;
+    if (emptyLiveCookieStatus(
+          persistedCookieCount: persistedCount,
+          claimedSignedIn: claimed,
+        ) ==
+        WebSessionStatusState.anonymous) {
       _setAnonymous(source: 'cookie-store');
     } else {
       _setUnavailable(source: 'cookie-store');
@@ -535,11 +564,25 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       _setTransient(WebSessionStatusState.unavailable, source);
 
   void _setTransient(WebSessionStatusState state, String source) {
+    final last = _lastSuccess;
+    if (this.state.isHealthy &&
+        last != null &&
+        _now().difference(last) < _cacheDuration) {
+      AppLogger.instance.info(
+        'auth',
+        'recovery inconclusive recoveryId=$_recoveryId accountEpoch=$_accountEpoch '
+            'sessionGeneration=$_generation credentialRevision=$_credentialRevision '
+            'evidenceSource=$source decisionReason=retained_unexpired_lease',
+      );
+      // Do not renew the lease: persistent inconclusive evidence eventually
+      // becomes unverified, while an authoritative logout takes effect now.
+      return;
+    }
     _failures += 1;
     final index = (_failures - 1).clamp(0, _backoff.length - 1);
     final next = WebSessionStatus(
       state: state,
-      cooldownUntil: DateTime.now().add(_backoff[index]),
+      cooldownUntil: _now().add(_backoff[index]),
     );
     _logTransition(next, source);
     this.state = next;

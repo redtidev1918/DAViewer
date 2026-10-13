@@ -28,9 +28,9 @@ The original Android incident still fails on v0.5.13. Source inspection confirms
 
 `WebSessionStatusController` owns recovery transactions, account epochs, generation guards and single-flight checks. Cookie restoration coalesces callers and fills missing cookies without replacing live rotations. OAuth, CSRF and cookies are candidates, never independent authentication proof.
 
-Both browser hosts use `BrowserSessionObserver`: load/history events and bounded sampling collect same-origin page identity through asynchronous initialization. Events never extend the original 20-second headless deadline. Explicit anonymous is distinct from missing or malformed state. Interactive recovery stops the hidden host and navigates a visible host with the same native Cookie Store. Native headless-to-visible conversion is supported by the plugin documentation but remains untested on the incident device; the implementation uses explicit navigation instead.
+Both browser hosts use `BrowserSessionObserver`: load/history events and bounded sampling collect same-origin page identity through asynchronous initialization. Events never extend the original 20-second headless deadline. Explicit anonymous is distinct from missing or malformed state; a first anonymous sample only arms one corroborating reload — the verdict completes on the sample that survives it, so redirect intermediate states and anonymous shells cannot log the session out on one observation, while a confirmed sample still completes immediately. Interactive recovery stops the hidden host and navigates a visible host with the same native Cookie Store. Native headless-to-visible conversion is supported by the plugin documentation but remains untested on the incident device; the implementation uses explicit navigation instead.
 
-`ArtworkFeedController` owns first-page requests. RFY uses DAKit's cancellable single-attempt public fetcher, disabling its implicit HTTP CSRF retry. Account epoch, ownership, health and generic-fallback checks decide acceptance. A newly verified same-account context may adopt a non-generic earlier response. An unverified cookie rotation remains conservatively rejected with an explicit reason. Cache behavior stays independent.
+`ArtworkFeedController` owns first-page requests. RFY uses DAKit's cancellable single-attempt public fetcher, disabling its implicit HTTP CSRF retry. Account epoch, ownership, health and generic-fallback checks decide acceptance. A newly verified same-account context may adopt a non-generic earlier response. A **same-generation** cookie/CSRF rotation (server-side, or this app's own same-session probe navigation — no login/lockout transition) no longer discards an in-flight response; that conservative rule was the source of self-inflicted pagination failures (REG-024 RC3). Cross-generation and cross-account guards are fully retained.
 
 Diagnostics exports the latest 20 launch files, up to 512 KiB per launch, with redaction and visible truncation markers. The 120-line display is only a preview. Serialized flushing reduces loss on force-stop, though an abrupt kill can still lose the final write. Candidate APKs record buildRevision; signing and the commit SHA must be checked before in-place upgrade.
 
@@ -154,8 +154,11 @@ neither a bare HTTP home probe (WAF-distorted) nor a successful
 `rfy/deviations` request is health evidence: an anonymous Cookie also gets an
 HTTP 200 answer with generic content. A bare anonymous verdict is arbitrated by
 the real headless WebView (the same Cookie stack as login): same account →
-healthy; the real browser also anonymous → anonymous and a re-login prompt;
-real-browser probe failure → stays unverified, never a silent downgrade.
+healthy; the real browser confirmed anonymous **after one corroborating
+reload** → anonymous and a re-login prompt; real-browser probe failure → stays
+unverified, never a silent downgrade. Empty local cookies and transient
+cookie-store read failures under a claimed signed-in account likewise produce
+unavailable, never anonymous.
 
 The headless probe uses the shared observer's bounded window rather than a
 three-load-stop counter. Challenge, missing and initializing identity remain
@@ -241,12 +244,15 @@ Recommendations require a server-confirmed web identity from the last five
 minutes. Confirmed anonymity prompts sign-in. A network failure or challenge
 blocks loading and offers web sign-in without declaring the Cookie expired.
 
-A signed-in identity does not guarantee that recommendations are available.
-When the endpoint returns a recorded generic fallback signal, the app rejects
-that batch and offers sign-in or retry. Another home-page identity confirmation
-does not clear this notice; explicit sign-in recovery, a successful Cookie
-import or a successful feed retry does. Detection uses historical protocol
-evidence; similar-looking artwork does not by itself mean expiry.
+A signed-in identity does not guarantee that recommendations were
+personalized. A historical cursor signal (`vespa_content_group=2`) correlated
+with generic fallback content (REG-009/022), but the protocol meaning is
+**unverified**: server-confirmed signed-in sessions receive it too. A
+suspected-generic batch is therefore displayed normally, never persisted as
+the personalized cold-start cache, and **never by itself** constitutes a login
+problem or a user-visible degradation notice (REG-024 RC1; diagnostic logs
+only). A genuinely dead session is still identified by the authoritative
+verdict chain and shows the recovery entry point.
 
 ## Checking for app updates
 

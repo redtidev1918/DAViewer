@@ -281,7 +281,7 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
         // A verdict may change while the feed is in flight. Do not commit
         // generic results after expiry or a switch to a different account.
         final currentHeader = await webSession.cookieHeader();
-        final degraded = rfyCursorSignalsGenericFallback(page.nextCursor);
+        final suspectedGroup = rfyCursorSignalsGenericFallback(page.nextCursor);
         final discardReason = personalizedResultDiscardReason(
           mounted: ref.mounted,
           sameAccount:
@@ -293,7 +293,7 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
           healthy: ref.mounted && ref.read(webSessionStatusProvider).isHealthy,
           sameGeneration: generation == statusOwner.generation,
           sameCredentials: currentHeader == cookieHeader,
-          generic: degraded,
+          generic: false,
         );
         final finalDiscardReason = ownershipLost() ?? discardReason;
         if (finalDiscardReason != null &&
@@ -316,35 +316,28 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
             .read(personalizedSessionStatusProvider.notifier)
             .observe(
               cookieHeader: cookieHeader,
-              degraded: degraded,
+              degraded: false,
               generation: statusOwner.generation,
             );
         ref.read(artworkStoreProvider.notifier).putAll(page.items);
-        trace('accepted', 'items=${page.items.length} degraded=$degraded');
+        trace(
+          'accepted',
+          'items=${page.items.length} degraded=false personalization=unknown suspectedGroup=$suspectedGroup',
+        );
         AppLogger.instance.info(
           'home',
           'personalized feed accepted items=${page.items.length} '
-              'request=$requestId generation=$generation degraded=$degraded',
+              'request=$requestId generation=$generation degraded=false personalization=unknown',
         );
-        if (degraded) {
-          // Suspected generic fallback: the group-2 cursor is a historical
-          // degradation signal (REG-009), not a verified protocol — the
-          // 2026-10-13 production log shows a server-confirmed signed-in
-          // session can receive it too. Keep the items usable under the
-          // degraded label instead of an empty tab (P0-B), but never persist
-          // them as the personalized cold-start cache and never claim the
-          // account is signed out.
-          AppLogger.instance.warning(
+        if (suspectedGroup) {
+          // Group 2 also occurs in confirmed signed-in responses (REG-022).
+          // Keep the diagnostic and conservative cache policy, but do not
+          // infer a capability incident or force an identity check from it.
+          AppLogger.instance.info(
             'home',
-            'rfy suspected generic fallback displayed '
+            'rfy protocol signal meaning=unverified userWarning=false '
                 'source=vespa_content_group_2 generation=$generation',
           );
-          // Preserve the capability incident even if a home probe confirms
-          // the username again. Only a usable feed or explicit recovery clears
-          // it.
-          await ref
-              .read(webSessionStatusProvider.notifier)
-              .recheckAfterWebSignal('rfy-generic-fallback');
         } else if (request.cursor == null) {
           // Persist the first page for the next cold start. Fire-and-forget:
           // storage latency must never delay the feed, and a failed save only
@@ -491,7 +484,7 @@ Future<Page<Artwork>?> _tryFetchRfy(
           'cursorStructure=${rfyCursorStructureTrace(page.nextCursor) ?? (page.nextCursor == null ? 'absent' : 'undecodable')}',
     );
     return page;
-  } on Object catch (error, stack) {
+  } on Object catch (error) {
     if (cancelToken.isCancelled) {
       trace('transport_cancelled', 'transportId=$requestId-t$attempt');
       rethrow;
@@ -507,8 +500,6 @@ Future<Page<Artwork>?> _tryFetchRfy(
           'classification=${classifyFeedFetchError(error)} '
           'elapsedMs=${stopwatch.elapsedMilliseconds} '
           'cursorPresent=${request.cursor != null} cursorFingerprint=${_cursorFingerprint(request.cursor)}',
-      error,
-      stack,
     );
     return null;
   }

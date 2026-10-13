@@ -1,5 +1,39 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-14: active P0 — runtime session verdict and misleading recovery UI
+
+- Workspace `D:\Code\DAViewer`; branch `codex/runtime-session-stability`;
+  baseline `5257454d609a5263a8ca57d5015ff2d80a6a0db7` (main, v0.5.17 released).
+- Full new user taskbook copied verbatim to `RUNTIME-STABILITY-SPEC.md`.
+- Implementation COMPLETE on this branch (2026-10-14, two concurrent sessions
+  merged: verdict/status/coordinator/UI fixes + probe corroboration, media
+  host attribution, same-generation rotation adoption). Full causal-path audit:
+  `audits/runtime-session-causal-paths.md`; regression record:
+  `docs/regressions/024-runtime-session-misjudge.md` (root causes RC1-RC4,
+  fixes F1-F5, invariant mapping).
+- Local validation: `dart format --set-exit-if-changed lib test` 0 changed;
+  `flutter analyze` clean; `flutter test --dart-define=DAVIEWER_VERSION=0.5.17`
+  **522 PASS** (was 511; new/updated regression tests included).
+- Key code-level facts (confirmed): a single anonymous browser-probe sample
+  used to complete an authoritative logout (A4) while media-image 403 regex
+  matching, rfy's own 403, WAF-unavailable escalation and timeout retries all
+  reached that probe during scrolling; group-2 cursors independently raised
+  the user-visible degraded banner; same-generation cookie rotation discarded
+  in-flight pages (`credentials_changed`); empty local cookies with a claimed
+  signed-in session could write anonymous directly. All addressed; real logout
+  still completes via the corroborated second anonymous sample.
+- UNVERIFIED: the exact on-device page shape that produced the original
+  incident (no failure trace exists — the 23:44 log is a success control);
+  group-2 protocol semantics. Diagnostic fields added for recurrence capture.
+- Retained original stash and historical untracked audit/import files unchanged.
+  Code Verified: PASS (local). CI/Release: PENDING (PR next). Android/Original
+  Incident: PENDING — do not claim device resolution from widget tests.
+- Next: commit, push, PR against main, verify CI, then release workflow per
+  repo conventions (original-phone gate removed by user 2026-10-13; disclose
+  PENDING acceptance honestly).
+- Recovery: read AGENTS/SPEC/this checkpoint and RUNTIME-STABILITY-SPEC, inspect
+  Git before edits, retain original stash; no data clearing or retry inflation.
+
 ## 2026-10-13: active P0 — v0.5.16 cached-preview pagination lock
 
 - Latest phase: implementation/review/publication complete; device acceptance

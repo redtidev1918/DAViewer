@@ -101,7 +101,12 @@ Future<BrowserSessionEvidence> readBrowserSessionEvidence({
     return const BrowserSessionEvidence();
   }
   final page = BrowserSessionEvidence.decode(await evaluate());
-  if (page.hasIdentity || page.blocked || page.challenge || page.csrf.isEmpty) {
+  if (await getUrl() != before) return const BrowserSessionEvidence();
+  if (page.hasIdentity ||
+      page.blocked ||
+      page.challenge ||
+      page.csrf.isEmpty ||
+      (page.initialized && page.loggedIn == false)) {
     return page;
   }
   String? html;

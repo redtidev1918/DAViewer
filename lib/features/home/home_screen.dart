@@ -301,10 +301,8 @@ final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
       onLoadMore: () => ref.read(personalizedFeedProvider.notifier).loadMore(),
       onRetryLoadMore: () =>
           ref.read(personalizedFeedProvider.notifier).retryLoadMore(),
-      errorActionLabel: needsWebLogin || sessionUnverified ? s.login : null,
-      errorOnAction: needsWebLogin || sessionUnverified
-          ? () => context.push('/web-login')
-          : null,
+      errorActionLabel: needsWebLogin ? s.login : null,
+      errorOnAction: needsWebLogin ? () => context.push('/web-login') : null,
     );
     if (recommendationDegraded) {
       content = Column(

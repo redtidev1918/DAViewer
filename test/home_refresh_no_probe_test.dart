@@ -187,44 +187,49 @@ void main() {
     return container;
   }
 
-  test('suspected generic fallback is displayed with a degraded incident, never as confirmed personalized', () async {
-    final rfy = _RfyAdapter()
-      ..nextCursor = base64Url.encode(
-        utf8.encode(jsonEncode({'vespa_content_group': 2})),
+  test(
+    'unverified group-2 cursor does not create a recovery incident or probe',
+    () async {
+      final rfy = _RfyAdapter()
+        ..nextCursor = base64Url.encode(
+          utf8.encode(jsonEncode({'vespa_content_group': 2})),
+        );
+      final probe = _HomeProbeAdapter();
+      final container = feedContainer(rfy, probe);
+      await container.read(personalizedFeedProvider.notifier).refresh();
+
+      expect(container.read(webSessionStatusProvider).isHealthy, isTrue);
+      expect(
+        container.read(personalizedSessionStatusProvider).needsRecovery,
+        isFalse,
       );
-    final container = feedContainer(rfy, _HomeProbeAdapter());
-    await container.read(personalizedFeedProvider.notifier).refresh();
+      expect(probe.calls, 0);
+      // Group 2 occurred in a confirmed signed-in production response on
+      // 2026-10-13 (REG-022). Its meaning remains unverified; this controlled
+      // fixture tests the policy, not a new interpretation of the protocol.
+      expect(container.read(personalizedFeedProvider).items, hasLength(1));
+      expect(container.read(artworkStoreProvider)['12345'], isNotNull);
+      expect(container.read(personalizedFeedProvider).error, isNull);
 
-    expect(container.read(webSessionStatusProvider).isHealthy, isTrue);
-    expect(
-      container.read(personalizedSessionStatusProvider).needsRecovery,
-      isTrue,
-    );
-    // P0-B (2026-10-13): the batch stays usable under the degraded label
-    // instead of leaving an empty tab, but it is not a confirmed
-    // personalized result and must not surface as a login problem.
-    expect(container.read(personalizedFeedProvider).items, hasLength(1));
-    expect(container.read(artworkStoreProvider)['12345'], isNotNull);
-    expect(container.read(personalizedFeedProvider).error, isNull);
-
-    // An explicit recovery supersedes the incident and retries the same feed.
-    container
-        .read(webSessionStatusProvider.notifier)
-        .markHealthy(serverUsername: 'artist');
-    expect(
-      container.read(personalizedSessionStatusProvider).needsRecovery,
-      isFalse,
-    );
-    rfy.nextCursor = null;
-    // The user retry path is forceRefresh (pull-to-refresh/banner retry);
-    // the idempotent refresh() would skip the still-valid session context.
-    await container.read(personalizedFeedProvider.notifier).forceRefresh();
-    expect(container.read(personalizedFeedProvider).items, hasLength(1));
-    expect(
-      container.read(personalizedSessionStatusProvider).phase,
-      PersonalizedSessionPhase.usable,
-    );
-  });
+      // An explicit recovery supersedes the incident and retries the same feed.
+      container
+          .read(webSessionStatusProvider.notifier)
+          .markHealthy(serverUsername: 'artist');
+      expect(
+        container.read(personalizedSessionStatusProvider).needsRecovery,
+        isFalse,
+      );
+      rfy.nextCursor = null;
+      // The user retry path is forceRefresh (pull-to-refresh/banner retry);
+      // the idempotent refresh() would skip the still-valid session context.
+      await container.read(personalizedFeedProvider.notifier).forceRefresh();
+      expect(container.read(personalizedFeedProvider).items, hasLength(1));
+      expect(
+        container.read(personalizedSessionStatusProvider).phase,
+        PersonalizedSessionPhase.usable,
+      );
+    },
+  );
 
   test(
     'account change while waiting on Cookie read sends no obsolete transport',
@@ -313,7 +318,7 @@ void main() {
             'queued',
             'in_flight',
             'transport_succeeded',
-            verifiedRotation ? 'accepted' : 'discarded',
+            'accepted',
             'completed',
           ]),
         );
@@ -333,14 +338,6 @@ void main() {
           }
         }
         expect(traces.any((line) => line.contains('transportId=')), isTrue);
-        if (!verifiedRotation) {
-          expect(
-            traces.any(
-              (line) => line.contains('discardReason=credentials_changed'),
-            ),
-            isTrue,
-          );
-        }
         expect(rfy.calls, 1);
       },
     );
@@ -413,52 +410,61 @@ void main() {
     expect(container.read(personalizedFeedProvider).items, hasLength(1));
   });
 
+  test('group-2 follows the same verified same-account adoption policy as other pages', () async {
+    final gate = Completer<void>();
+    final entered = Completer<void>();
+    final rfy = _RfyAdapter()
+      ..nextCursor = base64Url.encode(
+        utf8.encode(jsonEncode({'vespa_content_group': 2})),
+      )
+      ..gate = gate.future
+      ..onFetch = entered.complete;
+    final container = feedContainer(rfy, _HomeProbeAdapter());
+    final pending = container.read(personalizedFeedProvider.notifier).refresh();
+    await entered.future;
+    container
+        .read(webSessionStatusProvider.notifier)
+        .markHealthy(serverUsername: 'artist');
+    gate.complete();
+    await pending;
+    expect(
+      container.read(personalizedSessionStatusProvider).needsRecovery,
+      isFalse,
+    );
+    expect(container.read(personalizedFeedProvider).items, hasLength(1));
+    expect(container.read(artworkStoreProvider)['12345'], isNotNull);
+  });
+
   test(
-    'a late generic result cannot replace a newer same-account login',
+    'a same-generation cookie rotation during a feed request adopts its result',
     () async {
+      // RC3 (2026-10-14): a same-generation rotation is the server (or this
+      // app's own same-session probe navigation) rotating cookies for the very
+      // session the request belongs to — no login, lockout or account change
+      // happened (those bump the generation and stay rejected). Discarding the
+      // in-flight page was self-inflicted pagination damage.
       final gate = Completer<void>();
       final entered = Completer<void>();
+      final cookies = _FakeCookieManager();
       final rfy = _RfyAdapter()
-        ..nextCursor = base64Url.encode(
-          utf8.encode(jsonEncode({'vespa_content_group': 2})),
-        )
         ..gate = gate.future
         ..onFetch = entered.complete;
-      final container = feedContainer(rfy, _HomeProbeAdapter());
+      final container = feedContainer(
+        rfy,
+        _HomeProbeAdapter(),
+        cookies: cookies,
+      );
       final pending = container
           .read(personalizedFeedProvider.notifier)
           .refresh();
       await entered.future;
-      container
-          .read(webSessionStatusProvider.notifier)
-          .markHealthy(serverUsername: 'artist');
+      cookies.csrfCookie = 'rotated';
       gate.complete();
       await pending;
-      expect(
-        container.read(personalizedSessionStatusProvider).needsRecovery,
-        isFalse,
-      );
-      expect(container.read(personalizedFeedProvider).items, isEmpty);
-      expect(container.read(artworkStoreProvider)['12345'], isNull);
+      expect(container.read(personalizedFeedProvider).items, hasLength(1));
+      expect(container.read(artworkStoreProvider)['12345'], isNotNull);
     },
   );
-
-  test('a cookie rotation during a feed request discards its result', () async {
-    final gate = Completer<void>();
-    final entered = Completer<void>();
-    final cookies = _FakeCookieManager();
-    final rfy = _RfyAdapter()
-      ..gate = gate.future
-      ..onFetch = entered.complete;
-    final container = feedContainer(rfy, _HomeProbeAdapter(), cookies: cookies);
-    final pending = container.read(personalizedFeedProvider.notifier).refresh();
-    await entered.future;
-    cookies.csrfCookie = 'rotated';
-    gate.complete();
-    await pending;
-    expect(container.read(personalizedFeedProvider).items, isEmpty);
-    expect(container.read(artworkStoreProvider)['12345'], isNull);
-  });
 
   test('verified same-account recovery adopts a successful in-flight response without second RFY', () async {
     final gate = Completer<void>();
