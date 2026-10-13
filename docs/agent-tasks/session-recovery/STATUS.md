@@ -1,5 +1,45 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-14: final runtime review boundaries fixed
+
+R1 now uses committed main-document generations; SPA History and duplicate
+load-stop events only invalidate samples, never corroborate anonymous. R2
+credentials-superseded paths retain only an unexpired lease, otherwise move to
+unverified. R3 uses URI hostname parsing for root/subdomain/explicit-port URLs,
+excluding CDN and unidentifiable text. R4 binds native Cookie fingerprints to
+the page sampling transaction (reads before/after), checks them at delivery,
+and never persists a later unverified replacement set.
+
+Local final source: analyze clean, full suite **532 PASS**, including native
+Headless callback wiring and the reviewer boundary cases. Format run completed;
+fresh commit CI remains required. Logs: `D:\Android\setup\p0-final-*.log`.
+19 accidentally tracked historical audits/screenshots/test dumps/patches were
+removed from the PR index, preserved locally and copied to
+`D:\Android\setup\p0-historical-audits-backup-2026-10-14`.
+Only the current causal-path audit stays in this PR. No old stash applied.
+Next: push #111, verify current-SHA CI/SDK/three-platform candidates, merge;
+integrate #112 and run fresh checks before release-please publication.
+Android Verified / Original Incident Verified remain PENDING. Older entries
+below are historical checkpoints, not approval of the previously failing R1-R4.
+
+## 2026-10-14: Codex takes implementation and release ownership
+
+User authorized Codex to complete the interrupted zcode fixes, push, merge,
+publish and update documentation after fresh verification. Main workspace
+`D:\Code\DAViewer`, branch `codex/runtime-session-stability`, HEAD `63ba115`.
+Three inherited uncommitted files: observer, refresher, media signal. Diff
+backup `D:\Android\setup\p0-zcode-handoff-2026-10-14.patch`; old stash retained.
+UI worktree `C:\Users\12629\.codex\worktrees\notice-ux\DAViewer` on
+`codex/notice-ux`, HEAD `2215e1a`, contains pending feedback-helper migration;
+diff and new helper backed up outside repository. Do not drop that work.
+Next: finish committed-document fencing, expired superseded-probe handling,
+typed URL attribution and transaction-owned browser credentials; migrate tests
+to the new observer epoch API, run reviewer probes plus full regression. Then
+finish UI feedback tests, integrate via PRs #111/#112, fresh CI and release.
+Prior 525/530 passing suites and previous CI do not verify these new changes.
+Android/Original Incident remain PENDING; no data/cookie reset, no timeout or
+retry inflation, no unrelated SDK refactor. Historic evidence is preserved.
+
 ## 2026-10-14: active P0 — runtime session verdict and misleading recovery UI
 
 - Workspace `D:\Code\DAViewer`; branch `codex/runtime-session-stability`;

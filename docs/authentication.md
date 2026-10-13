@@ -25,7 +25,7 @@ v0.5.13 的 Android 原始故障仍未通过实机验收。源码确认 HTTP 解
 
 `WebSessionStatusController` 是恢复事务协调器：冷启动、响应信号、前台恢复和 Feed 的上下文刷新共享 single-flight。它管理 `recoveryId`、`accountEpoch` 和 generation；账号变化使旧结果失效。Cookie 恢复归并并保留现有有效 Cookie，不以 Cookie、OAuth 或 CSRF 单独授予健康状态。
 
-后台及可见 WebView 使用 `BrowserSessionObserver`：加载、历史导航和有界采样收集同源页面身份，20 秒总预算不随事件延长。CSRF 已有但身份尚未初始化时继续观察；只有页面明确 `anonymous` 才是匿名证据，缺失/解析失败为不确定。首个 anonymous 样本不直接定论：探测会 reload 一次做佐证，且复核结论必须来自严格更新的导航序号（reload 尚未落地时同文档的重读不完成探测，回落 unavailable）；只有复核后仍是 anonymous 才完成匿名结论（重定向中间态、匿名壳页不会单样本登出）。confirmed 样本仍立即完成，真实登出不受延迟影响。人工恢复停止隐藏浏览器，使用共享原生 Cookie Store 和显式首页导航；没有宣称原生实例转换已在 Android 验证。可见页面的用户导航可以打开新的有界观察窗口。
+后台及可见 WebView 使用 `BrowserSessionObserver`：加载、历史导航和有界采样收集同源页面身份，20 秒总预算不随事件延长。CSRF 已有但身份尚未初始化时继续观察；只有页面明确 `anonymous` 才是匿名证据，缺失/解析失败为不确定。首个 anonymous 样本不直接定论：探测会 reload 一次做佐证，且复核结论必须来自严格更新的已提交主文档代际（SPA History 不算新文档）（reload 尚未落地时同文档的重读不完成探测，回落 unavailable）；只有复核后仍是 anonymous 才完成匿名结论（重定向中间态、匿名壳页不会单样本登出）。confirmed 样本仍立即完成，真实登出不受延迟影响。人工恢复停止隐藏浏览器，使用共享原生 Cookie Store 和显式首页导航；没有宣称原生实例转换已在 Android 验证。可见页面的用户导航可以打开新的有界观察窗口。
 
 推荐的请求所有权在 `ArtworkFeedController`；明确区分初次加载、会话恢复、用户刷新、前台刷新、凭据上下文变化和分页。RFY 调用 DAKit 公共 fetcher 的可取消、单次请求接口，禁用隐式 HTTP CSRF 重试。成功响应只有在账号 epoch、请求所有者和健康状态仍有效时才能接受；已确认的同账号恢复可以接收非通用旧响应。**同代际**的 Cookie/CSRF 轮换只有在判决链确认过轮换后的凭据集（`verifiedCredentialFingerprint` 匹配，例如本应用同会话探测导航并确认了新 Cookie）时才采纳在途响应；未经确认的轮换保持 `credentials_changed` 保守废弃——"没有观察到账号变化"本身不构成轮换安全的证明。跨代际与跨账号的守卫全部保留。
 

@@ -1,16 +1,22 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:dakit_flutter/dakit_flutter.dart';
+import 'package:dakit_flutter/dakit_flutter.dart' hide WebSession;
 import 'package:daviewer/core/auth/web_session_refresher.dart';
 import 'package:daviewer/core/diagnostics/app_logger.dart';
 import 'package:daviewer/core/runtime/app_runtime.dart';
 import 'package:daviewer/core/runtime/runtime_provider.dart';
+import 'package:daviewer/core/auth/session_state.dart';
+import 'package:daviewer/core/data/web_session.dart';
+import 'package:daviewer/core/auth/web_session_diagnostics.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _Controller extends Fake implements InAppWebViewController {
+  int reloads = 0;
+  @override
+  Future<void> reload() async => reloads++;
   String? username;
   String csrf = '';
   bool challenge = false;
@@ -26,6 +32,16 @@ class _Controller extends Fake implements InAppWebViewController {
     'csrf': csrf,
     'challenge': challenge,
   });
+}
+
+class _Cookies extends Fake implements CookieManager {
+  String value = 'transaction-test';
+  @override
+  Future<List<Cookie>> getCookies({
+    required WebUri url,
+    InAppWebViewController? webViewController,
+    InAppWebViewController? iosBelow11WebViewController,
+  }) async => [Cookie(name: 'context', value: value)];
 }
 
 class _Browser extends PlatformHeadlessInAppWebView {
@@ -71,15 +87,18 @@ class _Platform extends InAppWebViewPlatform {
 void main() {
   late _Platform platform;
   late ProviderContainer container;
+  late _Cookies cookies;
   InAppWebViewPlatform? originalPlatform;
   final transfers = BackgroundTransferManager(diagnostics: AppLogger.instance);
 
   setUp(() {
     originalPlatform = InAppWebViewPlatform.instance;
     platform = _Platform();
+    cookies = _Cookies();
     InAppWebViewPlatform.instance = platform;
     container = ProviderContainer(
       overrides: [
+        webSessionProvider.overrideWithValue(WebSession(() => cookies)),
         runtimeProvider.overrideWithValue(
           AppRuntime(
             clientId: 'test',
@@ -122,6 +141,47 @@ void main() {
       page.username = 'artist';
       await tester.pump(const Duration(milliseconds: 500));
       expect((await probe).username, 'artist');
+    },
+  );
+
+  testWidgets(
+    'native headless callbacks require reload commit, not SPA history or a stale stop',
+    (tester) async {
+      var finished = false;
+      final probe = container.read(webSessionRefresherProvider).refresh();
+      unawaited(probe.then((_) => finished = true));
+      await tester.pump();
+      final browser = platform.browsers.single;
+      final page = _Controller()
+        ..username = 'anonymous'
+        ..csrf = 'token';
+      final url = WebUri('https://www.deviantart.com/');
+      browser.params.onWebViewCreated?.call(page);
+      browser.params.onLoadStart?.call(page, url);
+      browser.params.onLoadStop?.call(page, url);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(page.reloads, 1);
+      expect(finished, isFalse);
+      browser.params.onUpdateVisitedHistory?.call(page, url, false);
+      await tester.pump();
+      browser.params.onLoadStop?.call(page, url); // Duplicate old stop.
+      await tester.pump();
+      expect(finished, isFalse);
+      browser.params.onLoadStart?.call(page, url);
+      browser.params.onLoadStop?.call(page, url);
+      await tester.pump();
+      final result = await probe;
+      expect(result.outcome, WebSessionProbeOutcome.anonymous);
+      expect(
+        result.credentialFingerprint,
+        cookieHeaderFingerprint('context=transaction-test'),
+      );
+      cookies.value = 'later-unverified-store';
+      expect(
+        result.credentialFingerprint,
+        isNot(cookieHeaderFingerprint('context=${cookies.value}')),
+      );
     },
   );
 

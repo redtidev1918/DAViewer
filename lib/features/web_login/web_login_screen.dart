@@ -240,7 +240,11 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
               source: browserSessionEvidenceScript,
             ),
           );
-      if (!mounted || seq != _reportSeq || page.blocked || page.challenge) {
+      if (!mounted ||
+          seq != _reportSeq ||
+          page.blocked ||
+          page.challenge ||
+          page.loggedIn == false) {
         return;
       }
       final csrf = page.csrf;

@@ -265,6 +265,24 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   bool _isCurrent(int generation) =>
       mounted && _ref.mounted && generation == _generation;
 
+  Future<bool> _probeCredentialsCurrent(
+    WebSessionProbeResult probe,
+    int generation,
+  ) async {
+    final observed = probe.credentialFingerprint;
+    if (observed == null) return _isCurrent(generation);
+    final live = await _ref.read(webSessionProvider).cookieHeader();
+    if (!_isCurrent(generation)) return false;
+    if (live.isNotEmpty && cookieHeaderFingerprint(live) == observed) {
+      return true;
+    }
+    _setTransient(
+      WebSessionStatusState.unverified,
+      'browser-credentials-superseded',
+    );
+    return false;
+  }
+
   /// The only entry point that turns evidence into a verdict. Everything the
   /// controller (or a future coordinator) learns about the session must pass
   /// through here, so generation protection and transition logging can never
@@ -336,6 +354,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         _ref.read(webSessionRefresherProvider).recoveryId = recoveryId;
         final probe = await _ref.read(webSessionProbeProvider)();
         if (!_isCurrent(generation)) return;
+        if (!await _probeCredentialsCurrent(probe, generation)) return;
         final last = _lastSuccess;
         if (probe.outcome == WebSessionProbeOutcome.unavailable &&
             state.isHealthy &&
@@ -356,12 +375,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
           ),
         );
         if (browserDecision.nextState == WebSessionStatusState.healthy) {
-          // The probe navigated the live store; record the credential set the
-          // server just accepted so a concurrent feed response can attribute
-          // the rotation to this verification.
-          final live = await _ref.read(webSessionProvider).cookieHeader();
-          if (!_isCurrent(generation)) return;
-          _verifiedCredentialFingerprint = cookieHeaderFingerprint(live);
+          _verifiedCredentialFingerprint = probe.credentialFingerprint;
         }
         return;
       }
@@ -416,6 +430,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       AppLogger.instance.info('auth', before.logLine());
       final verificationCredentialRevision = _credentialRevision;
       final verificationCsrf = _ref.read(webSessionControllerProvider).csrf;
+      String? verifiedFingerprint = cookieHeaderFingerprint(cookieHeader);
       // The persisted snapshot only exists because a previous session was
       // confirmed during an actual WebView login. The home page answer decides
       // whether that session is still who the server thinks it is, but a bare
@@ -439,6 +454,10 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
           'recovery discarded recoveryId=$recoveryId accountEpoch=$accountEpoch '
               'sessionGeneration=$generation credentialRevision=$_credentialRevision '
               'evidenceSource=bareProbe decisionReason=credentials_superseded',
+        );
+        _setTransient(
+          WebSessionStatusState.unverified,
+          'credentials-superseded',
         );
         return;
       }
@@ -475,6 +494,8 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         // real-browser evidence and apply it as a separate observation.
         final probe = await _ref.read(webSessionProbeProvider)();
         if (!_isCurrent(generation)) return;
+        if (!await _probeCredentialsCurrent(probe, generation)) return;
+        verifiedFingerprint = probe.credentialFingerprint;
         decision = applyVerification(
           WebSessionEvidence(
             source: WebSessionEvidenceSource.realBrowserProbe,
@@ -496,9 +517,20 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         // (the credentials-superseded guard above rejected any rotation),
         // for the escalated path it is the post-probe store the probe itself
         // authenticated. Feed-side rotation adoption keys off this value.
-        _verifiedCredentialFingerprint = cookieHeaderFingerprint(
-          WebSession.cookieHeaderFrom(confirmedCookies),
-        );
+        _verifiedCredentialFingerprint = verifiedFingerprint;
+        // Snapshot collection is another asynchronous read. A rotation after
+        // the verdict must not persist an unverified replacement credential set.
+        if (verifiedFingerprint == null ||
+            cookieHeaderFingerprint(
+                  WebSession.cookieHeaderFrom(confirmedCookies),
+                ) !=
+                verifiedFingerprint) {
+          AppLogger.instance.info(
+            'auth',
+            'confirmed snapshot skipped reason=credentials_superseded',
+          );
+          return;
+        }
         // Persist only a server-confirmed live cookie set. An unconfirmed
         // health check must never overwrite the snapshot: a degraded live
         // store during a WAF challenge can still carry a matching

@@ -90,6 +90,25 @@ void main() {
   });
 
   group('MediaSessionSignal.isWebSessionAuthRejection (host attribution)', () {
+    test('root site and explicit default port in platform error are attributed by parsed host', () {
+      for (final url in [
+        'https://deviantart.com/page',
+        'https://www.deviantart.com:443/page',
+      ]) {
+        expect(
+          MediaSessionSignal.isWebSessionAuthRejection(
+            StateError('HTTP status 403 $url'),
+          ),
+          isTrue,
+        );
+      }
+      expect(
+        MediaSessionSignal.isWebSessionAuthRejection(
+          StateError('HTTP status 403 https://deviantart.com.evil.test/page'),
+        ),
+        isFalse,
+      );
+    });
     final deviantUri = Uri.parse('https://www.deviantart.com/some/page');
 
     test('a DeviantArt-host rejection may feed the verdict chain', () {
