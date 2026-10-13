@@ -3,6 +3,15 @@
 这里只写下载者需要知道的变化，一行一条。内部实现、协议与调试细节请见
 `CHANGELOG.md`。
 
+## 0.5.15
+
+- 修复登录成功后首页无法加载的问题：网页会话验证读取的键名与 DeviantArt 实际页面不符（`@publicSession` → `@@publicSession`），登录完成后首页不再始终判定“会话不可用”。
+- 会话身份判定同时解析 `isLoggedIn`：未登录立即判定匿名；已登录但用户名尚未渲染时保持“未验证”，不再误判。
+- 登录页自动关闭与个性化推荐自动恢复正常工作。
+- 新增基于生产页面真实结构的回归测试，并采纳永久工程规则：外部协议解析必须先对照实抓证据验证。
+
+- Fixed the home feed failing to load after a successful login (web-session verification read the wrong page key); `isLoggedIn` is now parsed so signed-out pages are anonymous immediately and pending identities stay unverified instead of being misjudged; login auto-close and feed auto-recovery work again, with regression tests built from the real page structure.
+
 ## 0.5.14
 
 - 修复 Android 已登录冷启动可能卡在“恢复登录”的问题：启动就绪有独立总时限并修复启动页路由循环，卡住时也能进入应用。
