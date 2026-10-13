@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.15](https://github.com/redtidev1918/DAViewer/compare/v0.5.14...v0.5.15) (2026-10-13)
+
+
+### Bug Fixes
+
+* read @[@public](https://github.com/public)Session with isLoggedIn for web-session verification ([364f7f0](https://github.com/redtidev1918/DAViewer/commit/364f7f0a2bdfef64f033bbab7c3c3aee3d7f8950))
+* read @[@public](https://github.com/public)Session with isLoggedIn for web-session verification ([ae1f2c9](https://github.com/redtidev1918/DAViewer/commit/ae1f2c924947100b23378b83b19f1b681bb8f8c8))
+
 ## [0.5.14](https://github.com/redtidev1918/DAViewer/compare/v0.5.13...v0.5.14) (2026-10-13)
 
 
