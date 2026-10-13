@@ -68,6 +68,7 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
 
   DateTime? _lastPointerScrollAt;
   bool _loadMoreArmed = true;
+  bool _userScrollActive = false;
 
   void _handlePointerSignal(PointerSignalEvent event) {
     if (event is PointerScrollEvent) {
@@ -81,7 +82,7 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
       OverscrollNotification(:final dragDetails) => dragDetails,
       _ => null,
     };
-    if (dragDetails != null) return true;
+    if (dragDetails != null || _userScrollActive) return true;
     final lastPointerScroll = _lastPointerScrollAt;
     return lastPointerScroll != null &&
         DateTime.now().difference(lastPointerScroll) <= _pointerScrollGrace;
@@ -96,17 +97,51 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
   @override
   void didUpdateWidget(covariant ArtworkFeedGrid oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!oldWidget.feed.hasMore && widget.feed.hasMore) {
+      _loadMoreArmed = true;
+    }
     if (oldWidget.feed.phase == FeedRequestPhase.paginating &&
         widget.feed.phase != FeedRequestPhase.paginating) {
-      _loadMoreArmed = true;
+      // No visible growth (empty/duplicate-only page) must not keep asking
+      // automatically in the same fling. Its new cursor remains available
+      // for the next gesture; item count never determines exhaustion.
+      _loadMoreArmed = widget.feed.items.length > oldWidget.feed.items.length;
     }
   }
 
   bool _maybeLoadMore(ScrollNotification notification) {
+    if (notification.depth != 0) return false;
+    if (notification is ScrollStartNotification) {
+      _userScrollActive = notification.dragDetails != null;
+      _loadMoreArmed = true;
+      return false;
+    }
+    if (notification is ScrollEndNotification) {
+      _userScrollActive = false;
+      // A skipped controller gate may never enter the paginating phase.
+      // The next gesture must still be allowed to ask, without a same-scroll loop.
+      _loadMoreArmed = true;
+      return false;
+    }
+    if (notification is! ScrollUpdateNotification &&
+        notification is! OverscrollNotification) {
+      return false;
+    }
+    final towardBottom = switch (notification) {
+      ScrollUpdateNotification(:final scrollDelta) => (scrollDelta ?? 0) > 0,
+      OverscrollNotification(:final overscroll) => overscroll > 0,
+      _ => false,
+    };
+    if (!towardBottom) return false;
     if (widget.onLoadMore == null) return false;
     if (!_isManualScroll(notification)) return false;
     if (widget.feed.isLoading ||
-        widget.feed.phase == FeedRequestPhase.paginating) {
+        widget.feed.phase == FeedRequestPhase.loading ||
+        widget.feed.phase == FeedRequestPhase.refreshing ||
+        widget.feed.phase == FeedRequestPhase.paginating ||
+        !widget.feed.hasMore ||
+        widget.feed.error != null ||
+        widget.feed.lastRefreshError != null) {
       return false;
     }
     final metrics = notification.metrics;
@@ -121,7 +156,10 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
     if (metrics.extentAfter <= _prefetchPixels || draggedPastBottom) {
       if (!_loadMoreArmed) return false;
       _loadMoreArmed = false;
-      AppLogger.instance.info('feed', 'pagination trigger');
+      AppLogger.instance.info(
+        'feed',
+        'pagination trigger stage=scroll_near_bottom extentAfter=${metrics.extentAfter.round()} cursorPresent=${widget.feed.hasMore}',
+      );
       widget.onLoadMore?.call();
     }
     return false;
@@ -162,75 +200,102 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
               (widget.feed.error != null ||
                   widget.feed.lastRefreshError != null) &&
               widget.feed.items.isNotEmpty);
-      body = MasonryGridView.count(
+      body = CustomScrollView(
         controller: widget.scrollController,
-        padding: const EdgeInsets.all(12),
         physics: const AlwaysScrollableScrollPhysics(),
-        crossAxisCount: crossAxisCount,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        itemCount: widget.feed.items.length + (showTrailing ? 1 : 0),
-        itemBuilder: (context, index) {
-          if (index >= widget.feed.items.length) {
-            if (widget.feed.isLoading) {
-              return const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: CircularProgressIndicator(),
-                ),
-              );
-            }
-            final onRetry = widget.feed.lastRefreshError != null
-                ? widget.onRefresh
-                : widget.onRetryLoadMore ?? widget.onLoadMore;
-            if (onRetry == null) return const SizedBox.shrink();
-            final savedAt = widget.feed.lastSuccessfulRefreshAt;
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Column(
-                  children: [
-                    Text(
-                      widget.errorMessage ??
-                          friendlyErrorMessage(
-                            widget.feed.lastRefreshError ?? widget.feed.error!,
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.all(12),
+            sliver: SliverMasonryGrid.count(
+              crossAxisCount: crossAxisCount,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childCount: widget.feed.items.length,
+              itemBuilder: (context, index) {
+                final artwork = widget.feed.items[index];
+                return ArtworkCard(
+                  artwork: artwork,
+                  onTap: () => openArtworkFromList(
+                    context,
+                    ref,
+                    artworks: widget.feed.items,
+                    artwork: artwork,
+                  ),
+                );
+              },
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Builder(
+              builder: (context) {
+                if (showTrailing) {
+                  if (widget.feed.isLoading) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+                  final onRetry = widget.feed.lastRefreshError != null
+                      ? widget.onRefresh
+                      : widget.onRetryLoadMore ?? widget.onLoadMore;
+                  if (onRetry == null) return const SizedBox.shrink();
+                  final savedAt = widget.feed.lastSuccessfulRefreshAt;
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Column(
+                        children: [
+                          Text(
+                            widget.errorMessage ??
+                                friendlyErrorMessage(
+                                  widget.feed.lastRefreshError ??
+                                      widget.feed.error!,
+                                ),
+                            textAlign: TextAlign.center,
                           ),
+                          if (savedAt != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                strings(ref.watch(appLanguageProvider))
+                                    .feedLastUpdated(_formatSavedAt(savedAt)),
+                                style: Theme.of(context).textTheme.bodySmall,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          const SizedBox(height: 8),
+                          FilledButton.tonalIcon(
+                            onPressed: onRetry,
+                            icon: const Icon(Icons.refresh),
+                            label: Text(
+                              strings(ref.watch(appLanguageProvider)).retry,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                if (!widget.feed.hasMore && widget.onLoadMore != null) {
+                  final s = strings(ref.watch(appLanguageProvider));
+                  return Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      widget.feed.paginationStatus ==
+                              FeedPaginationStatus.exhausted
+                          ? s.feedEnd
+                          : s.feedPaginationUnknown,
                       textAlign: TextAlign.center,
                     ),
-                    if (savedAt != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          strings(ref.watch(appLanguageProvider))
-                              .feedLastUpdated(_formatSavedAt(savedAt)),
-                          style: Theme.of(context).textTheme.bodySmall,
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    const SizedBox(height: 8),
-                    FilledButton.tonalIcon(
-                      onPressed: onRetry,
-                      icon: const Icon(Icons.refresh),
-                      label: Text(
-                        strings(ref.watch(appLanguageProvider)).retry,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-          final artwork = widget.feed.items[index];
-          return ArtworkCard(
-            artwork: artwork,
-            onTap: () => openArtworkFromList(
-              context,
-              ref,
-              artworks: widget.feed.items,
-              artwork: artwork,
+                  );
+                }
+                return const SizedBox(height: 16);
+              },
             ),
-          );
-        },
+          ),
+        ],
       );
     }
 

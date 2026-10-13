@@ -181,6 +181,11 @@ final class AppStrings {
   String get noResults =>
       _lang == AppLanguage.zh ? '无搜索结果' : 'No results found.';
   String get retry => _lang == AppLanguage.zh ? '重试' : 'Retry';
+  String get feedEnd =>
+      _lang == AppLanguage.zh ? '已加载全部内容' : 'All available items loaded';
+  String get feedPaginationUnknown => _lang == AppLanguage.zh
+      ? '暂无法确认后续页面，请刷新重试'
+      : 'Further pages could not be confirmed. Refresh to retry.';
   String get refresh => _lang == AppLanguage.zh ? '刷新' : 'Refresh';
   String get done => _lang == AppLanguage.zh ? '完成' : 'Done';
   String get pause => _lang == AppLanguage.zh ? '暂停' : 'Pause';

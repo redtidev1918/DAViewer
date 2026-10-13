@@ -176,6 +176,40 @@ void main() {
     expect(calls, 0);
   });
 
+  testWidgets('Android fling reaches pagination zone only during inertia', (
+    tester,
+  ) async {
+    var calls = 0;
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: ThemeData(platform: TargetPlatform.android),
+          home: Scaffold(
+            body: ArtworkFeedGrid(
+              feed: longFeed(),
+              emptyMessage: 'Empty',
+              scrollController: controller,
+              onLoadMore: () => calls++,
+            ),
+          ),
+        ),
+      ),
+    );
+    controller.jumpTo(controller.position.maxScrollExtent - 900);
+    await tester.pump();
+    await tester.fling(
+      find.byType(ArtworkFeedGrid),
+      const Offset(0, -200),
+      5000,
+    );
+    expect(calls, 0, reason: 'Direct drag ends outside the prefetch zone');
+    await tester.pumpAndSettle();
+    expect(controller.position.extentAfter, lessThan(400));
+    expect(calls, 1);
+  });
+
   testWidgets('trackpad scroll near the bottom loads next page', (
     tester,
   ) async {
@@ -318,6 +352,69 @@ void main() {
 
     expect(calls, 0);
   });
+
+  testWidgets('a skipped pagination ask unlocks on the next gesture', (
+    tester,
+  ) async {
+    var asks = 0;
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: ArtworkFeedGrid(
+              feed: longFeed(),
+              emptyMessage: 'Empty',
+              scrollController: controller,
+              onLoadMore: () => asks++,
+            ),
+          ),
+        ),
+      ),
+    );
+    controller.jumpTo(controller.position.maxScrollExtent);
+    await tester.pump();
+    await tester.drag(find.byType(ArtworkFeedGrid), const Offset(0, -80));
+    await tester.pumpAndSettle();
+    expect(asks, 1);
+    // Simulate a gate skipping the ask: no loading state or widget rebuild.
+    await tester.drag(find.byType(ArtworkFeedGrid), const Offset(0, -80));
+    await tester.pumpAndSettle();
+    expect(asks, 2);
+  });
+
+  testWidgets(
+    'pagination spinner occupies a full-width footer after the masonry',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: ArtworkFeedGrid(
+                feed: ArtworkFeedState(
+                  items: [artwork(0)],
+                  nextCursor: 'next',
+                  isLoading: true,
+                  phase: FeedRequestPhase.paginating,
+                ),
+                emptyMessage: 'Empty',
+              ),
+            ),
+          ),
+        ),
+      );
+      final footer = find.byType(SliverToBoxAdapter);
+      expect(footer, findsOneWidget);
+      expect(
+        tester
+            .getSize(find.descendant(of: footer, matching: find.byType(Center)))
+            .width,
+        tester.getSize(find.byType(ArtworkFeedGrid)).width,
+      );
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    },
+  );
 
   testWidgets('a drag at the exact bottom asks for the next page', (
     tester,
@@ -505,4 +602,41 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'pulling upward in the pagination zone refreshes without loading more',
+    (tester) async {
+      var pages = 0;
+      var refreshes = 0;
+      final scroll = ScrollController();
+      addTearDown(scroll.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: ArtworkFeedGrid(
+                feed: ArtworkFeedState(
+                  items: [for (var i = 0; i < 8; i++) artwork(i)],
+                  nextCursor: 'next',
+                ),
+                emptyMessage: 'Empty',
+                scrollController: scroll,
+                onLoadMore: () => pages++,
+                onRefresh: () async {
+                  refreshes++;
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      scroll.jumpTo(200);
+      await tester.pump();
+      expect(scroll.position.extentAfter, lessThan(400));
+      await tester.drag(find.byType(ArtworkFeedGrid), const Offset(0, 600));
+      await tester.pumpAndSettle();
+      expect(refreshes, 1);
+      expect(pages, 0);
+    },
+  );
 }

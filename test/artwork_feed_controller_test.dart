@@ -94,6 +94,104 @@ void main() {
     expect(controller.state.isLoading, isFalse);
   });
 
+  test(
+    'short pages append through three pages using opaque server cursors',
+    () async {
+      final cursors = <String?>[];
+      final controller = ArtworkFeedController((request) async {
+        cursors.add(request.cursor);
+        switch (request.cursor) {
+          case null:
+            return Page(
+              items: [artwork(1)],
+              hasMore: true,
+              nextCursor: 'opaque-a',
+            );
+          case 'opaque-a':
+            return Page(
+              items: [artwork(1), artwork(2)],
+              hasMore: true,
+              nextCursor: 'opaque-b',
+            );
+          default:
+            return Page(items: [artwork(3)], hasMore: false);
+        }
+      }, autoLoad: false);
+      addTearDown(controller.dispose);
+      await controller.refresh();
+      await controller.loadMore();
+      await controller.loadMore();
+      await controller.loadMore();
+      expect(cursors, [null, 'opaque-a', 'opaque-b']);
+      expect(controller.state.items.map((item) => item.id), [
+        'art-1',
+        'art-2',
+        'art-3',
+      ]);
+      expect(controller.state.paginationStatus, FeedPaginationStatus.exhausted);
+    },
+  );
+
+  test('cursor cycle is an error and explicit retry can recover without losing cards', () async {
+    var calls = 0;
+    final controller = ArtworkFeedController((request) async {
+      calls++;
+      return Page(
+        items: [artwork(calls)],
+        hasMore: calls < 4,
+        nextCursor: calls == 1
+            ? 'a'
+            : calls == 2
+            ? 'b'
+            : calls == 3
+            ? 'a'
+            : null,
+      );
+    }, autoLoad: false);
+    addTearDown(controller.dispose);
+    await controller.refresh();
+    await controller.loadMore();
+    await controller.loadMore();
+    expect(controller.state.paginationStatus, FeedPaginationStatus.failed);
+    expect(controller.state.items, hasLength(3));
+    await controller.loadMore();
+    expect(calls, 3, reason: 'Backoff prevents repeated automatic asks');
+    await controller.retryLoadMore();
+    expect(calls, 4);
+    expect(controller.state.items, hasLength(4));
+    expect(controller.state.paginationStatus, FeedPaginationStatus.exhausted);
+  });
+
+  test('empty continuing page retains the server cursor rather than inventing an end', () async {
+    final controller = ArtworkFeedController(
+      (request) async => request.cursor == null
+          ? Page(items: [artwork(1)], hasMore: true, nextCursor: 'a')
+          : const Page(items: <Artwork>[], hasMore: true, nextCursor: 'b'),
+      autoLoad: false,
+    );
+    addTearDown(controller.dispose);
+    await controller.refresh();
+    await controller.loadMore();
+    expect(controller.state.items, hasLength(1));
+    expect(controller.state.paginationStatus, FeedPaginationStatus.hasMore);
+    expect(controller.state.nextCursor, 'b');
+  });
+
+  test('empty terminal page ends according to server flag', () async {
+    final controller = ArtworkFeedController(
+      (request) async => request.cursor == null
+          ? Page(items: [artwork(1)], hasMore: true, nextCursor: 'a')
+          : const Page(items: <Artwork>[], hasMore: false),
+      autoLoad: false,
+    );
+    addTearDown(controller.dispose);
+    await controller.refresh();
+    await controller.loadMore();
+    expect(controller.state.items, hasLength(1));
+    expect(controller.state.paginationStatus, FeedPaginationStatus.exhausted);
+    expect(controller.state.error, isNull);
+  });
+
   test('refreshSilently keeps items when the re-fetch fails', () async {
     var calls = 0;
     final controller = ArtworkFeedController((request) async {
@@ -180,25 +278,27 @@ void main() {
     });
   }
 
-  test(
-    'overlapping pages deduplicate works and a repeated cursor stops',
-    () async {
-      final controller = ArtworkFeedController((request) async {
-        return Page<Artwork>(
-          items: request.cursor == null
-              ? [artwork(1), artwork(1)]
-              : [artwork(1), artwork(2)],
-          hasMore: true,
-          nextCursor: 'same',
-        );
-      }, autoLoad: false);
-      addTearDown(controller.dispose);
-      await controller.refresh();
-      await controller.loadMore();
-      expect(controller.state.items.map((item) => item.id), ['art-1', 'art-2']);
-      expect(controller.state.hasMore, isFalse);
-    },
-  );
+  test('overlapping pages deduplicate works and a repeated cursor is retryable failure', () async {
+    final controller = ArtworkFeedController((request) async {
+      return Page<Artwork>(
+        items: request.cursor == null
+            ? [artwork(1), artwork(1)]
+            : [artwork(1), artwork(2)],
+        hasMore: true,
+        nextCursor: 'same',
+      );
+    }, autoLoad: false);
+    addTearDown(controller.dispose);
+    await controller.refresh();
+    await controller.loadMore();
+    expect(controller.state.items.map((item) => item.id), ['art-1', 'art-2']);
+    expect(controller.state.hasMore, isTrue);
+    expect(controller.state.paginationStatus, FeedPaginationStatus.failed);
+    expect(
+      (controller.state.error as DAKitException).code,
+      'feed.pagination.invalid_progress',
+    );
+  });
 
   test(
     'a refreshed feed cannot join an old request for the same cursor',
