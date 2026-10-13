@@ -273,7 +273,9 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     if (observed == null) return _isCurrent(generation);
     final live = await _ref.read(webSessionProvider).cookieHeader();
     if (!_isCurrent(generation)) return false;
-    if (live.isNotEmpty && cookieHeaderFingerprint(live) == observed) {
+    if ((live.isNotEmpty ||
+            probe.outcome == WebSessionProbeOutcome.anonymous) &&
+        cookieHeaderFingerprint(live) == observed) {
       return true;
     }
     _setTransient(

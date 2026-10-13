@@ -4,6 +4,23 @@ import 'package:daviewer/core/auth/web_session_diagnostics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('empty credentials cannot confirm identity but retain explicit anonymous evidence', () async {
+    for (final loggedIn in [true, false]) {
+      final evidence = await readBrowserEvidenceWithCredentials(
+        cookieHeader: () async => '',
+        readPage: () async => BrowserSessionEvidence(
+          username: loggedIn ? 'artist' : 'anonymous',
+          loggedIn: loggedIn,
+          initialized: true,
+        ),
+      );
+      expect(evidence.hasIdentity, !loggedIn);
+      expect(
+        evidence.credentialFingerprint,
+        loggedIn ? isNull : cookieHeaderFingerprint(''),
+      );
+    }
+  });
   test('page sampling binds identity to stable native credentials in the same transaction', () async {
     final evidence = await readBrowserEvidenceWithCredentials(
       cookieHeader: () async => 'auth=stable',

@@ -121,7 +121,12 @@ Future<BrowserSessionEvidence> readBrowserEvidenceWithCredentials({
   final before = await cookieHeader();
   final page = await readPage();
   final after = await cookieHeader();
-  if (before.isEmpty || before != after) return const BrowserSessionEvidence();
+  final explicitlyAnonymous =
+      page.initialized &&
+      (page.loggedIn == false || page.username == 'anonymous');
+  if (before != after || (before.isEmpty && !explicitlyAnonymous)) {
+    return const BrowserSessionEvidence();
+  }
   return BrowserSessionEvidence(
     username: page.username,
     loggedIn: page.loggedIn,
