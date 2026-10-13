@@ -70,6 +70,14 @@ Domain Page doubles test scheduling only, not private protocol authenticity.
 
 ## Android acceptance: PENDING
 
+Published as v0.5.17, source `360fce097dcca8619650e3c61e762a68ab5e1cf8`:
+PR #108 (repair) and #109 (version) merged after checks. Official APK signature
+matches v0.5.16, package app.daviewer, versionCode 229; SHA256
+`295a47614f7fd8d097520325f9de5eb9801c06930ae395ca4f154506f73ffad9`.
+Release and download-page/Pages workflows completed successfully.
+Watched uses the same grid/controller without recommendation cache hydration;
+the premature cursorless preview state is specific to the recommendation path.
+
 No device is currently attached. Original reported pagination failure is not
 marked resolved on-device. On a retained-data upgrade: scroll cached content
 before live response, then continue scrolling after it; observe automatic second
