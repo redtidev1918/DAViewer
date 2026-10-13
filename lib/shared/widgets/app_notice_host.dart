@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/web_session_status.dart';
-import '../../core/auth/personalized_session_status.dart';
 import '../../core/diagnostics/app_logger.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/notice/app_notices.dart';
@@ -54,27 +53,20 @@ final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
   Widget build(BuildContext context) {
     final notice = ref.watch(appNoticeControllerProvider).current;
     final session = ref.watch(webSessionStatusProvider);
-    final personalizedSession = ref.watch(personalizedSessionStatusProvider);
     final dismissedNoticeIds = ref.watch(webSessionNoticeDismissalProvider);
     final s = strings(ref.watch(appLanguageProvider));
 
-    final sessionNotice =
-        _sessionNotice(session, s) ??
-        (personalizedSession.needsRecovery
-            ? AppNotice(
-                id: 'personalized-session-degraded',
-                message: s.recommendedSessionDegraded,
-                actionLabel: s.login,
-                action: _openWebLogin,
-              )
-            : null);
+    // Recommendation-capability degradation (personalizedSessionStatus) is
+    // deliberately NOT a host notice: it is labeled directly on the home
+    // recommendations tab, attached to the content it qualifies, with retry
+    // and dismissal there (P0-B, 2026-10-13).
+    final sessionNotice = _sessionNotice(session, s);
     if (sessionNotice != null && !_loginNoticeLogged) {
       _loginNoticeLogged = true;
       AppLogger.instance.warning(
         'notice',
-        'web-session login notice shown '
-            'state=${session.state.name} '
-            'source=${session.needsLogin ? 'verdict-chain' : 'rfy-response'}',
+        'web-session login notice shown state=${session.state.name} '
+            'source=verdict-chain',
       );
     } else if (sessionNotice == null) {
       _loginNoticeLogged = false;

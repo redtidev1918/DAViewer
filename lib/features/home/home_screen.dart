@@ -18,6 +18,7 @@ import '../../shared/widgets/skeleton.dart';
 import '../notifications/notifications_providers.dart';
 import 'home_feeds.dart';
 import 'home_providers.dart';
+import 'recommended_degraded_banner.dart';
 import 'update_banner.dart';
 
 /// Native home: two tabs, all rendered with the native feed UI.
@@ -245,12 +246,12 @@ final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
         (status) => status.needsRecovery,
       ),
     );
-    if (webSessionDead || recommendationDegraded) {
+    if (webSessionDead) {
       if (!_recoveryUiLogged) {
         _recoveryUiLogged = true;
         AppLogger.instance.warning(
           'home',
-          'recovery UI shown status=${webSessionDead ? 'needs-login' : 'recommendation-degraded'} '
+          'recovery UI shown status=needs-login '
               'claimed=${ref.read(webSessionControllerProvider).username}',
         );
       }
@@ -260,22 +261,12 @@ final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Text(
-                webSessionDead
-                    ? s.recommendedSignInHint
-                    : s.recommendedSessionDegraded,
-                textAlign: TextAlign.center,
-              ),
+              Text(s.recommendedSignInHint, textAlign: TextAlign.center),
               const SizedBox(height: 12),
               FilledButton(
                 onPressed: () => context.push('/web-login'),
                 child: Text(s.login),
               ),
-              if (!webSessionDead)
-                TextButton(
-                  onPressed: () => unawaited(_refreshFeed()),
-                  child: Text(s.retry),
-                ),
             ],
           ),
         ),
@@ -290,7 +281,12 @@ final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
         feed.error is DAKitException &&
         (feed.error! as DAKitException).code == 'rfy.session.unverified';
 
-    return ArtworkFeedGrid(
+    // Recommendation capability is separate from website identity: while the
+    // web session is healthy, a suspected-generic fallback batch is still
+    // displayed (never cached as personalized), clearly labeled by the
+    // banner below with a retry — it must not present itself as a login
+    // problem (P0-B, REG-022).
+    Widget content = ArtworkFeedGrid(
       scrollController: _scrollController,
       feed: feed,
       emptyMessage: s.noRecommendations,
@@ -310,6 +306,15 @@ final class PersonalizedFeedState extends ConsumerState<PersonalizedFeed>
           ? () => context.push('/web-login')
           : null,
     );
+    if (recommendationDegraded) {
+      content = Column(
+        children: <Widget>[
+          RecommendedDegradedBanner(onRetry: _refreshFeed),
+          Expanded(child: content),
+        ],
+      );
+    }
+    return content;
   }
 }
 

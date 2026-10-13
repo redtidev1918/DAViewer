@@ -1,71 +1,91 @@
 import 'package:daviewer/core/auth/web_session_status.dart';
 import 'package:daviewer/core/auth/personalized_session_status.dart';
+import 'package:daviewer/features/home/recommended_degraded_banner.dart';
 import 'package:daviewer/shared/widgets/app_notice_host.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('degraded recommendations prompt without a global logout', (
-    tester,
-  ) async {
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-    final identity = container.read(webSessionStatusProvider.notifier);
-    identity.markHealthy(serverUsername: 'artist');
-    final recommendations = container.read(
-      personalizedSessionStatusProvider.notifier,
-    );
-    recommendations.observe(
-      cookieHeader: 'fake=session',
-      degraded: true,
-      generation: identity.generation,
-    );
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const MaterialApp(home: Scaffold(body: AppNoticeHost())),
-      ),
-    );
-    await tester.pump();
-    expect(find.textContaining('通用内容'), findsOneWidget);
-    expect(container.read(webSessionStatusProvider).needsLogin, isFalse);
-    await tester.tap(find.byIcon(Icons.close));
-    await tester.pump();
+  testWidgets(
+    'degraded recommendations label on the tab, not a logout notice',
+    (tester) async {
+      var retries = 0;
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final identity = container.read(webSessionStatusProvider.notifier);
+      identity.markHealthy(serverUsername: 'artist');
+      final recommendations = container.read(
+        personalizedSessionStatusProvider.notifier,
+      );
+      recommendations.observe(
+        cookieHeader: 'fake=session',
+        degraded: true,
+        generation: identity.generation,
+      );
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: Scaffold(
+              body: Column(
+                children: <Widget>[
+                  RecommendedDegradedBanner(onRetry: () async => retries += 1),
+                  const Expanded(child: SizedBox.shrink()),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      // The degraded label is attached to the content it qualifies (P0-B,
+      // REG-022): it states the account is signed in and the items are not
+      // confirmed personalized, and offers a retry — never a login CTA.
+      expect(find.textContaining('通用内容'), findsOneWidget);
+      expect(find.textContaining('账号已登录'), findsOneWidget);
+      expect(find.text('重试'), findsOneWidget);
+      expect(container.read(webSessionStatusProvider).needsLogin, isFalse);
+      await tester.tap(find.text('重试'));
+      await tester.pump();
+      expect(retries, 1);
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pump();
 
-    identity.state = const WebSessionStatus(
-      state: WebSessionStatusState.healthy,
-      serverUsername: 'artist',
-    );
-    await tester.pump();
-    expect(find.textContaining('通用内容'), findsNothing);
-    expect(
-      container.read(personalizedSessionStatusProvider).needsRecovery,
-      isTrue,
-    );
+      identity.state = const WebSessionStatus(
+        state: WebSessionStatusState.healthy,
+        serverUsername: 'artist',
+      );
+      await tester.pump();
+      expect(find.textContaining('通用内容'), findsNothing);
+      expect(
+        container.read(personalizedSessionStatusProvider).needsRecovery,
+        isTrue,
+      );
 
-    // A transient identity probe recovering is the same recommendation incident.
-    identity.state = const WebSessionStatus(
-      state: WebSessionStatusState.unverified,
-    );
-    await tester.pump();
-    identity.state = const WebSessionStatus(
-      state: WebSessionStatusState.healthy,
-      serverUsername: 'artist',
-    );
-    await tester.pump();
-    expect(find.textContaining('通用内容'), findsNothing);
+      // A transient identity probe recovering is the same recommendation incident.
+      identity.state = const WebSessionStatus(
+        state: WebSessionStatusState.unverified,
+      );
+      await tester.pump();
+      identity.state = const WebSessionStatus(
+        state: WebSessionStatusState.healthy,
+        serverUsername: 'artist',
+      );
+      await tester.pump();
+      expect(find.textContaining('通用内容'), findsNothing);
 
-    identity.markHealthy(serverUsername: 'artist');
-    await tester.pump();
-    recommendations.observe(
-      cookieHeader: 'fake=new-session',
-      degraded: true,
-      generation: identity.generation,
-    );
-    await tester.pump();
-    expect(find.textContaining('通用内容'), findsOneWidget);
-  });
+      identity.markHealthy(serverUsername: 'artist');
+      await tester.pump();
+      recommendations.observe(
+        cookieHeader: 'fake=new-session',
+        degraded: true,
+        generation: identity.generation,
+      );
+      await tester.pump();
+      expect(find.textContaining('通用内容'), findsOneWidget);
+    },
+  );
 
   testWidgets('dismissal survives route replacement but resets offscreen', (
     tester,

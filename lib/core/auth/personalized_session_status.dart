@@ -77,6 +77,10 @@ final class PersonalizedSessionController
 /// REG-009 recorded group 2 in generic fallback responses. Treat it as a
 /// degradation signal, not a universal definition of DeviantArt's algorithm or
 /// evidence of logout. Unknown/malformed cursors supply no such evidence.
+///
+/// UNVERIFIED (2026-10-13): a server-confirmed signed-in session (healthy
+/// verdict + bareProbe `classification=signedIn`) also received a group-2
+/// cursor, so group 2 cannot alone prove the response is anonymous-generic.
 bool rfyCursorSignalsGenericFallback(String? cursor) {
   if (cursor == null || cursor.isEmpty || cursor.length > 8192) return false;
   try {
@@ -86,5 +90,24 @@ bool rfyCursorSignalsGenericFallback(String? cursor) {
     return value is Map && value['vespa_content_group'] == 2;
   } on Object {
     return false;
+  }
+}
+
+/// Sanitized cursor structure for production protocol evidence: the JSON key
+/// names (sorted) and the numeric group value only. Cursor values may carry
+/// session identifiers, so they are never logged — this is what future
+/// real-session comparisons can be built from without exposing credentials.
+String? rfyCursorStructureTrace(String? cursor) {
+  if (cursor == null || cursor.isEmpty || cursor.length > 8192) return null;
+  try {
+    final value = jsonDecode(
+      utf8.decode(base64Url.decode(base64Url.normalize(cursor))),
+    );
+    if (value is! Map) return 'shape=${value.runtimeType}';
+    final keys = value.keys.whereType<String>().toList()..sort();
+    final group = value['vespa_content_group'];
+    return 'keys=${keys.join('|')} group=$group';
+  } on Object {
+    return null;
   }
 }

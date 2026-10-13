@@ -187,45 +187,44 @@ void main() {
     return container;
   }
 
-  test(
-    'generic signal is rejected even when identity verification succeeds',
-    () async {
-      final rfy = _RfyAdapter()
-        ..nextCursor = base64Url.encode(
-          utf8.encode(jsonEncode({'vespa_content_group': 2})),
-        );
-      final container = feedContainer(rfy, _HomeProbeAdapter());
-      await container.read(personalizedFeedProvider.notifier).refresh();
+  test('suspected generic fallback is displayed with a degraded incident, never as confirmed personalized', () async {
+    final rfy = _RfyAdapter()
+      ..nextCursor = base64Url.encode(
+        utf8.encode(jsonEncode({'vespa_content_group': 2})),
+      );
+    final container = feedContainer(rfy, _HomeProbeAdapter());
+    await container.read(personalizedFeedProvider.notifier).refresh();
 
-      expect(container.read(webSessionStatusProvider).isHealthy, isTrue);
-      expect(
-        container.read(personalizedSessionStatusProvider).needsRecovery,
-        isTrue,
-      );
-      expect(container.read(personalizedFeedProvider).items, isEmpty);
-      expect(container.read(artworkStoreProvider)['12345'], isNull);
-      expect(
-        (container.read(personalizedFeedProvider).error as DAKitException).code,
-        'rfy.session.degraded',
-      );
+    expect(container.read(webSessionStatusProvider).isHealthy, isTrue);
+    expect(
+      container.read(personalizedSessionStatusProvider).needsRecovery,
+      isTrue,
+    );
+    // P0-B (2026-10-13): the batch stays usable under the degraded label
+    // instead of leaving an empty tab, but it is not a confirmed
+    // personalized result and must not surface as a login problem.
+    expect(container.read(personalizedFeedProvider).items, hasLength(1));
+    expect(container.read(artworkStoreProvider)['12345'], isNotNull);
+    expect(container.read(personalizedFeedProvider).error, isNull);
 
-      // An explicit recovery supersedes the incident and retries the same feed.
-      container
-          .read(webSessionStatusProvider.notifier)
-          .markHealthy(serverUsername: 'artist');
-      expect(
-        container.read(personalizedSessionStatusProvider).needsRecovery,
-        isFalse,
-      );
-      rfy.nextCursor = null;
-      await container.read(personalizedFeedProvider.notifier).refresh();
-      expect(container.read(personalizedFeedProvider).items, hasLength(1));
-      expect(
-        container.read(personalizedSessionStatusProvider).phase,
-        PersonalizedSessionPhase.usable,
-      );
-    },
-  );
+    // An explicit recovery supersedes the incident and retries the same feed.
+    container
+        .read(webSessionStatusProvider.notifier)
+        .markHealthy(serverUsername: 'artist');
+    expect(
+      container.read(personalizedSessionStatusProvider).needsRecovery,
+      isFalse,
+    );
+    rfy.nextCursor = null;
+    // The user retry path is forceRefresh (pull-to-refresh/banner retry);
+    // the idempotent refresh() would skip the still-valid session context.
+    await container.read(personalizedFeedProvider.notifier).forceRefresh();
+    expect(container.read(personalizedFeedProvider).items, hasLength(1));
+    expect(
+      container.read(personalizedSessionStatusProvider).phase,
+      PersonalizedSessionPhase.usable,
+    );
+  });
 
   test(
     'account change while waiting on Cookie read sends no obsolete transport',
