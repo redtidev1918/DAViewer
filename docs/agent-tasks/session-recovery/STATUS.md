@@ -1,6 +1,49 @@
 # DAViewer P0 session recovery — durable checkpoint
 
-## 2026-10-13 current checkpoint (supersedes historical entries below)
+## 2026-10-13 v0.5.14 published (supersedes all entries below)
+
+Formal release completed under the 2026-10-13 user decision (original-phone
+acceptance no longer a gate; Original Incident stays PENDING and disclosed).
+
+- Merge chain: PR #97 (SDK integration docs/gate removal) merged into
+  `codex/android-session-recovery` as `ad776de`; PR #96 → main `8ddf041`;
+  PR #98 (Chinese release notes) → main `afd63f4`; release-please version
+  PR #99 → main `111e2a9` (pubspec/manifest/CHANGELOG → 0.5.14).
+- release-please quirk fixed: PR #99's branch was generated from `8ddf041`
+  (before the notes PR merged), so CI's Chinese-notes check failed on `e2910a3`
+  ("missing Chinese release notes: .github/release-notes/0.5.14.md") and
+  release-please does not refresh its branch for docs-only commits. Fixed by
+  rebasing the release branch onto `afd63f4` and force-pushing (`22f0941`);
+  all four required checks (branch-contract, Analyze and test, quality,
+  build-plan) then passed and #99 merged.
+- Release run 38344813017 SUCCESS: release-please, build-plan, build on
+  windows-2022/macos-latest/ubuntu-latest, finalize. Tag `v0.5.14`
+  (annotated `9c27bb0`, target `111e2a9`); release published
+  2026-10-13T04:19:26Z.
+- Assets (SHA256): DAViewer-v0.5.14.apk
+  `8ff75caf7379619f1f1801e5c85112653edd205de2258e61747e45020b58bdb0`
+  (67,445,342 B); DAViewer-v0.5.14-windows.zip
+  `01a4448ecd1ba90730fdc129a37e1ab15c9426c395ccf4b217ed4443b27653be`
+  (14,604,847 B); DAViewer-v0.5.14-macos-unsigned-preview.zip
+  `879ce5c2e8e188d6e88760005899f42859556c305496d297a9f84f425a3056f4`
+  (25,385,742 B); plus SHA256SUMS and RELEASE-METADATA.json on the release.
+- Download page regenerated (run 38345921638, commit `f58fe6b` "docs:
+  refresh download page (v0.5.14)") and Pages deployed (run 38345937074).
+- Gate status after publication: Code Verified PASS (488 app tests, joint CI
+  38340996817, standard CI on merged heads); Release Verified PASS (this
+  entry, artifacts verified above); Android Verified: automated emulator
+  negative-path PASS on candidates d4f1d7e/43fe8bf, real retained-account
+  phone verification NOT performed (gate removed by user 2026-10-13);
+  Original Incident Verified: PENDING — needs real retained-account Android
+  evidence; publication was not blocked per explicit user instruction.
+- Local checkouts synced: `D:\Code\DAViewer` on main `f58fe6b`; worktree
+  `C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer` on
+  `codex/daviewer-sdk-integration` @ `8e73712` (fully merged via #97).
+- Remaining: nothing actionable by agent. Optional real-device evidence from
+  the user would close Original Incident Verified; AGENTS task pointers stay
+  until completion per the archive rule.
+
+## 2026-10-13 current checkpoint (superseded by publication entry above)
 
 LATEST USER DECISION: original-phone acceptance is no longer a merge/release gate.
 Proceed with integration, main merge, ReleaseGraph version PR and formal release
