@@ -599,11 +599,11 @@ final class _WebLoginScreenState extends ConsumerState<WebLoginScreen> {
                                 ),
                                 getHtml: controller.getHtml,
                               ),
-                              onEvidence: (page) {
+                              onEvidence: (page, navigationSequence) {
                                 if (!mounted) return;
                                 AppLogger.instance.info(
                                   'webview',
-                                  'browser recoveryId=${_sessionStatus.recoveryId} host=visible classification=${page.classification} identitySource=${page.identitySource} csrfPresent=${page.csrf.isNotEmpty}',
+                                  'browser recoveryId=${_sessionStatus.recoveryId} host=visible classification=${page.classification} identitySource=${page.identitySource} csrfPresent=${page.csrf.isNotEmpty} navSeq=$navigationSequence',
                                 );
                                 if (page.blocked) {
                                   _sessionStatus.markLocked();

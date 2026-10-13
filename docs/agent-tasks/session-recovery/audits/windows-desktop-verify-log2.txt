@@ -1,0 +1,57 @@
+=== Windows release build retry (toolset 14.44 + /utf-8 + revision pin) ===
+started: 2026-10-12T20:50:44.1903717+08:00
+python: Python 3.14.7
+Building Windows application...                                 
+Nuget is not installed! The flutter_inappwebview_windows plugin requires it. Check https://inappwebview.dev/docs/intro#setup-windows
+CMake Warning (dev) at flutter/ephemeral/.plugin_symlinks/flutter_inappwebview_windows/windows/CMakeLists.txt:31 (add_custom_command):
+  The following keywords are not supported when using
+  add_custom_command(TARGET): DEPENDS.
+
+  Policy CMP0175 is not set: add_custom_command() rejects invalid arguments.
+  Run "cmake --help-policy CMP0175" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+D:\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppCommon.targets(156,5): error MSB3073: 命令“setlocal [C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\plugins\flutter_inappwebview_windows\flutter_inappwebview_windows_DEPENDENCIES_DOWNLOAD.vcxproj]
+D:\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppCommon.targets(156,5): error MSB3073: NUGET-NOTFOUND install Microsoft.Windows.ImplementationLibrary -Version 1.0.231216.1 -ExcludeVersion -OutputDirectory C:/Users/12629/.codex/worktrees/daviewer-sdk-integration/DAViewer/build/windows/x64/packages [C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\plugins\flutter_inappwebview_windows\flutter_inappwebview_windows_DEPENDENCIES_DOWNLOAD.vcxproj]
+D:\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppCommon.targets(156,5): error MSB3073: if %errorlevel% neq 0 goto :cmEnd [C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\plugins\flutter_inappwebview_windows\flutter_inappwebview_windows_DEPENDENCIES_DOWNLOAD.vcxproj]
+D:\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppCommon.targets(156,5): error MSB3073: NUGET-NOTFOUND install Microsoft.Web.WebView2 -Version 1.0.2792.45 -ExcludeVersion -OutputDirectory C:/Users/12629/.codex/worktrees/daviewer-sdk-integration/DAViewer/build/windows/x64/packages [C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\plugins\flutter_inappwebview_windows\flutter_inappwebview_windows_DEPENDENCIES_DOWNLOAD.vcxproj]
+D:\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppCommon.targets(156,5): error MSB3073: if %errorlevel% neq 0 goto :cmEnd [C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\plugins\flutter_inappwebview_windows\flutter_inappwebview_windows_DEPENDENCIES_DOWNLOAD.vcxproj]
+D:\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppCommon.targets(156,5): error MSB3073: NUGET-NOTFOUND install nlohmann.json -Version 3.11.2 -ExcludeVersion -OutputDirectory C:/Users/12629/.codex/worktrees/daviewer-sdk-integration/DAViewer/build/windows/x64/packages [C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\plugins\flutter_inappwebview_windows\flutter_inappwebview_windows_DEPENDENCIES_DOWNLOAD.vcxproj]
+D:\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppCommon.targets(156,5): error MSB3073: if %errorlevel% neq 0 goto :cmEnd [C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\plugins\flutter_inappwebview_windows\flutter_inappwebview_windows_DEPENDENCIES_DOWNLOAD.vcxproj]
+D:\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppCommon.targets(156,5): error MSB3073: :cmEnd [C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\plugins\flutter_inappwebview_windows\flutter_inappwebview_windows_DEPENDENCIES_DOWNLOAD.vcxproj]
+D:\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppCommon.targets(156,5): error MSB3073: endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone [C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\plugins\flutter_inappwebview_windows\flutter_inappwebview_windows_DEPENDENCIES_DOWNLOAD.vcxproj]
+D:\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppCommon.targets(156,5): error MSB3073: :cmErrorLevel [C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\plugins\flutter_inappwebview_windows\flutter_inappwebview_windows_DEPENDENCIES_DOWNLOAD.vcxproj]
+D:\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppCommon.targets(156,5): error MSB3073: exit /b %1 [C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\plugins\flutter_inappwebview_windows\flutter_inappwebview_windows_DEPENDENCIES_DOWNLOAD.vcxproj]
+D:\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppCommon.targets(156,5): error MSB3073: :cmDone [C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\plugins\flutter_inappwebview_windows\flutter_inappwebview_windows_DEPENDENCIES_DOWNLOAD.vcxproj]
+D:\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppCommon.targets(156,5): error MSB3073: if %errorlevel% neq 0 goto :VCEnd [C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\plugins\flutter_inappwebview_windows\flutter_inappwebview_windows_DEPENDENCIES_DOWNLOAD.vcxproj]
+D:\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppCommon.targets(156,5): error MSB3073: :VCEnd”已退出，代码为 9009。 [C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\plugins\flutter_inappwebview_windows\flutter_inappwebview_windows_DEPENDENCIES_DOWNLOAD.vcxproj]
+Building Windows application...                                     5.9s
+Build process failed.
+build exit: 1
+finished: 2026-10-12T20:50:52.1492159+08:00
+=== retry 3: +nuget(D:\Android\setup) in PATH ===
+nuget: D:\Android\setup\nuget.exe
+started: 2026-10-12T20:54:35.4222428+08:00
+Building Windows application...                                 
+CMake Warning (dev) at flutter/ephemeral/.plugin_symlinks/flutter_inappwebview_windows/windows/CMakeLists.txt:31 (add_custom_command):
+  The following keywords are not supported when using
+  add_custom_command(TARGET): DEPENDS.
+
+  Policy CMP0175 is not set: add_custom_command() rejects invalid arguments.
+  Run "cmake --help-policy CMP0175" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\windows\flutter\ephemeral\.plugin_symlinks\flutter_inappwebview_windows\windows\types\web_resource_response.cpp(54,28): warning C4244: “参数”: 从“__int64”转换到“int”，可能丢失数据 [C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\plugins\flutter_inappwebview_windows\flutter_inappwebview_windows_plugin.vcxproj]
+C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\packages\Microsoft.Web.WebView2\build\native\include\WebView2EnvironmentOptions.h(194,3): warning C4458: “value”的声明隐藏了类成员 [C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\plugins\flutter_inappwebview_windows\flutter_inappwebview_windows_plugin.vcxproj]
+C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\packages\Microsoft.Web.WebView2\build\native\include\WebView2EnvironmentOptions.h(193,3): warning C4458: “value”的声明隐藏了类成员 [C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\plugins\flutter_inappwebview_windows\flutter_inappwebview_windows_plugin.vcxproj]
+C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\packages\Microsoft.Web.WebView2\build\native\include\WebView2EnvironmentOptions.h(194,3): warning C4458: “value”的声明隐藏了类成员 [C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\plugins\flutter_inappwebview_windows\flutter_inappwebview_windows_plugin.vcxproj]
+C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\packages\Microsoft.Web.WebView2\build\native\include\WebView2EnvironmentOptions.h(193,3): warning C4458: “value”的声明隐藏了类成员 [C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer\build\windows\x64\plugins\flutter_inappwebview_windows\flutter_inappwebview_windows_plugin.vcxproj]
+Building Windows application...                                   159.4s
+√ Built build\windows\x64\runner\Release\daviewer.exe
+build exit: 0
+--- verify-desktop-startup.py (local build) ---
+{"scope":"desktop_startup_only_no_login_verification","platform":"win32","expectedRevision":"43fe8bf635a842801d0b9edd06b06b2b8deb930f","revisionMatches":true,"readyObserved":true,"splashExitObserved":true,"status":"PASS","reason":"startup_ready","processExitCode":null,"elapsedSeconds":1.765}
+verify exit: 0
+finished: 2026-10-12T20:57:18.4883639+08:00

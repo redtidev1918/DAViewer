@@ -150,7 +150,7 @@ void main() {
         reads++;
         return const BrowserSessionEvidence(username: 'artist');
       },
-      onEvidence: observations.add,
+      onEvidence: (evidence, _) => observations.add(evidence),
       onDeadline: () {},
     );
     observer.navigationStarted(loading: true);
@@ -209,7 +209,7 @@ void main() {
         final observations = <BrowserSessionEvidence>[];
         final observer = BrowserSessionObserver(
           read: () async => current,
-          onEvidence: observations.add,
+          onEvidence: (evidence, _) => observations.add(evidence),
           onDeadline: () {},
         )..start();
         await tester.pump();
@@ -233,7 +233,7 @@ void main() {
       var expired = false;
       final observer = BrowserSessionObserver(
         read: () async => current,
-        onEvidence: observations.add,
+        onEvidence: (evidence, _) => observations.add(evidence),
         onDeadline: () => expired = true,
       )..start();
       for (var i = 0; i < 5; i++) {
@@ -260,7 +260,7 @@ void main() {
     var calls = 0;
     final observer = BrowserSessionObserver(
       read: () => read.future,
-      onEvidence: (_) => calls++,
+      onEvidence: (_, _) => calls++,
       onDeadline: () => fail('disposed deadline'),
     )..start();
     observer.navigationStarted();
@@ -283,7 +283,7 @@ void main() {
           reads++;
           return gate.future;
         },
-        onEvidence: (_) => reports++,
+        onEvidence: (_, _) => reports++,
         onDeadline: () {},
       )..start();
       unawaited(observer.sample());
@@ -303,7 +303,7 @@ void main() {
       var deadlines = 0;
       final observer = BrowserSessionObserver(
         read: () async => const BrowserSessionEvidence(),
-        onEvidence: (_) {},
+        onEvidence: (_, _) {},
         onDeadline: () => deadlines++,
       )..start();
       await tester.pump(const Duration(seconds: 21));
@@ -311,6 +311,44 @@ void main() {
       observer.restart();
       await tester.pump(const Duration(seconds: 21));
       expect(deadlines, 2);
+      observer.dispose();
+    },
+  );
+
+  testWidgets(
+    'evidence carries the navigation sequence it was read under (review 2026-10-14)',
+    (tester) async {
+      // Corroboration must bind to a NEW navigation, so the observer has to
+      // tell its consumer which navigation epoch each sample belongs to: the
+      // sequence only advances when a real navigation event fires.
+      final reads = <Completer<BrowserSessionEvidence>>[];
+      final delivered = <int>[];
+      final observer = BrowserSessionObserver(
+        read: () {
+          final completer = Completer<BrowserSessionEvidence>();
+          reads.add(completer);
+          return completer.future;
+        },
+        onEvidence: (_, navigationSequence) =>
+            delivered.add(navigationSequence),
+        onDeadline: () {},
+      )..start();
+
+      await tester.pump();
+      expect(reads, hasLength(1));
+      reads[0].complete(const BrowserSessionEvidence(username: 'anonymous'));
+      await tester.pump();
+      expect(delivered, [0]);
+
+      // No navigation yet: a re-read of the same document (dedup reset by a
+      // CSRF rotation) still reports the same sequence.
+      observer.navigationStarted();
+      observer.navigationCommitted();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(reads, hasLength(2));
+      reads[1].complete(const BrowserSessionEvidence(username: 'anonymous'));
+      await tester.pump();
+      expect(delivered, [0, 2]);
       observer.dispose();
     },
   );

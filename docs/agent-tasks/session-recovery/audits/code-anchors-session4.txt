@@ -1,0 +1,116 @@
+# Code anchors — session 4 (seven P1/P2 fixes)
+
+Verified against working tree @ aead827 (branch codex/android-session-recovery).
+Line numbers are pre-edit positions; each fix cites its anchor below.
+
+## ① app_logger.dart — initialize() has no crash guard / no timeouts
+
+- `lib/core/diagnostics/app_logger.dart:50-69`
+```dart
+  static Future<AppLogger> initialize({String? fileName}) async {
+    if (_instance case final existing?) return existing;
+    final support = await getApplicationSupportDirectory();      // :52 — can throw (MissingPluginException / IO)
+    final logsDir = Directory('${support.path}${Platform.pathSeparator}logs');
+    await logsDir.create(recursive: true);                       // :54 — can throw (IO)
+    ...
+    final sink = file.openWrite(mode: FileMode.append);          // :59 — can throw
+    ...
+    await logger.flush();                                        // :67 — unbounded
+    return logger;
+  }
+```
+No try/catch around any stage; exception propagates into `main()` (main.dart:57) before `runApp` (main.dart:86).
+- Fallback singleton already exists: `instance` getter :33-41 uses `_fallback ??= AppLogger._(NullSink(), Directory.systemTemp)`; `NullSink` :198-234.
+- `_instance = logger` at :61; `dispose/_close` :182-194 nulls `_instance` only when identical.
+- Fix: wrap whole body in try/catch → on failure set `_instance = AppLogger._(NullSink(), Directory.systemTemp)` and return it; add `.timeout(const Duration(seconds: 5))` to getApplicationSupportDirectory / logsDir.create / first flush; add `@visibleForTesting static void resetForTest()`.
+
+## ② main.dart — startup chain awaits unbounded
+
+- `lib/main.dart:52-86` (main):
+  - :57 `final logger = await AppLogger.initialize();` (guarded by fix ①)
+  - :61 `final crashedLastSession = await CrashMarker.consume();` — no timeout
+  - :76 `final preferences = await AppPreferences.load();` — no timeout
+- Fix: `.timeout(const Duration(seconds: 5), onTimeout: ...)` with safe fallbacks (`false` for CrashMarker, `const <String,String>{}` for AppPreferences.load which returns `Future<Map<String,String>>`).
+
+## ③ web_session_controller.dart — no logout tombstone
+
+- `report()` entry `lib/core/auth/web_session_controller.dart:312-393`:
+  - :317 `final loggedIn = username.isNotEmpty;`
+  - :318-320 username change → `_identityEpoch++`
+  - :321 `final epoch = _identityEpoch;`
+  - :323-340 OAuth account mismatch → deleteAllCookies + `state = WebSessionState(isLoggedIn: false)` + `store.clear('identity_mismatch')`
+  - :346-364 anonymous-preserve branch (early return; keeps signed-in)
+  - :366-379 invalid-snapshot branch (`persist skipped ... empty_capture/missing_userinfo`), sets `state` (isLoggedIn: true) then returns
+  - :381-392 valid-snapshot branch, `_store.update(...)`
+- `clear()` :652-667: `_identityEpoch++; _cookieRestore = null; state = WebSessionState(isLoggedIn: false);` + native cookie clear + `_store.clear(reason: 'explicit_logout')` — **no logout revision counter**.
+- restore-verified :280-297: `if (!mounted || !_ref.mounted || epoch != _identityEpoch) return;` → sets `state = WebSessionState(csrf: state.csrf, isLoggedIn: true, username: restored.username)` + `_store.update(...)`.
+- Fix: fields `int _logoutRevision = 0; int _resolvedLogoutRevision = 0;` + `bool get _hasUnresolvedLogout => _logoutRevision > _resolvedLogoutRevision;`
+  - `clear()`: `_logoutRevision++`
+  - `report()`: capture `final logoutRevision = _logoutRevision;` at entry; before :366 invalid-snapshot branch add gate: `if (loggedIn && (_logoutRevision != logoutRevision || _hasUnresolvedLogout)) { log 'stale signed-in report dropped reason=post_logout_no_snapshot'; return; }`
+  - valid-snapshot branch: when `loggedIn` → `_resolvedLogoutRevision = _logoutRevision;`
+  - restore-verified: same resolve after successful restore.
+  - `ensurePersistentSnapshot` unchanged (epoch-guarded transitively); markHealthy transitively guarded by web_login_screen :250-252 stale-check before :270.
+
+## ④⑤⑥ auth_controller.dart
+
+- logout() `lib/core/auth/auth_controller.dart:350-383`: sets `_authEpoch += 1; state = AuthState(signedOut)` :355-356, then webClear + `saveOAuthSessionKnown(false)` + `runtime.oauth!.logout(revoke: true)` :369-382 — **no `authorization.cancelPending()`**. Pattern to copy: cancelLogin :318-348 does `await runtime.oauth!.authorization.cancelPending()` in try/catch :323-334.
+  - Fix (D2): after `state = AuthState(signedOut)` add cancelPending try/catch (mirroring cancelLogin).
+- initialize() signedOut-evidence branch :114-132: logs, clears stale token (`session.logout(revoke: false)`), `_initializing = false; return;` — **never sets `state`**, stays `unknown` → router sends to /web-login.
+  - Fix (D3): add `state = const AuthState(status: AuthStatus.signedOut);` before return.
+- _performLogin :270-314: :291 `await runtime.oauth!.authorize();` — **no timeout**; on TimeoutException nothing currently catches (only DAKitException + generic catch at :307-310 which would swallow timeout only if epoch current — actually generic catch sets signedOut+error but doesn't cancel the pending authorize future).
+  - Fix (D4): :291 →
+```dart
+      final authorize = runtime.oauth!.authorize();
+      try {
+        await authorize.timeout(const Duration(minutes: 5));
+      } on TimeoutException {
+        if (!_isCurrentEpoch(epoch)) return;
+        _log.warning('auth', 'OAuth login timed out after 5min; abandoning');
+        try {
+          await runtime.oauth!.authorization.cancelPending();
+        } on Object {
+          // Best effort.
+        }
+        unawaited(authorize.then((_ => {}), onError: (_ => {})));  // swallow abandoned stream
+        state = AuthState(status: AuthStatus.signedOut, error: TimeoutException('OAuth login timed out'));
+        return;
+      }
+```
+  5min not 60s (password/2FA entry time); timeout path must NOT call `saveOAuthSessionKnown(true)` (it returns before :293).
+
+## ⑦ web_login_screen.dart — dakit:// captured in ONE hook only
+
+- `shouldOverrideUrlLoading` `lib/features/web_login/web_login_screen.dart:534-558`: checks `uri.scheme == 'dakit' && uri.host == 'oauth'` → `_bridge?.addCallback(uri)`, `_navSource = 'oauth_callback'`, `_navigate(controller.loadUrl(home))` source `oauth_callback_home`, returns `NavigationActionPolicy.CANCEL`.
+- `onLoadStart` :559-572: only `_reportSeq++`, sessionObserver navigationStarted, `_navSource = 'server_redirect'`, `_loading = true` — **no dakit:// check**.
+- `onUpdateVisitedHistory` :595-604: `_reportSeq++`, navigationStarted, observer restart/sample — **no dakit:// check**.
+- Fix (R1): extract helper
+```dart
+  bool _handlePossibleOAuthCallback(InAppWebViewController controller, Uri? uri) {
+    if (uri == null || uri.scheme != 'dakit' || uri.host != 'oauth') return false;
+    _bridge?.addCallback(uri);
+    _navSource = 'oauth_callback';
+    if (mounted) {
+      unawaited(_navigate(
+        () => controller.loadUrl(urlRequest: URLRequest(url: WebUri(_homeUri.toString()))),
+        source: 'oauth_callback_home',
+      ));
+    }
+    return true;
+  }
+```
+  - `shouldOverrideUrlLoading`: `if (_handlePossibleOAuthCallback(controller, uri)) return NavigationActionPolicy.CANCEL;` (keep ALLOW otherwise)
+  - `onLoadStart`: call helper (before the observer bookkeeping); if true, skip the rest of the onLoadStart body (don't bump nav source to server_redirect).
+  - `onUpdateVisitedHistory`: call helper before observer sampling.
+  - Bridge `addCallback` is idempotent (filter+log+broadcast in webview_oauth_bridge.dart:33-40); double-fire worst case = one redundant home load, acceptable per design.
+
+## Verification of anchors vs design summary
+
+All seven fix points match the recovered design (design-summary-full.txt) exactly:
+①②③④⑤⑥⑦ anchors above correspond to design items D1-logger, D2-main, D1-session, D2-auth, D3-auth, D4-auth, R1.
+
+Confirmed live readings (this session):
+- web_login_screen.dart onLoadStart/onUpdateVisitedHistory exist and do NOT capture dakit:// (only shouldOverrideUrlLoading does) → supports oauth-callback-redirect-loss.
+- app_logger.initialize has zero try/catch, zero timeouts → supports startup-io-crash.
+- main.dart:61/:76 awaits unbounded → supports startup-io-crash.
+- web_session_controller.clear() has no revision tombstone; report()/restore paths unguarded → supports logout-resurrection.
+- auth_controller logout() lacks cancelPending; initialize signedOut branch leaves state unknown; _performLogin:291 authorize() unbounded → supports auth-unbounded-lifecycle.

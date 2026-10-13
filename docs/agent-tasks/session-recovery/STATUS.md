@@ -13,7 +13,19 @@
   fixes F1-F5, invariant mapping).
 - Local validation: `dart format --set-exit-if-changed lib test` 0 changed;
   `flutter analyze` clean; `flutter test --dart-define=DAVIEWER_VERSION=0.5.17`
-  **522 PASS** (was 511; new/updated regression tests included).
+  **525 PASS** (was 511; new/updated regression tests included).
+- Review round 1 (2026-10-14 user feedback) addressed on the same branch:
+  (1) anonymous corroboration now binds to a strictly newer navigation
+  sequence — `BrowserSessionObserver` delivers each evidence with its navSeq
+  and `webSessionProbeSampleDecision` gained a `wait` outcome for samples
+  read before the reload lands; (2) credential-rotation adoption is
+  verification-gated — the status controller records
+  `verifiedCredentialFingerprint` on every server-confirmed healthy verdict
+  and the feed adopts a rotated response only on fingerprint match;
+  unverified rotations keep the `credentials_changed` rejection. Three
+  boundary tests added: reload-not-landed (wait), unverified rotation
+  (reject), expired lease (transitions to unavailable after the 5-minute
+  lease, clock-injected). PR #111 checks re-run after push.
 - Key code-level facts (confirmed): a single anonymous browser-probe sample
   used to complete an authoritative logout (A4) while media-image 403 regex
   matching, rfy's own 403, WAF-unavailable escalation and timeout retries all

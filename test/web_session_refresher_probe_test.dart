@@ -58,18 +58,52 @@ void main() {
         webSessionProbeSampleDecision(
           webSessionProbeResultFromPage(pageUsername: 'anonymous', csrf: 't'),
           corroborationPending: false,
+          evidenceNavigation: 0,
+          armedNavigation: 0,
         ),
         WebSessionProbeSampleDecision.corroborateAnonymous,
       );
     });
 
-    test('an anonymous sample surviving the reload completes the probe', () {
+    test(
+      'an anonymous sample surviving a new navigation completes the probe',
+      () {
+        expect(
+          webSessionProbeSampleDecision(
+            webSessionProbeResultFromPage(pageUsername: 'anonymous', csrf: 't'),
+            corroborationPending: true,
+            evidenceNavigation: 3,
+            armedNavigation: 1,
+          ),
+          WebSessionProbeSampleDecision.complete,
+        );
+      },
+    );
+
+    test('an anonymous sample before the reload lands does not complete (review 2026-10-14)', () {
+      // corroborationPending=true only says a reload was *requested*; it
+      // proves nothing about the new page. A second anonymous sample read
+      // under the same navigation sequence (or a lower one) is the stale
+      // document re-read — e.g. its dedup key changed because the CSRF
+      // rotated. The transaction must keep waiting; its deadline resolves
+      // unavailable, never anonymous.
       expect(
         webSessionProbeSampleDecision(
           webSessionProbeResultFromPage(pageUsername: 'anonymous', csrf: 't'),
           corroborationPending: true,
+          evidenceNavigation: 1,
+          armedNavigation: 1,
         ),
-        WebSessionProbeSampleDecision.complete,
+        WebSessionProbeSampleDecision.wait,
+      );
+      expect(
+        webSessionProbeSampleDecision(
+          webSessionProbeResultFromPage(pageUsername: 'anonymous', csrf: 't'),
+          corroborationPending: true,
+          evidenceNavigation: 0,
+          armedNavigation: 1,
+        ),
+        WebSessionProbeSampleDecision.wait,
       );
     });
 
@@ -81,6 +115,8 @@ void main() {
           webSessionProbeSampleDecision(
             webSessionProbeResultFromPage(pageUsername: 'artist', csrf: 't'),
             corroborationPending: pending,
+            evidenceNavigation: 0,
+            armedNavigation: 0,
           ),
           WebSessionProbeSampleDecision.complete,
         );
@@ -94,12 +130,16 @@ void main() {
       final first = webSessionProbeSampleDecision(
         webSessionProbeResultFromPage(pageUsername: 'anonymous', csrf: 't'),
         corroborationPending: pending,
+        evidenceNavigation: 0,
+        armedNavigation: 0,
       );
       expect(first, WebSessionProbeSampleDecision.corroborateAnonymous);
       pending = true; // the refresher arms the reload after that decision
       final second = webSessionProbeSampleDecision(
         webSessionProbeResultFromPage(pageUsername: 'artist', csrf: 't'),
         corroborationPending: pending,
+        evidenceNavigation: 2,
+        armedNavigation: 0,
       );
       expect(second, WebSessionProbeSampleDecision.complete);
     });

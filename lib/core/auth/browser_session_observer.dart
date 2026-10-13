@@ -141,7 +141,14 @@ final class BrowserSessionObserver {
   });
 
   final Future<BrowserSessionEvidence> Function() read;
-  final void Function(BrowserSessionEvidence) onEvidence;
+
+  /// Receives each distinct evidence together with the navigation sequence it
+  /// was read under. A sample delivered under the same sequence as an earlier
+  /// one came from the same navigation epoch (no new page load happened in
+  /// between) — corroboration logic must bind to a *new* navigation, never to
+  /// a second sample of a stale document.
+  final void Function(BrowserSessionEvidence evidence, int navigationSequence)
+  onEvidence;
   final void Function() onDeadline;
   final Duration budget;
   final Duration interval;
@@ -203,7 +210,7 @@ final class BrowserSessionObserver {
           '${evidence.classification}:${evidence.username}:${evidence.csrf}';
       if (_lastEvidence == key) return;
       _lastEvidence = key;
-      onEvidence(evidence);
+      onEvidence(evidence, navigation);
     } finally {
       _reading = false;
     }
