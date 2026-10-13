@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.16](https://github.com/redtidev1918/DAViewer/compare/v0.5.15...v0.5.16) (2026-10-13)
+
+
+### Bug Fixes
+
+* **home:** display suspected-generic RFY batches with a clear degraded label ([d280439](https://github.com/redtidev1918/DAViewer/commit/d280439632499203469279e57dc9a1be1e56b846))
+* login auto-close (P0-A) and degraded RFY display (P0-B) ([67caac1](https://github.com/redtidev1918/DAViewer/commit/67caac1d3503f4a9f5cea0c2f035db7bfbe35ff3))
+* **login:** close the web login screen without waiting for a frame ([261324c](https://github.com/redtidev1918/DAViewer/commit/261324cd7c502d2a20b7b00129533e74dad39d33))
+
 ## [0.5.15](https://github.com/redtidev1918/DAViewer/compare/v0.5.14...v0.5.15) (2026-10-13)
 
 
