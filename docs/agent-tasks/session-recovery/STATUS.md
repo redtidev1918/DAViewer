@@ -26,6 +26,18 @@
 - Next: finish SDK publication recovery through CI, verify hosted versions, update
   app dependencies and rerun joint checks. Preserve Draft gate and missing original
   phone evidence. Validate the final candidate signature/revision before delivery.
+- Candidate 43fe8bf rechecked 2026-10-13: APK SHA256
+  `7720b79cafafdc1c001d2ffa57dc5f5c15d65f26793090218a83eaa68420f63b`;
+  production certificate SHA256
+  `686474b39fd91d20c1db3ce5bf6216ed8ab05ec7638f904251e0d108a34e7141`.
+  Emulator API36 install -r PASS; buildRevision matches, startup ready=true,
+  routes to usable /web-login. Synthetic wrong-state native callback rejected and
+  stays /web-login; Settings and Logs/Diagnostics reachable. No live account used.
+  Private evidence: `D:\Android\setup\candidate-43fe8bf-{startup,callback}.log`
+  and startup/settings XML. Do not commit raw logs.
+- SDK CLI 0.4.2 Latest metadata corrected without changing tags/assets. Download
+  update 38339499090 and Pages deploy 38339512117 SUCCESS. SDK pub packages still
+  pending recovery PR #45 and publication; these docs results do not imply pub success.
 
 ## Goal and non-negotiable acceptance
 
