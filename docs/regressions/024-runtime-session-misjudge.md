@@ -83,12 +83,23 @@ v0.5.17）。任务书：`docs/agent-tasks/session-recovery/RUNTIME-STABILITY-SP
   再核对该指纹，禁止用稍后读到的 Cookie 为旧页面背书。持久化再次核对集合。
   最终测试结果以 STATUS 最新检查点及对应提交 CI 为准；此前 525 PASS 为历史记录。
 
+## 2026-10-14 最终审查与交付
+
+R1 使用独立的已提交主文档代际，SPA History 和重复 load-stop 不提供匿名佐证。
+R2 凭据变化作废路径也检查租约期限。R3 通过 Uri.host 判断根域、子域和显式端口，
+排除 CDN/不可归因文本。R4 采样前后原生 Cookie 集合一致才附加指纹；交付和
+持久化再次核对，不能用后来读取的凭据为旧页面背书。空 Cookie 不确认登录，
+但已佐证的真实匿名结论仍可生效。原生回调与四个独立审查探针均通过。
+
+最终 v0.5.18 源码 `08295a192227a5748cbdafa24fc6279bd53f219e`，544 tests PASS。
+发布与资产证据见 [交付核验](../agent-tasks/session-recovery/audits/v0.5.18-release-verification.md)。
+
 ## 验收状态
 
 ```text
-Code Verified: PASS（本地全量回归）
-CI Verified: PENDING（PR 检查）
-Release Verified: PENDING
+Code Verified: PASS（最终源码 544 tests）
+CI Verified: PASS（最新 PR、SDK 联合检查及发布源码 CI）
+Release Verified: PASS（v0.5.18 三平台、校验和、APK 签名及 Pages）
 Android Verified: PENDING（无真机/模拟器运行）
 Original Incident Verified: PENDING（需要保留账号真机证据）
 ```

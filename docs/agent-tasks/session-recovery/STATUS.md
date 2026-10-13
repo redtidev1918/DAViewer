@@ -1,5 +1,38 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-14: v0.5.18 published and verified
+
+Engineering delivery complete; retained-account Android acceptance remains
+PENDING. Release source/tag `08295a192227a5748cbdafa24fc6279bd53f219e`,
+v0.5.18+230. PRs #111, #112, #113 merged. Full release-source CI
+`38447618889` confirms **544 tests PASS**; format/analyze clean. Release PR
+source `16eea73` passed SDK joint verification and three candidates in
+`38445279371`; all formal platform builds and finalize in `38447619267` PASS.
+
+Official assets downloaded to `D:\Android\setup\release-v0.5.18-08295a1`.
+All three hashes match SHA256SUMS, RELEASE-METADATA and GitHub asset digests;
+compiled revision found in all three platform binaries equals release source.
+APK `app.daviewer`, versionName 0.5.18, versionCode 230; signature verified and
+certificate matches v0.5.17. macOS remains the existing unsigned preview.
+Detailed hashes, certificate and run links: `audits/v0.5.18-release-verification.md`.
+Release https://github.com/redtidev1918/DAViewer/releases/tag/v0.5.18 published
+2026-10-13T18:46:30Z, draft=false; concise bilingual notes and asset table present.
+Download update `38449533725` PASS, Pages `38449556619` PASS on `23aa5a7`;
+both public served download documents independently fetched and show v0.5.18.
+
+Code Verified PASS; CI Verified PASS; Release Verified PASS.
+Android Verified PENDING; Original Incident Verified PENDING. ADB currently
+lists no device. Successful older pagination logs are not failure evidence.
+No timeout/retry inflation, data clearing, unrelated SDK migration or new notice
+queue. DAKit published dependencies unchanged and locked; historical stash,
+runtime/notice branches and external audit backups remain preserved.
+Current maintenance branch `codex/release-verification-0.5.18`; latest operation
+was official asset/signature/provenance and live Pages verification. Next: merge
+the documentation checkpoint after its CI; investigate any new device failure
+from exact build/log evidence. Do not reuse old 63ba115/2215e1a test conclusions.
+
+Older sections below are dated history, including pre-publication PENDING states.
+
 ## 2026-10-14: v0.5.18 publication in progress
 
 PRs #111/#112/#113 merged in dependency order. Release source
