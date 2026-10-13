@@ -25,8 +25,8 @@ without real retained-account Android evidence. These navigation rules remain
 active until completion; archive/remove their temporary pointers afterward using
 repository maintenance conventions.
 
-The user's 2026-10-13 AGENTS instructions retain PR #96 as Draft pending device
-acceptance. Continue push, release preparation and documentation updates, but do
-not merge #96 or publish the formal app release before those results. The 12aaeac
-login and 3d62b45 startup candidates FAILED on the incident phone. Preserve exact
-SDK/app dependencies and evidence; Original Incident Verified remains PENDING.
+The user explicitly removed the original-phone acceptance release gate on
+2026-10-13. After CI and artifact checks, proceed with PR integration, merge and
+formal publication. Original Incident Verified remains PENDING until evidence
+exists; disclose that limit without blocking publication. The 12aaeac login and
+3d62b45 startup candidates FAILED. Preserve exact SDK/app dependencies and evidence.

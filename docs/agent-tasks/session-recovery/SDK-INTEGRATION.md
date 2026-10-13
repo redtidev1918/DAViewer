@@ -9,7 +9,17 @@ request ownership, cache and diagnostics. No protocol logic moves just for purit
 
 ## Source and ownership
 
-Latest pin: `2590cbec59e0193d231addc73b3373cbe2b9b88e`, SDK CI 38240753370 PASS
+2026-10-13 current: SDK PRs #42–45 merged; publication source
+`f489f529d7d103eaec27bb4dcc4dec53b134e0a6`, exact immutable component tags for
+core 2.0.0 / api 1.2.0 / web 0.3.0 / flutter 1.1.0. All are verified available
+on pub.dev; Release 38340065798 SUCCESS. Flutter's API minimum is 1.2.0.
+DAViewer `d4f1d7e1fe6ffeff6a72d94475ce5aece81cfa34` removes candidate Git overrides,
+locks hosted packages, passes local analyze/488 tests and standard CI 38340996834.
+Joint quality 38340996817 PASS; native candidates running. PR #96 remains Draft,
+and original retained-account phone evidence remains PENDING. The entries below
+are chronological implementation history, not the current dependency selection.
+
+Previous pin: `2590cbec59e0193d231addc73b3373cbe2b9b88e`, SDK CI 38240753370 PASS
 with 262 tests and native examples. Public TokenStore late-write/new-account race
 is fixed by full transaction serialization and bounded callers; native I/O remains
 ordered after caller timeout. Same-generation valid late credentials are retained.

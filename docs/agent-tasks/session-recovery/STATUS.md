@@ -2,6 +2,19 @@
 
 ## 2026-10-13 current checkpoint (supersedes historical entries below)
 
+LATEST USER DECISION: original-phone acceptance is no longer a merge/release gate.
+Proceed with integration, main merge, ReleaseGraph version PR and formal release
+after CI/artifact checks. Keep Original Incident Verified PENDING honestly; no
+old Draft/device hold below overrides this explicit 2026-10-13 instruction.
+Candidate d4f1d7e joint CI 38340996817 SUCCESS on all three platforms including
+desktop runtime smoke. APK artifact digest verified; production signing certificate
+matches v0.5.13. APK SHA256
+`fd790afc87065b87868e9bebda19ec27e016b9b583402060ef9d734372b1dfac`.
+API36 preserved-data install PASS; runtime revision d4f1d7e, startup ready=true,
+usable login and wrong-state callback rejection without route disposal PASS.
+Local APK: `D:\Android\setup\DAViewer-v0.5.13-session-recovery-d4f1d7e.apk`.
+Next: merge integration PR #97 into #96, then complete main PR/release checks.
+
 Publication completed: SDK PR #45 merged as
 `f489f529d7d103eaec27bb4dcc4dec53b134e0a6`; all four component tags point to it.
 Release 38340065798 SUCCESS; pub.dev verified core 2.0.0 / api 1.2.0 /
@@ -9,34 +22,31 @@ web 0.3.0 / flutter 1.1.0. The earlier publication-blocked entries below are
 historical. DAViewer now uses these hosted package minimums, removes all four
 candidate Git overrides and uses pub.dev lock URLs/checksums (other package
 versions unchanged). Joint CI source pin updated to the exact publication SHA.
-Hosted-dependency analyze PASS; full 488 tests PASS. New CI/native candidate builds
-must run on the dependency-update commit; earlier artifacts are not this commit.
+Hosted-dependency analyze PASS; full 488 tests PASS. Standard CI 38340996834 PASS;
+joint quality 38340996817 PASS, native candidate builds running on d4f1d7e.
+Earlier artifacts are not this commit.
 App PR #96 remains Draft; no formal app release or original-device verification.
 
 - Active workspace: `C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer`;
-  branch `codex/daviewer-sdk-integration`, source HEAD `43fe8bf635a842801d0b9edd06b06b2b8deb930f`.
+  branch `codex/daviewer-sdk-integration`, source HEAD `d4f1d7e1fe6ffeff6a72d94475ce5aece81cfa34`.
 - Joint CI 38243805269 SUCCESS: SDK 262 / app 488 tests, Android/Windows/macOS
   builds and Windows/macOS startup smoke. Authenticated OAuth/RFY and original
   retained-account phone scenario remain PENDING; old phone candidates FAILED.
 - Latest user-supplied AGENTS on 2026-10-13 explicitly retains the Draft/device
   gate. PR #96 remains OPEN Draft. This supersedes the release-authority
   interpretation recorded on 2026-10-12 below. Do not formally release the app.
-- SDK PRs 42/43/44 merged; release commit f89938b08f5dd985524ccbe26e62c5a5d250091e.
-  SDK packages have NOT published: pub.dev still core 1.1.0 / api 1.1.1 /
-  web 0.2.5 / flutter 1.0.0. Release 38254995130 failed CLI Latest audit;
-  later dispatches skipped component publication. Recovery PR #45 raises Flutter
-  API minimum to 1.2.0 and enables explicit non-dry-run main repair dispatch.
-  SDK branch codex/release-publication-recovery, commit 22866c4; local analyze
-  and all 262 tests PASS; CI pending. Do not replace app Git pins with unavailable packages.
-- Current app candidate remains pinned to SDK 2590cbec59e0193d231addc73b3373cbe2b9b88e.
+- SDK PRs 42/43/44/45 merged; published versions and source are recorded above.
+  Release 38254995130 initially failed CLI Latest audit; PR #45 and corrected
+  Latest metadata resolved publication. SDK analyze, 262 tests and native CI PASS.
+- Current app uses published SDK packages; joint workflow tests their exact source.
   CN/EN authentication and build documentation updated. No application source edits
   in this continuation. dist/release/startup-smoke-local.json is a local artifact,
   excluded from this documentation commit.
 - Original stash and remote backup remain retained; main checkout dirty source
   edits remain untouched. Do not apply old stash or reset either checkout.
-- Next: finish SDK publication recovery through CI, verify hosted versions, update
-  app dependencies and rerun joint checks. Preserve Draft gate and missing original
-  phone evidence. Validate the final candidate signature/revision before delivery.
+- Next: finish d4f1d7e candidate builds; verify artifact hash, signature and runtime
+  source; run preserved-data emulator startup/negative callback/diagnostics checks.
+  Preserve Draft gate and missing original phone evidence.
 - Candidate 43fe8bf rechecked 2026-10-13: APK SHA256
   `7720b79cafafdc1c001d2ffa57dc5f5c15d65f26793090218a83eaa68420f63b`;
   production certificate SHA256
@@ -47,8 +57,8 @@ App PR #96 remains Draft; no formal app release or original-device verification.
   Private evidence: `D:\Android\setup\candidate-43fe8bf-{startup,callback}.log`
   and startup/settings XML. Do not commit raw logs.
 - SDK CLI 0.4.2 Latest metadata corrected without changing tags/assets. Download
-  update 38339499090 and Pages deploy 38339512117 SUCCESS. SDK pub packages still
-  pending recovery PR #45 and publication; these docs results do not imply pub success.
+  update 38339499090 and Pages deploy 38339512117 SUCCESS. SDK publication was
+  verified separately through OIDC runs and the pub.dev registry.
 
 ## Goal and non-negotiable acceptance
 
