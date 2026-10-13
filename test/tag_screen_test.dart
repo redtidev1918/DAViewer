@@ -1,5 +1,4 @@
 import 'package:dakit_core/dakit_core.dart' as dakit;
-import 'package:dakit_flutter/dakit_flutter.dart';
 import 'package:daviewer/core/feed/artwork_feed_controller.dart';
 import 'package:daviewer/features/tag/tag_screen.dart';
 import 'package:daviewer/shared/widgets/compact_tag_strip.dart';
@@ -42,7 +41,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(CompactTagStrip), findsOneWidget);
-    await tester.drag(find.byType(MasonryGridView), const Offset(0, -320));
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -320));
     await tester.pump(const Duration(milliseconds: 220));
 
     expect(find.byType(CompactTagStrip), findsNothing);

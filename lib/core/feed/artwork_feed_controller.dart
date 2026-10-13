@@ -1,11 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:dakit_core/dakit_core.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
 import '../data/request_gate.dart';
+import '../diagnostics/app_logger.dart';
 
 enum FeedRequestPhase { idle, loading, refreshing, paginating, stopped }
+
+enum FeedPaginationStatus { hasMore, loading, failed, exhausted, unknown }
 
 final class ArtworkFeedState {
   const ArtworkFeedState({
@@ -16,6 +21,7 @@ final class ArtworkFeedState {
     this.lastRefreshError,
     this.phase = FeedRequestPhase.idle,
     this.lastSuccessfulRefreshAt,
+    this.paginationExhausted = false,
   });
 
   final List<Artwork> items;
@@ -24,6 +30,19 @@ final class ArtworkFeedState {
   final Object? error;
   final Object? lastRefreshError;
   final FeedRequestPhase phase;
+  final bool paginationExhausted;
+  FeedPaginationStatus get paginationStatus {
+    if (phase == FeedRequestPhase.paginating) {
+      return FeedPaginationStatus.loading;
+    }
+    if (error != null || lastRefreshError != null) {
+      return FeedPaginationStatus.failed;
+    }
+    if (hasMore) return FeedPaginationStatus.hasMore;
+    return paginationExhausted
+        ? FeedPaginationStatus.exhausted
+        : FeedPaginationStatus.unknown;
+  }
 
   /// When the current items were last served by a successful first-page
   /// fetch (or by a cache hydration, whose value is the cache's save time).
@@ -31,7 +50,7 @@ final class ArtworkFeedState {
   /// content with its age instead of presenting it as live.
   final DateTime? lastSuccessfulRefreshAt;
 
-  bool get hasMore => nextCursor != null;
+  bool get hasMore => nextCursor?.isNotEmpty == true;
 }
 
 /// A paged artwork feed that loads its first page automatically when created
@@ -100,6 +119,17 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
   int _paginationFailures = 0;
   DateTime? _paginationBackoffUntil;
   int _revision = 0;
+  final _consumedCursors = <String>{};
+  void _paginationTrace(String stage, [String detail = '']) {
+    final cursor = state.nextCursor;
+    final fingerprint = cursor == null
+        ? 'absent'
+        : sha256.convert(utf8.encode(cursor)).toString().substring(0, 12);
+    AppLogger.instance.info(
+      'feed',
+      'pagination stage=$stage revision=$_revision cursorPresent=${state.hasMore} cursorFingerprint=$fingerprint items=${state.items.length} $detail',
+    );
+  }
 
   List<Artwork> _uniqueItems(Iterable<Artwork> items) {
     final seen = <String>{};
@@ -195,7 +225,10 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
     state = ArtworkFeedState(
       items: List<Artwork>.unmodifiable(items),
       lastSuccessfulRefreshAt: refreshedAt,
-      phase: FeedRequestPhase.refreshing,
+      isLoading: _activeFirstPageFetch != null,
+      phase: _activeFirstPageFetch != null
+          ? FeedRequestPhase.refreshing
+          : FeedRequestPhase.idle,
     );
   }
 
@@ -243,7 +276,15 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
     try {
       final page = await _fetchPage(PageRequest(limit: pageSize));
       if (!mounted || revision != _revision) return;
+      if (page.hasMore && page.nextCursor?.isNotEmpty != true) {
+        throw const DAKitException(
+          kind: DAKitFailureKind.parsing,
+          code: 'feed.pagination.missing_cursor',
+          message: 'The next page could not be confirmed. Refresh to retry.',
+        );
+      }
       _resetPaginationBackoff();
+      _consumedCursors.clear();
       _firstPageFetched = true;
       final contextKey = sessionContextKey;
       if (contextKey != null) {
@@ -258,10 +299,12 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
       }
       state = ArtworkFeedState(
         items: _uniqueItems(page.items),
-        nextCursor: page.nextCursor,
+        nextCursor: page.hasMore ? page.nextCursor : null,
+        paginationExhausted: !page.hasMore,
         phase: FeedRequestPhase.idle,
         lastSuccessfulRefreshAt: _now(),
       );
+      _paginationTrace('first_page', 'hasMore=${page.hasMore}');
     } catch (error) {
       if (!mounted || revision != _revision) return;
       // Ownership of the first page is released on failure so the recovery
@@ -288,8 +331,23 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
   }
 
   Future<void> loadMore() async {
-    if (!mounted || state.isLoading || !state.hasMore) return;
-    if (_inPaginationBackoff) return;
+    if (!mounted) return;
+    _paginationTrace('requested');
+    final skip =
+        state.isLoading ||
+            state.phase == FeedRequestPhase.loading ||
+            state.phase == FeedRequestPhase.refreshing
+        ? 'loading'
+        : !state.hasMore
+        ? 'no_cursor'
+        : _inPaginationBackoff
+        ? 'backoff'
+        : null;
+    if (skip != null) {
+      _paginationTrace('skipped', 'reason=$skip');
+      return;
+    }
+    _paginationTrace('gate_passed');
     final revision = _revision;
     final cursor = state.nextCursor;
     onRequestStarted?.call('pagination');
@@ -298,18 +356,56 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
       nextCursor: state.nextCursor,
       isLoading: true,
       phase: FeedRequestPhase.paginating,
+      lastSuccessfulRefreshAt: state.lastSuccessfulRefreshAt,
     );
     try {
       final page = await _fetchPage(
         PageRequest(cursor: cursor, limit: pageSize),
       );
-      if (!mounted || revision != _revision) return;
+      if (!mounted || revision != _revision) {
+        if (mounted) _paginationTrace('discarded', 'reason=newer_revision');
+        return;
+      }
+      final invalid =
+          page.hasMore &&
+          (page.nextCursor?.isNotEmpty != true ||
+              page.nextCursor == cursor ||
+              _consumedCursors.contains(page.nextCursor));
+      if (invalid) {
+        _enterPaginationBackoff();
+        state = ArtworkFeedState(
+          items: _uniqueItems([...state.items, ...page.items]),
+          nextCursor: cursor,
+          phase: FeedRequestPhase.stopped,
+          lastSuccessfulRefreshAt: state.lastSuccessfulRefreshAt,
+          error: const DAKitException(
+            kind: DAKitFailureKind.parsing,
+            code: 'feed.pagination.invalid_progress',
+            message: 'The next page could not be confirmed. Retry or refresh the feed.',
+          ),
+        );
+        _paginationTrace(
+          'protocol_error',
+          'reason=${page.nextCursor?.isNotEmpty != true
+              ? 'missing_cursor'
+              : page.nextCursor == cursor
+              ? 'repeated_cursor'
+              : 'cursor_cycle'} nextCursorPresent=${page.nextCursor?.isNotEmpty == true}',
+        );
+        return;
+      }
+      if (cursor != null) _consumedCursors.add(cursor);
       _resetPaginationBackoff();
       state = ArtworkFeedState(
         items: _uniqueItems(<Artwork>[...state.items, ...page.items]),
-        nextCursor: page.nextCursor == cursor ? null : page.nextCursor,
+        nextCursor: page.hasMore ? page.nextCursor : null,
+        paginationExhausted: !page.hasMore,
         phase: FeedRequestPhase.idle,
         lastSuccessfulRefreshAt: state.lastSuccessfulRefreshAt,
+      );
+      _paginationTrace(
+        page.hasMore ? 'appended' : 'exhausted',
+        'responseItems=${page.items.length}',
       );
     } catch (error) {
       if (!mounted || revision != _revision) return;
@@ -319,7 +415,9 @@ final class ArtworkFeedController extends StateNotifier<ArtworkFeedState> {
         nextCursor: cursor,
         error: error,
         phase: FeedRequestPhase.stopped,
+        lastSuccessfulRefreshAt: state.lastSuccessfulRefreshAt,
       );
+      _paginationTrace('failed');
     }
   }
 

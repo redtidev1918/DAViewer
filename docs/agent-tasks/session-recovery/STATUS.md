@@ -1,5 +1,51 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-13: active P0 — v0.5.16 cached-preview pagination lock
+
+- Workspace `D:\Code\DAViewer`; branch `codex/rfy-scroll-pagination` from
+  current main `642e2f477aa4f9f18c953c674ad561171ea6faef`.
+- User's exact Android build `1b6527747018dd818bcba5af68143a248d92a13e`:
+  cache 24 items at 22:16:45, premature grid trigger at :47, live first page
+  and cursor at :50, but no RFY pagination; watched pagination succeeds.
+- Confirmed with identical scheduling regression on release commit: second-page
+  request missing; repaired branch passes 24 -> 48 append. Independently reproduced
+  Android ballistic-scroll filtering (zero pagination asks before repair).
+- Changes: grid checks cursor/loading/refresh before latch, rearms when live
+  cursor appears or after a skipped gesture, accepts user ballistic scrolling;
+  hydrate retains active first-page loading. Full-width sliver footer. Controller
+  logs gates/appends, preserves cards on errors, treats repeated/cyclic cursors as
+  errors with explicit retry, follows Page.hasMore; no item-count exhaustion.
+  RFY raw-cursor logs replaced by presence/fingerprints. Details/evidence limits:
+  `docs/regressions/023-cached-feed-pagination-lock.md`.
+- DAKit/OAuth/WebSession untouched. Existing SDK absent/empty-cursor mapping
+  remains; independently captured terminal-payload semantics still unverified.
+- Latest validation (22:26 CST): analyze clean; format 215 files, 0 changed;
+  `flutter test --no-pub --dart-define=DAVIEWER_VERSION=0.5.16`: **511 PASS**.
+  Exact-release reproduction deliberately FAILS only the added cache-race test;
+  identical repaired test passes. These are automation results, not phone acceptance.
+- Code commit `27ede3f`; independent PR #108:
+  https://github.com/redtidev1918/DAViewer/pull/108 . Pushed; CI in progress.
+  Candidate workflow's stale 0.5.13 label/define is replaced by the current
+  manifest version so the pagination test APK identifies itself correctly.
+  No dependency, signing or build-tool changes.
+- Code Verified: PASS locally (511 tests). CI PENDING. New release: PENDING.
+  Android pagination acceptance: PENDING
+  (ADB has no attached device); user's v0.5.16 incident FAIL. Original Incident
+  Verified remains PENDING. Do not claim real-device resolution from widgets.
+- Reproduction worktree `D:\Code\DAViewer-pagination-repro-1b65277` is detached
+  at the exact release commit; contains only a copy of the new race test. Local
+  test logs in `D:\Android\setup\daviewer-cache-pagination-baseline.log` and
+  `daviewer-pagination-final-tests.log`; preserve evidence until PR review.
+- Retained old stash untouched; historic untracked audits/clear/imports untouched.
+- Next: finish PR #108 CI and three-platform candidates; inspect signing/source
+  metadata before handing over the Android APK. Preserve Android PENDING until
+  actual scrolling evidence arrives; then locate the last diagnostic stage.
+- Other authorized tasks preserved, not superseded: DeviantDrop uncertain-send
+  WIP `ce296e9` pushed on `codex/telegram-uncertain-delivery`, still needs new
+  regressions/review/PR. Python `codex/verified-range-resume` clean at `14b7291`;
+  416/206 repair not yet implemented. Resume after this P0; no ecosystem redesign.
+
+
 ## 2026-10-13 15:00–16:00 CST: P0-A + P0-B fixes on PR #105
 
 New agent session (WorkBuddy) took over from the 2026-10-13 13:37–13:39 production

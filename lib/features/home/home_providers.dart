@@ -26,6 +26,9 @@ import '../artwork/artwork_store.dart';
 
 int _personalizedProviderSeq = 0;
 int _personalizedRequestSeq = 0;
+String _cursorFingerprint(String? cursor) => cursor == null
+    ? 'absent'
+    : sha256.convert(utf8.encode(cursor)).toString().substring(0, 12);
 
 /// Overrides where per-account personalized-feed caches live (tests inject a
 /// temporary directory here). `null` — the default — resolves to
@@ -121,7 +124,7 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
           'personalized feed fetch '
               'request=$requestId '
               'reason=$reason '
-              'cursor=${request.cursor ?? 'initial'}',
+              'cursorPresent=${request.cursor != null} cursorFingerprint=${_cursorFingerprint(request.cursor)}',
         );
         final dio = runtime.dio;
         if (dio == null) {
@@ -479,8 +482,9 @@ Future<Page<Artwork>?> _tryFetchRfy(
     trace(
       'transport_succeeded',
       'transportId=$requestId-t$attempt elapsedMs=${stopwatch.elapsedMilliseconds} '
-          'cursor=${request.cursor ?? 'initial'} '
+          'cursorPresent=${request.cursor != null} cursorFingerprint=${_cursorFingerprint(request.cursor)} '
           'items=${page.items.length} '
+          'hasMore=${page.hasMore} nextCursorPresent=${page.nextCursor?.isNotEmpty == true} nextCursorFingerprint=${_cursorFingerprint(page.nextCursor)} '
           'gated=${page.items.where((a) => artworkViewLock(a) != null).length} '
           'blurred=$blurred '
           'genericFallback=${rfyCursorSignalsGenericFallback(page.nextCursor)} '
@@ -502,7 +506,7 @@ Future<Page<Artwork>?> _tryFetchRfy(
           'request=$requestId '
           'classification=${classifyFeedFetchError(error)} '
           'elapsedMs=${stopwatch.elapsedMilliseconds} '
-          'cursor=${request.cursor ?? 'initial'}',
+          'cursorPresent=${request.cursor != null} cursorFingerprint=${_cursorFingerprint(request.cursor)}',
       error,
       stack,
     );

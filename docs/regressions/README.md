@@ -39,6 +39,11 @@ machine cannot produce the required evidence.
 
 ## Evidence still required before calling the architecture closed
 
+REG-023: [cached preview pagination lock](023-cached-feed-pagination-lock.md)
+has a failing reproduction on the exact v0.5.16 commit and passing host
+Widget/Provider regressions after repair. Physical Android pagination acceptance
+remains PENDING; do not confuse this with on-device incident closure.
+
 2026-10-12: v0.5.13 failed the original Android cold-start incident despite its
 automated checks. REG-018/019 describe earlier coverage, not closure of that
 incident. See [REG-021](021-android-session-recovery.md) for the shared observer,

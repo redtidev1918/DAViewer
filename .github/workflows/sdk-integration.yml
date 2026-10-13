@@ -55,7 +55,8 @@ jobs:
           flutter pub get
           flutter analyze --no-pub
           dart format --output=none --set-exit-if-changed lib test
-          flutter test --no-pub --dart-define=DAVIEWER_VERSION=0.5.13
+          candidate_version=$(python3 -c 'import json; print(json.load(open(".release-please-manifest.json"))["."])')
+          flutter test --no-pub --dart-define="DAVIEWER_VERSION=$candidate_version"
 
   candidate:
     needs: quality
@@ -97,7 +98,6 @@ jobs:
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
           KEYSTORE_PROPERTIES: ${{ secrets.KEYSTORE_PROPERTIES }}
-          RELEASE_VERSION: 0.5.13
           DRY_RUN: 'true'
           DAVIEWER_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
@@ -105,6 +105,7 @@ jobs:
             echo 'Production signing secrets required; no debug substitute.' >&2
             exit 1
           fi
+          export RELEASE_VERSION=$(python -c 'import json; print(json.load(open(".release-please-manifest.json"))["."])')
           bash scripts/build-release
           cp sdk-integration-provenance.json dist/release/
       - name: Verify desktop candidate startup
