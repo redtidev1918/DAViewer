@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.18](https://github.com/redtidev1918/DAViewer/compare/v0.5.17...v0.5.18) (2026-10-13)
+
+
+### Bug Fixes
+
+* **auth:** close runtime evidence and credential ownership gaps ([ad8f126](https://github.com/redtidev1918/DAViewer/commit/ad8f126fd1a60d40a48da89e7cc72ece3ba13817))
+* **auth:** gate probe corroboration on navigation and rotation adoption on verification ([ee7f01d](https://github.com/redtidev1918/DAViewer/commit/ee7f01d8586752a50bcb742c308a2b7a6e72ae4b))
+* **auth:** preserve corroborated logout with empty native cookies ([1de1c63](https://github.com/redtidev1918/DAViewer/commit/1de1c63564c46bac07274ea2f1ea906a439d4948))
+* **auth:** stabilize runtime session verdicts and pagination-time recovery UI ([793ce8d](https://github.com/redtidev1918/DAViewer/commit/793ce8d3f806309d9845f95e49d6eb524426bac4))
+* **auth:** stabilize runtime session verdicts and pagination-time recovery UI ([6a5856a](https://github.com/redtidev1918/DAViewer/commit/6a5856a3ad17acb2ce3b63e9d4a6e6337545d166))
+* **ui:** coalesce feedback and suppress stale asynchronous notices ([31b5515](https://github.com/redtidev1918/DAViewer/commit/31b551536b832d9edf9d1604dd7acb4e8a02058a))
+* **ui:** improve reminders and immediate dismissal ([fc9e543](https://github.com/redtidev1918/DAViewer/commit/fc9e543ed5d5c3e866a9c8927ce824e5a5ee169a))
+* **ui:** make app reminders readable and immediately dismissible ([ef01892](https://github.com/redtidev1918/DAViewer/commit/ef018924f0d5df74b580bd659f73d92f81d05a71))
+
 ## [0.5.17](https://github.com/redtidev1918/DAViewer/compare/v0.5.16...v0.5.17) (2026-10-13)
 
 

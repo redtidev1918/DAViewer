@@ -1,5 +1,26 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-14: runtime/UI merged, v0.5.18 release preparation
+
+PR #111 source `1de1c63564c46bac07274ea2f1ea906a439d4948` merged as `793ce8d`;
+PR #112 source `c6d4e3e76afa06899614d51b69a71a502821b5fb` merged as `fc9e543`.
+Both exact-head CI, SDK tests/joint regression and three-platform candidates
+PASS. SDK candidate runs: `38443051710`, `38443199120`; desktop native startup
+checks PASS. Original four independent review probes PASS on 1de1c63.
+Code Verified PASS (534 runtime / 544 combined local tests), CI Verified PASS
+for these PR heads. Production release is not yet verified.
+
+Release-please PR #113 generated 0.5.18+230 (previous 0.5.17+229), manifest
+0.5.18; concise bilingual notes added. Release preparation reuses the clean
+notice worktree on `codex/release-0.5.18`, based on release-please `e71cbab`.
+Original notice branch/commits and main-workspace stash remain intact.
+Next: verify #113 fresh CI/candidates, merge release PR, verify Tag/source,
+official assets/checksums/production Android certificate/version and Pages.
+Release Verified PENDING; Android Verified / Original Incident Verified PENDING.
+No retained-account Android run exists. Windows/macOS CI startup is not Android
+incident evidence. DAKit remains published core 2.0.0 / API 1.2.0 / Web 0.3.0 /
+Flutter 1.1.0, tested against fixed SDK source f489f529; no release path override.
+
 ## 2026-10-14: integrated runtime and notification verification
 
 UI branch `codex/notice-ux` integrates runtime fix `1de1c63564c46bac07274ea2f1ea906a439d4948`.
