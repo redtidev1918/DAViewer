@@ -1,5 +1,70 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-13 v0.5.15 published — @@publicSession fix (supersedes all entries below)
+
+User reported a v0.5.14 P0 regression: OAuth login succeeds but the home feed
+shows 加载失败 (rfy-1..rfy-4 all rejected `dakit:authentication:
+web.session.unavailable` before the network; observer stuck at
+`classification=page_uninitialized` with `csrfPresent=true`; route stayed on
+`/web-login`).
+
+- Root cause (single point): DeviantArt renders the session under
+  `window.__INITIAL_STATE__['@@publicSession']` (double-`@`, contains
+  `isLoggedIn`/`csrfToken`/`user.username`), but the observer script
+  (`browser_session_observer.dart`) and HTML parser
+  (`web_session_verifier.dart`) read the single-`@` key, which never exists on
+  real pages → identity never parsed → login page never auto-closed →
+  WebSessionState logged-out → status judged `anonymous source=localState` →
+  RFY gate rejected everything. Verified against a raw fetch of the production
+  home page 2026-10-13. DAKit contains zero `publicSession` references; the
+  bug was DAViewer-side only.
+- Fix: PR #101 (commit `ae1f2c9`, branch `fix/public-session-key`, +182/-30
+  across 11 files): prefer `@@publicSession` (legacy single-`@` tolerated);
+  parse `isLoggedIn` (`false` ⇒ explicit anonymous even without username;
+  `true` without username ⇒ stays unverified instead of guessing); new
+  `identity_pending` classification; fixtures rebuilt from the real production
+  page shape with capture date noted; docs updated to `@@publicSession`.
+  First push `d0b284c` failed CI only on `dart format` (3 files reformatted,
+  amended); lesson: run `dart format --output=none --set-exit-if-changed lib
+  test` locally before pushing.
+- Permanent engineering rule adopted (user, 2026-10-13) and written into
+  AGENTS.md: external API/web-protocol/config/third-party-structure parsing
+  must first be verified against independently obtained real evidence; test
+  fixtures built from real protocol evidence, never reverse-engineered from
+  the implementation; DAKit-style projects build sanitized protocol samples +
+  contract tests.
+- Merge chain: PR #102 (Chinese release notes 0.5.15) merged first
+  (deliberately, so release-please's version PR branches from a main that
+  already contains the notes — avoids the 0.5.14 rebase); PR #101 → main;
+  release-please version PR #103 "chore(main): release 0.5.15" → main
+  `adf9488` (pubspec/manifest/CHANGELOG → 0.5.15). #103's CI passed without
+  manual intervention, confirming the notes-first ordering.
+- Release run 38350349650 SUCCESS. Tag `v0.5.15`; release published
+  2026-10-13T05:26:26Z, draft=false. RELEASE-METADATA.json: version 0.5.15,
+  commit `adf9488071863c3c6c75eab561aa60d3d03048fd`.
+- Assets (SHA256): DAViewer-v0.5.15.apk
+  `4dfb1540295b2507061123c8aa47095f39208eb274ee61fd66222befc07bbe88`
+  (67,445,346 B); DAViewer-v0.5.15-windows.zip
+  `9fa1577b240dcb5470f957cf869739005c0ba376fa1aea49be7430261ffe5b74`
+  (14,605,228 B); DAViewer-v0.5.15-macos-unsigned-preview.zip
+  `f12bed4c681e04169f1947518c84523561fcdf197a08c9c5028bbf0d8787549d`
+  (25,386,292 B); plus SHA256SUMS and RELEASE-METADATA.json.
+- Post-publish: download page regenerated (commit `8aea74d` "docs: refresh
+  download page (v0.5.15)") and Pages deployed, both success.
+- Gate status after publication: Code Verified PASS (analyze clean, 498 app
+  tests on `ae1f2c9`, +10 new regression tests from real page fixtures);
+  Release Verified PASS (this entry, artifacts + digests verified above);
+  Android Verified: NOT performed for 0.5.15 — needs real-device check of the
+  exact chain login → WebView auto-close → home → RFY personalized content
+  (emulator negative-path evidence exists only for 0.5.14-era candidates);
+  Original Incident Verified: PENDING — same verification chain as the
+  original incident; requires real retained-account Android evidence.
+  Publication was not blocked per explicit user instruction.
+- No rollback, no architecture rework (user direction 2026-10-13): if the
+  chain still fails on device, diagnose with the 0.5.15 diagnostic logs
+  (multi-launch session export + redacted OAuth redirects), not by rebuilding
+  the session architecture.
+
 ## 2026-10-13 v0.5.14 published (supersedes all entries below)
 
 Formal release completed under the 2026-10-13 user decision (original-phone
