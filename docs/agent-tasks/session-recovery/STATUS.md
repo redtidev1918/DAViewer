@@ -4,6 +4,8 @@
 
 - Workspace `D:\Code\DAViewer`; branch `codex/rfy-scroll-pagination` from
   current main `642e2f477aa4f9f18c953c674ad561171ea6faef`.
+  Candidate source HEAD `c810e2167461a048fba20f777200bc1b6eb1aefb`;
+  fixed SDK source `f489f529d7d103eaec27bb4dcc4dec53b134e0a6`.
 - User's exact Android build `1b6527747018dd818bcba5af68143a248d92a13e`:
   cache 24 items at 22:16:45, premature grid trigger at :47, live first page
   and cursor at :50, but no RFY pagination; watched pagination succeeds.
@@ -28,7 +30,18 @@
   Candidate workflow's stale 0.5.13 label/define is replaced by the current
   manifest version so the pagination test APK identifies itself correctly.
   No dependency, signing or build-tool changes.
-- Code Verified: PASS locally (511 tests). CI PENDING. New release: PENDING.
+- Code Verified: PASS locally (511 tests). Standard CI PASS (`38413948884`);
+  SDK + application joint quality PASS (`38413948879`, Flutter 3.47.1).
+  Android/Windows/macOS candidate builds PASS on that same source HEAD,
+  including Windows/macOS native startup smoke tests. All 7 required PR checks
+  passed. PR #108 merged -> `7b60012b24c8e02c2b93f567ed869f1ebdc82b13`.
+  Candidate `D:\Android\setup\pagination-candidate-c810e21\DAViewer-v0.5.16.apk`
+  SHA256 `06beac5fe59d08b6f7da9f4530e91738d792831bf1417442de77ff31bfed0ba2`.
+  Signature matches v0.5.16 (certificate SHA256
+  `686474b39fd91d20c1db3ce5bf6216ed8ab05ec7638f904251e0d108a34e7141`);
+  package `app.daviewer`, versionName 0.5.16, versionCode 228. Provenance JSON
+  binds exact app/SDK SHAs above. Artifact id `11823612619`, run `38413948879`.
+  New release: PENDING.
   Android pagination acceptance: PENDING
   (ADB has no attached device); user's v0.5.16 incident FAIL. Original Incident
   Verified remains PENDING. Do not claim real-device resolution from widgets.
@@ -37,9 +50,9 @@
   test logs in `D:\Android\setup\daviewer-cache-pagination-baseline.log` and
   `daviewer-pagination-final-tests.log`; preserve evidence until PR review.
 - Retained old stash untouched; historic untracked audits/clear/imports untouched.
-- Next: finish PR #108 CI and three-platform candidates; inspect signing/source
-  metadata before handing over the Android APK. Preserve Android PENDING until
-  actual scrolling evidence arrives; then locate the last diagnostic stage.
+- Next: complete normal 0.5.17 release-please PR/CI/publication (notes already
+  prepared). Original-phone release gate is removed; Android acceptance stays
+  PENDING until actual scrolling evidence arrives, then locate the last trace.
 - Other authorized tasks preserved, not superseded: DeviantDrop uncertain-send
   WIP `ce296e9` pushed on `codex/telegram-uncertain-delivery`, still needs new
   regressions/review/PR. Python `codex/verified-range-resume` clean at `14b7291`;
