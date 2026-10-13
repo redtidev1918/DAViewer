@@ -62,6 +62,33 @@ from main `ba9d5de`, pushed as PR #105:
   backup patches), stash `backup-local-edits-before-update-2026-10-12` and
   the three historical worktrees.
 
+Publication completed the same session (2026-10-13 16:15–16:55 CST):
+
+- PR #105 merged → main `67caac1` (all 7 checks PASS incl. three-platform
+  candidate builds). PR #107 (Chinese/English notes 0.5.16) merged → main
+  `e20738c`. release-please PR #106 had branched before the notes (same
+  0.5.14 failure mode: Chinese-notes check failed); fixed by rebasing the
+  release-please branch onto `e20738c` (→ `692f7cc`) and force-pushing, all
+  11 checks then PASS; merged → main `1b65277`.
+- Release run (workflow `release.yml`) SUCCESS. Tag `v0.5.16`, published
+  2026-10-13T08:51:35Z, draft=false. Assets: DAViewer-v0.5.16.apk
+  `8f2b6674809e801528120e4181347dd9f547bbbb354d0354f8d891c51aed5030`
+  (67,445,406 B); DAViewer-v0.5.16-windows.zip
+  `78d63ec42c9b0ce72b1b14c7905ccdd87555960ddb2190cf5c61c6f2c567821b`
+  (14,606,691 B); DAViewer-v0.5.16-macos-unsigned-preview.zip
+  `29446e6831f053d71573dd4c1a2eafa3c8b420d53510f6014606b49bcc7df59b`
+  (25,391,649 B); plus SHA256SUMS and RELEASE-METADATA.json.
+- Download page workflow auto-ran post-release (run 38372225349 SUCCESS);
+  release body carries the Chinese 0.5.16 notes.
+- Gate status after publication: Code Verified PASS (this session, local +
+  PR #105 CI, 500 tests); Release Verified PASS (this entry, assets and
+  digests verified above); Android Verified PENDING — no emulator/device run
+  this session; Original Incident Verified PENDING — requires real
+  retained-account Android evidence of the full chain (login auto-close →
+  home → labeled recommendations → cold-start recovery). Per the 2026-10-13
+  user decision, publication was not blocked on these; the diagnostic build
+  for the user to verify on-device is the published v0.5.16 APK itself.
+
 ## 2026-10-13 v0.5.15 published — @@publicSession fix (supersedes all entries below)
 
 User reported a v0.5.14 P0 regression: OAuth login succeeds but the home feed
