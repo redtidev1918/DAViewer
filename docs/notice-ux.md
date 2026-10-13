@@ -41,7 +41,8 @@ were rendered and inspected outside the repository at
 previews, not screenshots from an Android installation.
 
 No OAuth/WebSession verdict or RFY ownership code changed in this UI delta.
-Final local validation: format 217 files, 0 changed; analyze clean; **527 tests
+Integrated zcode's updated P0 source `63ba115352588cd9d35e8c8603111ae167ef4c41`.
+Final local validation: format 217 files, 0 changed; analyze clean; **530 tests
 PASS**, including the new dismissal race and update-dialog regression.
 CI and release state are recorded in the PR; Android and original-incident
 verification remain separate and PENDING absent real-device evidence.
