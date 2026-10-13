@@ -23,7 +23,13 @@
   `flutter test --no-pub --dart-define=DAVIEWER_VERSION=0.5.16`: **511 PASS**.
   Exact-release reproduction deliberately FAILS only the added cache-race test;
   identical repaired test passes. These are automation results, not phone acceptance.
-- CI/PR: PENDING. New release: PENDING. Android pagination acceptance: PENDING
+- Code commit `27ede3f`; independent PR #108:
+  https://github.com/redtidev1918/DAViewer/pull/108 . Pushed; CI in progress.
+  Candidate workflow's stale 0.5.13 label/define is replaced by the current
+  manifest version so the pagination test APK identifies itself correctly.
+  No dependency, signing or build-tool changes.
+- Code Verified: PASS locally (511 tests). CI PENDING. New release: PENDING.
+  Android pagination acceptance: PENDING
   (ADB has no attached device); user's v0.5.16 incident FAIL. Original Incident
   Verified remains PENDING. Do not claim real-device resolution from widgets.
 - Reproduction worktree `D:\Code\DAViewer-pagination-repro-1b65277` is detached
@@ -31,8 +37,9 @@
   test logs in `D:\Android\setup\daviewer-cache-pagination-baseline.log` and
   `daviewer-pagination-final-tests.log`; preserve evidence until PR review.
 - Retained old stash untouched; historic untracked audits/clear/imports untouched.
-- Next: `flutter analyze`, `dart format --output=none --set-exit-if-changed lib test`,
-  `flutter test --dart-define=DAVIEWER_VERSION=0.5.16`, focused independent PR/CI.
+- Next: finish PR #108 CI and three-platform candidates; inspect signing/source
+  metadata before handing over the Android APK. Preserve Android PENDING until
+  actual scrolling evidence arrives; then locate the last diagnostic stage.
 - Other authorized tasks preserved, not superseded: DeviantDrop uncertain-send
   WIP `ce296e9` pushed on `codex/telegram-uncertain-delivery`, still needs new
   regressions/review/PR. Python `codex/verified-range-resume` clean at `14b7291`;
