@@ -67,7 +67,7 @@ macOS 当前脚本执行 Flutter release 构建后压缩 `DAViewer.app`，没有
 `.github/workflows/release.yml` 调用 ReleaseGraph；`.release-policy.yml` 选择 release-please 版本管理、三平台构建、资产检查和保留策略。PR 执行 dry-run，`main` 推送、定时任务和手动触发进入发布流程。当前工作流没有 `v*` tag 推送触发器。
 
 1. 通过 release-please 管理版本变更，核对 `pubspec.yaml` 与 `.release-please-manifest.json`。
-2. 在 `.github/release-notes/<版本>.md` 中编写中文正文，包含「本次更新」。CI 检查当前 manifest 版本的文件是否存在并含中文。
+2. 在 `.github/release-notes/<版本>.md` 中编写中文正文，包含「本次更新」。CI 检查当前 manifest 版本的文件是否存在并含中文。正文面向最终用户，每条一句话、控制在 4 条左右；不写根因分析、日志时间戳或内部组件名（文风细则见 `.github/release-notes/README.md`）。
 3. 通过质量检查、构建和资产验证。发布前人工验收见 [发布门禁](release-gate.md)。
 4. 发布后，脚本更新中英文下载页并触发 Pages 部署。`CHANGELOG.md` 与 `RELEASE_NOTES.md` 保留历史更新记录。
 

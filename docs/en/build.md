@@ -60,7 +60,7 @@ The current macOS script runs a Flutter release build and archives `DAViewer.app
 `.github/workflows/release.yml` calls ReleaseGraph. `.release-policy.yml` selects release-please versioning, three-platform builds, asset validation, and retention. PRs run in dry-run mode; pushes to `main`, scheduled runs, and manual dispatch enter the release workflow. The current workflow has no `v*` tag-push trigger.
 
 1. Manage version changes through release-please and check `pubspec.yaml` against `.release-please-manifest.json`.
-2. Write Chinese notes in `.github/release-notes/<version>.md`, including a 本次更新 section. CI checks that the current manifest version has a notes file containing Chinese.
+2. Write Chinese notes in `.github/release-notes/<version>.md`, including a 本次更新 section. CI checks that the current manifest version has a notes file containing Chinese. Keep notes end-user facing: one sentence per change, about four bullets total, no root-cause analysis, log timestamps, or internal component names (style rules in `.github/release-notes/README.md`).
 3. Pass quality, build, and asset checks. Manual acceptance requirements are in the [Release gate](../release-gate.md) (Chinese).
 4. After publishing, the script updates both download pages and dispatches Pages deployment. `CHANGELOG.md` and `RELEASE_NOTES.md` retain past changes.
 

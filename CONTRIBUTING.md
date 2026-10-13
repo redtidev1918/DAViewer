@@ -53,6 +53,6 @@ Documentation changes should keep corresponding Chinese and English guides align
 
 ## CI and releases
 
-CI runs analysis, formatting checks, tests, and release-note validation on PRs and pushes to `main`. The Release workflow calls ReleaseGraph with dry-run enabled for PRs; published assets are built for Android, macOS, and Windows. Release versioning uses release-please, and Chinese release bodies live in `.github/release-notes/<version>.md`.
+CI runs analysis, formatting checks, tests, and release-note validation on PRs and pushes to `main`. The Release workflow calls ReleaseGraph with dry-run enabled for PRs; published assets are built for Android, macOS, and Windows. Release versioning uses release-please, and Chinese release bodies live in `.github/release-notes/<version>.md` (keep them end-user facing and concise; see the style rules in `.github/release-notes/README.md`).
 
 See [Building and releasing](docs/en/build.md) for workflow inputs and [Release gate](docs/release-gate.md) for manual acceptance requirements. Report a bug with its app version, platform, reproduction steps, and relevant redacted diagnostics.
