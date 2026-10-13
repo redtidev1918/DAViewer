@@ -27,13 +27,27 @@ v0.5.13 的 Android 原始故障仍未通过实机验收。源码确认 HTTP 解
 
 后台及可见 WebView 使用 `BrowserSessionObserver`：加载、历史导航和有界采样收集同源页面身份，20 秒总预算不随事件延长。CSRF 已有但身份尚未初始化时继续观察；只有页面明确 `anonymous` 才是匿名证据，缺失/解析失败为不确定。人工恢复停止隐藏浏览器，使用共享原生 Cookie Store 和显式首页导航；没有宣称原生实例转换已在 Android 验证。可见页面的用户导航可以打开新的有界观察窗口。
 
-推荐的请求所有权在 `ArtworkFeedController`；明确区分初次加载、会话恢复、用户刷新、前台刷新、凭据上下文变化和分页。RFY 使用可取消的 Dio 传输及 DAKit 公共解析器，避免 fetcher 内的隐式 HTTP CSRF 重试。成功响应只有在账号 epoch、请求所有者和健康状态仍有效时才能接受；已确认的同账号恢复可以接收非通用旧响应。未经确认的 Cookie 变化仍安全废弃，记录 `credentials_changed`。这条保守规则需要真机证据后再缩小。
+推荐的请求所有权在 `ArtworkFeedController`；明确区分初次加载、会话恢复、用户刷新、前台刷新、凭据上下文变化和分页。RFY 调用 DAKit 公共 fetcher 的可取消、单次请求接口，禁用隐式 HTTP CSRF 重试。成功响应只有在账号 epoch、请求所有者和健康状态仍有效时才能接受；已确认的同账号恢复可以接收非通用旧响应。未经确认的 Cookie 变化仍安全废弃，记录 `credentials_changed`。这条保守规则需要真机证据后再缩小。
 
 诊断页的导出按钮合并最近 20 次启动日志，每次最多 512 KiB，标明截断并脱敏；界面上的最后 120 行仍只是一段预览。每次启动独立文件不覆盖旧日志。日志及时串行刷盘，但不能保证突然断电/强杀瞬间的最后一条写入。日志带 buildRevision；候选 APK 的签名和该 SHA 必须核验后才用于覆盖升级。
 
 状态对应：unknown=尚未恢复，healthy=verified，unverified/unavailable=inconclusive，anonymous=明确匿名，locked=blocked。恢复中与人工交互属于事务阶段，保留已有 UI 状态契约。流程与验收见 [REG-021](regressions/021-android-session-recovery.md)。
 
 ## 单入口登录契约
+
+Android 使用 DAKit 的 `app_links` 回调源，Manifest 关闭
+`flutter_deeplinking_enabled`，避免同一回调进入 Flutter 路由并提前移除登录页。
+WebView 和原生回调交给同一个 PKCE 事务消费；网页显示首页本身不代表 OAuth 成功。
+
+OAuth 与账号加载成功后，如果 Web 身份观察到期，页面解除同步遮罩并显示
+推荐会话尚未确认。账号和 Cookie 保留；刷新可启动新的有界观察窗口。
+旧窗口的迟到采样不能关闭页面或触发推荐请求。
+
+Token、PKCE 和网页协议解析由 DAKit 负责。TokenStore 写入、世代复核和过期清理
+处于同一个串行事务；调用者超时不释放尚未完成的原生 I/O 队列。同一世代的有效
+迟到写入被保留，超时本身不是登出。应用同步启动 SDK 登出隔离，不等待宿主 I/O，
+也不在旧清理失败后再次登出新账号。RFY 使用 SDK 公共 fetcher 的 `CancelToken`
+和 `retryInvalidCsrf: false`，替代应用独立的 Dio/DTO 解析绕行。
 
 应用只暴露一个 **登录或创建账号** 操作，它打开内嵌登录界面：
 
@@ -55,7 +69,7 @@ v0.5.13 的 Android 原始故障仍未通过实机验收。源码确认 HTTP 解
 
 网页会话的 Cookie、CSRF 和账号信息使用平台安全存储，独立于 OAuth token。升级时自动迁移应用支持目录内旧的 `web_session.json`：写入安全存储并读回验证后才删除旧文件。存储不可用或数据损坏时保留原凭据供重试，不回退到明文写入。迁移成功前，旧文件仍等同于登录凭据，请勿复制或公开。
 
-一次内嵌登录同时建立两种会话。WebView 只在 OAuth 回调回到 DeviantArt 首页之后才上报网页会话（CSRF token 与 `userinfo` Cookie），因此应用不会把匿名登录页的未登录状态记录为网页会话。
+网页身份可以先于 OAuth 账号到达；账号加载后会重新采样当前文档，避免等待不会再发生的导航。CSRF 和 Cookie 本身不是健康证据，旧账号世代的观察不能覆盖新状态。
 
 持久化的 Cookie 快照保留每个 Cookie 的完整元数据（域名、路径、过期时间、
 Secure/HttpOnly），而不是折叠成 `name→value` 表：同名的 `.deviantart.com` 与
@@ -91,11 +105,9 @@ Cookie 也能拿到 HTTP 200 的通用内容。匿名探测结果由真实 headl
 anonymous 并提示重新登录；真实浏览器无法作答（挑战/网络）→ 保持 unverified，
 绝不静默降级。
 
-headless 探测以**导航收敛**为准，而不是某一次加载结束（见
-[REG-018](regressions/018-headless-webview-second-navigation.md)）：挑战页的首次
-`onLoadStop` 只累计「结论不成立」，不写 verdict；等待挑战通过后的 JavaScript
-跳转再次 `onLoadStop` 才采样。达到停止上限（3 次）仍无可判定页面时返回
-unavailable（→ unverified），**绝不返回 anonymous**。
+headless 探测使用共享观察器的有界窗口，不再靠三次加载停止计数结束。
+挑战页、缺失身份和初始化中的页面均不产生匿名结论；导航完成后继续采样。
+截止时仍无可信身份则返回 unavailable（→ unverified），**绝不返回 anonymous**。
 
 个性化推荐的首屏请求有明确所有权（见
 [REG-019](regressions/019-first-page-request-ownership.md)）：验证恢复与显式重试

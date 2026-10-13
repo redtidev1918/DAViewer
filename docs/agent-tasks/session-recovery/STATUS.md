@@ -1,5 +1,32 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-13 current checkpoint (supersedes historical entries below)
+
+- Active workspace: `C:\Users\12629\.codex\worktrees\daviewer-sdk-integration\DAViewer`;
+  branch `codex/daviewer-sdk-integration`, source HEAD `43fe8bf635a842801d0b9edd06b06b2b8deb930f`.
+- Joint CI 38243805269 SUCCESS: SDK 262 / app 488 tests, Android/Windows/macOS
+  builds and Windows/macOS startup smoke. Authenticated OAuth/RFY and original
+  retained-account phone scenario remain PENDING; old phone candidates FAILED.
+- Latest user-supplied AGENTS on 2026-10-13 explicitly retains the Draft/device
+  gate. PR #96 remains OPEN Draft. This supersedes the release-authority
+  interpretation recorded on 2026-10-12 below. Do not formally release the app.
+- SDK PRs 42/43/44 merged; release commit f89938b08f5dd985524ccbe26e62c5a5d250091e.
+  SDK packages have NOT published: pub.dev still core 1.1.0 / api 1.1.1 /
+  web 0.2.5 / flutter 1.0.0. Release 38254995130 failed CLI Latest audit;
+  later dispatches skipped component publication. Recovery PR #45 raises Flutter
+  API minimum to 1.2.0 and enables explicit non-dry-run main repair dispatch.
+  SDK branch codex/release-publication-recovery, commit 22866c4; local analyze
+  and all 262 tests PASS; CI pending. Do not replace app Git pins with unavailable packages.
+- Current app candidate remains pinned to SDK 2590cbec59e0193d231addc73b3373cbe2b9b88e.
+  CN/EN authentication and build documentation updated. No application source edits
+  in this continuation. dist/release/startup-smoke-local.json is a local artifact,
+  excluded from this documentation commit.
+- Original stash and remote backup remain retained; main checkout dirty source
+  edits remain untouched. Do not apply old stash or reset either checkout.
+- Next: finish SDK publication recovery through CI, verify hosted versions, update
+  app dependencies and rerun joint checks. Preserve Draft gate and missing original
+  phone evidence. Validate the final candidate signature/revision before delivery.
+
 ## Goal and non-negotiable acceptance
 
 Fix Android retained-account cold-start web-session recovery and duplicate RFY
@@ -52,6 +79,13 @@ Code/Release/Android/Original Incident verification must remain separate.
 ## Current phase
 
 ### 2026-10-12 joint SDK integration (active; supersedes next-action list below)
+
+Latest user direction (2026-10-12): push, release, deploy and update documentation.
+Proceed through verified SDK publication and downstream release workflows; the
+earlier Draft hold is superseded by this release instruction. This authorization
+does not supply original-phone or authenticated-service evidence: Original Incident
+Verified remains PENDING and must be disclosed in release notes. No test result is
+upgraded by publication. Keep the release process reproducible and CI-gated.
 
 19:40 CST release continuation: SDK `2590cbec59e0193d231addc73b3373cbe2b9b88e`
 is pushed; CI 38240753370 passes **262 tests**, analyze and all native examples.
