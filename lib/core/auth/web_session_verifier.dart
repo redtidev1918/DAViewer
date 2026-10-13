@@ -30,10 +30,13 @@ final class WebSessionVerification {
 /// Confirms the DeviantArt web login with the server, not with the local
 /// cookie store.
 ///
-/// The home page's `__INITIAL_STATE__` exposes
-/// `@publicSession.user.username`; an anonymous page reports `anonymous`.
-/// A stale local `userinfo` cookie might still exist, but the server answer is
-/// what decides whether the personalized web session is usable.
+/// The home page's `__INITIAL_STATE__` exposes the session under the
+/// redux-style key `@@publicSession` (verified against the production home
+/// page; a single-@ spelling is tolerated as legacy): `isLoggedIn` states
+/// whether the cookie session is signed in, and `user.username` names the
+/// account (an anonymous page reports `anonymous`). A stale local `userinfo`
+/// cookie might still exist, but the server answer is what decides whether
+/// the personalized web session is usable.
 final class WebSessionVerifier {
   const WebSessionVerifier(this._dio);
 
@@ -109,8 +112,10 @@ final class WebSessionVerifier {
     return username == 'anonymous' ? '' : username ?? '';
   }
 
-  /// Null means absent or unparseable evidence; only the literal anonymous
-  /// identity is a server statement that the session is signed out.
+  /// Null means absent or unparseable evidence. Only a server statement —
+  /// the literal `anonymous` identity or an explicit `isLoggedIn: false` —
+  /// says the session is signed out; `isLoggedIn: true` without a username
+  /// stays unverified (null) instead of guessing.
   static String? pageUsernameFromInitialState(String html) {
     try {
       final state = jsonParseAssignment(
@@ -118,13 +123,14 @@ final class WebSessionVerifier {
         marker: _marker,
         missingMessage: 'Missing session initializer.',
       );
-      final session = state['@publicSession'];
+      final session = state['@@publicSession'] ?? state['@publicSession'];
       if (session is! Map) return null;
       final user = session['user'];
-      if (user is! Map) return null;
-      final username = user['username'];
-      if (username is! String) return null;
-      return username.trim();
+      final username = user is Map && user['username'] is String
+          ? (user['username'] as String).trim()
+          : null;
+      if (session['isLoggedIn'] == false) return 'anonymous';
+      return username;
     } on FormatException {
       return null;
     }

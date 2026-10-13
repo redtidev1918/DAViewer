@@ -116,7 +116,8 @@ final class _HomeProbeAdapter implements HttpClientAdapter {
   ) async {
     calls += 1;
     final escaped = jsonEncode(<String, Object?>{
-      '@publicSession': <String, Object?>{
+      '@@publicSession': <String, Object?>{
+        'isLoggedIn': true,
         'user': <String, Object?>{'username': username},
       },
     });

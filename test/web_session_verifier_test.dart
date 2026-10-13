@@ -30,19 +30,62 @@ final class _StatusAdapter implements HttpClientAdapter {
 void main() {
   test('shared SDK decoder accepts JavaScript escapes in session initializer', () {
     const html =
-        r'''<script>window.__INITIAL_STATE__ = JSON.parse("{\"@publicSession\":{\"user\":{\"username\":\"artist\"}},\"title\":\"artist\'s work\"}");</script>''';
+        r'''<script>window.__INITIAL_STATE__ = JSON.parse("{\"@@publicSession\":{\"isLoggedIn\":true,\"user\":{\"username\":\"artist\"}},\"title\":\"artist\'s work\"}");</script>''';
     expect(WebSessionVerifier.pageUsernameFromInitialState(html), 'artist');
   });
   test('single-quoted initializer keeps explicit anonymous distinct from missing', () {
     const html =
-        r'''<script>window.__INITIAL_STATE__ = JSON.parse('{"@publicSession":{"user":{"username":"anonymous"}}}');</script>''';
+        r'''<script>window.__INITIAL_STATE__ = JSON.parse('{"@@publicSession":{"isLoggedIn":false,"user":{"username":"anonymous"}}}');</script>''';
     expect(WebSessionVerifier.pageUsernameFromInitialState(html), 'anonymous');
     expect(WebSessionVerifier.pageUsernameFromInitialState('<html/>'), isNull);
+  });
+  test('legacy single-@ spelling still parses for older page variants', () {
+    const html =
+        r'''<script>window.__INITIAL_STATE__ = JSON.parse("{\"@publicSession\":{\"user\":{\"username\":\"artist\"}}}");</script>''';
+    expect(WebSessionVerifier.pageUsernameFromInitialState(html), 'artist');
+  });
+  group('isLoggedIn regression (production key @@publicSession)', () {
+    test('isLoggedIn=false without a username is a signed-out statement', () {
+      const html =
+          r'''<script>window.__INITIAL_STATE__ = JSON.parse("{\"@@publicSession\":{\"isLoggedIn\":false}}");</script>''';
+      expect(
+        WebSessionVerifier.pageUsernameFromInitialState(html),
+        'anonymous',
+      );
+    });
+    test('isLoggedIn=true without a username stays unverified', () {
+      const html =
+          r'''<script>window.__INITIAL_STATE__ = JSON.parse("{\"@@publicSession\":{\"isLoggedIn\":true}}");</script>''';
+      expect(WebSessionVerifier.pageUsernameFromInitialState(html), isNull);
+    });
+    test('verify maps isLoggedIn=false (no username) to anonymous', () async {
+      final dio = Dio()
+        ..httpClientAdapter = _StatusAdapter(
+          200,
+          html: '<script>window.__INITIAL_STATE__ = JSON.parse("{\\"@@publicSession\\":{\\"isLoggedIn\\":false}}");</script>',
+        );
+      final result = await WebSessionVerifier(dio)
+          .verify(cookieHeader: 'userinfo=saved');
+      expect(result.state, WebSessionVerificationState.anonymous);
+    });
+    test(
+      'verify maps isLoggedIn=true without username to unavailable',
+      () async {
+        final dio = Dio()
+          ..httpClientAdapter = _StatusAdapter(
+            200,
+            html: '<script>window.__INITIAL_STATE__ = JSON.parse("{\\"@@publicSession\\":{\\"isLoggedIn\\":true}}");</script>',
+          );
+        final result = await WebSessionVerifier(dio)
+            .verify(cookieHeader: 'userinfo=saved');
+        expect(result.state, WebSessionVerificationState.unavailable);
+      },
+    );
   });
   for (final fixture in [
     'window.__INITIAL_STATE__ = JSON.parse("broken");',
     'window.__INITIAL_STATE__ = JSON.parse("{}");',
-    'window.__INITIAL_STATE__ = JSON.parse("{\\"@publicSession\\":{}}");',
+    'window.__INITIAL_STATE__ = JSON.parse("{\\"@@publicSession\\":{}}");',
   ]) {
     test(
       'HTTP 200 with incomplete or malformed state is inconclusive: $fixture',
@@ -59,7 +102,7 @@ void main() {
     final dio = Dio()
       ..httpClientAdapter = _StatusAdapter(
         200,
-        html: '<script>window.__INITIAL_STATE__ = JSON.parse("{\\"@publicSession\\":{\\"user\\":{\\"username\\":\\"anonymous\\"}}}");</script>',
+        html: '<script>window.__INITIAL_STATE__ = JSON.parse("{\\"@@publicSession\\":{\\"isLoggedIn\\":false,\\"user\\":{\\"username\\":\\"anonymous\\"}}}");</script>',
       );
     final result = await WebSessionVerifier(dio)
         .verify(cookieHeader: 'userinfo=saved');
@@ -68,14 +111,14 @@ void main() {
   group('WebSessionVerifier.usernameFromInitialState', () {
     test('reads the server-rendered logged-in username', () {
       const html =
-          '<script>window.__INITIAL_STATE__ = JSON.parse("{\\"@publicSession\\":{\\"user\\":{\\"username\\":\\"artist\\"}}}");</script>';
+          '<script>window.__INITIAL_STATE__ = JSON.parse("{\\"@@publicSession\\":{\\"isLoggedIn\\":true,\\"user\\":{\\"username\\":\\"artist\\"}}}");</script>';
 
       expect(WebSessionVerifier.usernameFromInitialState(html), 'artist');
     });
 
     test('treats anonymous as unavailable', () {
       const html =
-          '<script>window.__INITIAL_STATE__ = JSON.parse("{\\"@publicSession\\":{\\"user\\":{\\"username\\":\\"anonymous\\"}}}");</script>';
+          '<script>window.__INITIAL_STATE__ = JSON.parse("{\\"@@publicSession\\":{\\"isLoggedIn\\":false,\\"user\\":{\\"username\\":\\"anonymous\\"}}}");</script>';
 
       expect(WebSessionVerifier.usernameFromInitialState(html), '');
     });
