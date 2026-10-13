@@ -316,35 +316,36 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
               degraded: degraded,
               generation: statusOwner.generation,
             );
-        if (degraded) {
-          trace('discarded', 'discardReason=generic_fallback');
-          AppLogger.instance.warning(
-            'home',
-            'rfy generic fallback rejected source=vespa_content_group_2 '
-                'generation=$generation',
-          );
-          // Preserve the capability incident even if a home probe confirms the
-          // username again. Only a usable feed or explicit recovery clears it.
-          await ref
-              .read(webSessionStatusProvider.notifier)
-              .recheckAfterWebSignal('rfy-generic-fallback');
-          throw const DAKitException(
-            kind: DAKitFailureKind.network,
-            code: 'rfy.session.degraded',
-            message: 'Recommendations returned a generic fallback signal.',
-          );
-        }
         ref.read(artworkStoreProvider.notifier).putAll(page.items);
-        trace('accepted', 'items=${page.items.length}');
+        trace('accepted', 'items=${page.items.length} degraded=$degraded');
         AppLogger.instance.info(
           'home',
           'personalized feed accepted items=${page.items.length} '
-              'request=$requestId generation=$generation',
+              'request=$requestId generation=$generation degraded=$degraded',
         );
-        // Persist the first page for the next cold start. Fire-and-forget:
-        // storage latency must never delay the feed, and a failed save only
-        // costs the next start its cached preview.
-        if (request.cursor == null) {
+        if (degraded) {
+          // Suspected generic fallback: the group-2 cursor is a historical
+          // degradation signal (REG-009), not a verified protocol — the
+          // 2026-10-13 production log shows a server-confirmed signed-in
+          // session can receive it too. Keep the items usable under the
+          // degraded label instead of an empty tab (P0-B), but never persist
+          // them as the personalized cold-start cache and never claim the
+          // account is signed out.
+          AppLogger.instance.warning(
+            'home',
+            'rfy suspected generic fallback displayed '
+                'source=vespa_content_group_2 generation=$generation',
+          );
+          // Preserve the capability incident even if a home probe confirms
+          // the username again. Only a usable feed or explicit recovery clears
+          // it.
+          await ref
+              .read(webSessionStatusProvider.notifier)
+              .recheckAfterWebSignal('rfy-generic-fallback');
+        } else if (request.cursor == null) {
+          // Persist the first page for the next cold start. Fire-and-forget:
+          // storage latency must never delay the feed, and a failed save only
+          // costs the next start its cached preview.
           unawaited(
             _persistPersonalizedFeedCache(
               ref,
@@ -482,7 +483,8 @@ Future<Page<Artwork>?> _tryFetchRfy(
           'items=${page.items.length} '
           'gated=${page.items.where((a) => artworkViewLock(a) != null).length} '
           'blurred=$blurred '
-          'genericFallback=${rfyCursorSignalsGenericFallback(page.nextCursor)}',
+          'genericFallback=${rfyCursorSignalsGenericFallback(page.nextCursor)} '
+          'cursorStructure=${rfyCursorStructureTrace(page.nextCursor) ?? (page.nextCursor == null ? 'absent' : 'undecodable')}',
     );
     return page;
   } on Object catch (error, stack) {

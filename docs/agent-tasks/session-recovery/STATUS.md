@@ -1,5 +1,67 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-13 15:00–16:00 CST: P0-A + P0-B fixes on PR #105
+
+New agent session (WorkBuddy) took over from the 2026-10-13 13:37–13:39 production
+log report. Both v0.5.15 P0 defects were fixed on branch `fix/p0a-login-auto-close`
+from main `ba9d5de`, pushed as PR #105:
+
+- **P0-A (commit `261324c`)** login auto-close: root cause was the close being
+  queued via `addPostFrameCallback` which never requests a frame; the async
+  web-session report completes while the app is idle so the close waited for
+  the user's own tap (13:38:23 → 13:38:39). All close paths now funnel through
+  `_requestClose` (immediate dispatch when idle; deferred only mid-frame) and
+  `_closeScreen` is fenced by `_closed` (exactly one navigation, idempotent
+  with the manual Done button). New `test/web_login_auto_close_test.dart`
+  drives the report inside `tester.runAsync` and asserts closure **before any
+  frame is pumped** — a plain pumpAndSettle cannot see the bug. The previous
+  agent had left this fix uncommitted in the working tree; this session
+  verified it against a backup patch (identical), fixed two test-harness
+  defects in it (secure-storage mock returning null → StateError; Done button
+  off-canvas on the frozen entrance transition), and committed it.
+- **P0-B (commit `d280439`)** degraded RFY display: the 13:38:40 log shows a
+  server-confirmed signed-in healthy session receiving 24 items with a
+  `vespa_content_group:2` cursor that were all discarded as `generic_fallback`,
+  leaving an empty recovery UI whose primary action was Login — a capability
+  degradation misreported as "not signed in" plus an unusable home tab.
+  group-2 semantics remain UNVERIFIED (signed-in healthy sessions can receive
+  it too; no external protocol evidence obtainable — CloudFront-blocked
+  anonymous baselines are NOT retried per AGENTS.md). Fix: suspected-generic
+  batches are now displayed under `RecommendedDegradedBanner` (signed-in
+  label, not-confirmed-personalized, retry, dismissible per incident), never
+  persisted to the personalized cold-start cache; the blocking login recovery
+  UI only appears under an authoritative needsLogin verdict; the global
+  notice host no longer raises a login-CTA notice for degraded
+  recommendations. Sanitized `cursorStructure` (key names + numeric group)
+  added to transport traces for future protocol evidence. Cross-generation
+  late-generic rejection and incident-reset semantics retained. Full analysis:
+  `docs/regressions/022-degraded-rfy-empty-home.md`.
+- Local verification: `dart format --set-exit-if-changed` 0 changed, analyze
+  clean, **500 tests passed**. DAKit unmodified (request params, cookie/CSRF
+  pairing and cursor passthrough audited clean; UA divergence from the login
+  WebView recorded as UNVERIFIED, unchanged).
+- PR #105 opened against main with the full evidence chain in the
+  description; CI branch-contract + build-plan passed at first check,
+  Analyze-and-test/quality pending at the time of this writing.
+- Gate status: Code Verified PASS (local). Release Verified PENDING (PR not
+  merged; no release run). Android Verified PENDING (no emulator run this
+  session). Original Incident Verified PENDING — requires real
+  retained-account Android evidence (login auto-close → home → labeled
+  recommendations → cold-start recovery).
+- Environment notes for the next session: the local Dart VM could not spawn
+  child processes (CreateFile 231) under the previous sandboxed host; it was
+  resolved by the user disabling the sandbox — if 231 reappears, that is the
+  first thing to check, before suspecting the machine. `git push` hangs under
+  the system credential `helper-selector` (GCM GUI prompt): use
+  `git -c credential.helper= -c credential.helper='!gh auth git-credential'`
+  or an inline token helper via `gh auth token`. Bash needs PATH prefix
+  `/c/Windows/System32:/c/Windows:/c/Program Files/Git/cmd:/d/flutter-sdk/bin`.
+- Untracked working-tree leftovers preserved untouched: `.tmp-probe/`,
+  `.tmp-session-import/`, `clear/` (previous-session knowledge ledger),
+  `docs/agent-tasks/session-recovery/audits/*` (incl. the two 2026-10-13
+  backup patches), stash `backup-local-edits-before-update-2026-10-12` and
+  the three historical worktrees.
+
 ## 2026-10-13 v0.5.15 published — @@publicSession fix (supersedes all entries below)
 
 User reported a v0.5.14 P0 regression: OAuth login succeeds but the home feed
