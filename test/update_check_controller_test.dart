@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dakit_flutter/dakit_flutter.dart';
@@ -15,6 +16,8 @@ import 'package:flutter_test/flutter_test.dart';
 final class _ReleaseAdapter implements HttpClientAdapter {
   int calls = 0;
   bool fail = false;
+  Completer<void>? gate;
+  Completer<void>? entered;
 
   @override
   void close({bool force = false}) {}
@@ -26,6 +29,8 @@ final class _ReleaseAdapter implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     calls++;
+    if (entered != null && !entered!.isCompleted) entered!.complete();
+    await gate?.future;
     return ResponseBody.fromString(
       jsonEncode({'tag_name': 'v0.5.9', 'body': '- Cookie 修复。'}),
       fail ? 503 : 200,
@@ -118,5 +123,33 @@ void main() {
     final second = containerFor(adapter);
     await second.read(updateCheckControllerProvider.notifier).check();
     expect(second.read(updateCheckControllerProvider).hasUpdate, isFalse);
+  });
+
+  test('close is immediate and a pending failed check cannot resurrect the reminder', () async {
+    final adapter = _ReleaseAdapter();
+    final container = containerFor(adapter);
+    final controller = container.read(updateCheckControllerProvider.notifier);
+    await controller.check();
+    expect(container.read(updateCheckControllerProvider).hasUpdate, isTrue);
+    adapter.fail = true;
+    adapter.gate = Completer<void>();
+    adapter.entered = Completer<void>();
+    final checking = controller.check(force: true);
+    await adapter.entered!.future;
+    final storage = Completer<String>();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('plugins.flutter.io/path_provider'),
+          (_) => storage.future,
+        );
+    final closing = controller.dismiss('0.5.9');
+    expect(container.read(updateCheckControllerProvider).hasUpdate, isFalse);
+    adapter.gate!.complete();
+    await checking;
+    expect(container.read(updateCheckControllerProvider).hasUpdate, isFalse);
+    storage.complete(
+      (await Directory.systemTemp.createTemp('daviewer-dismiss-')).path,
+    );
+    await closing;
   });
 }

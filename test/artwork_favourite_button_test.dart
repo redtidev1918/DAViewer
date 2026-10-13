@@ -102,7 +102,14 @@ void main() {
     await tester.pump();
     expect(find.byIcon(Icons.favorite), findsOneWidget);
     expect(
-      tester.widget<IconButton>(find.byType(IconButton)).onPressed,
+      tester
+          .widget<IconButton>(
+            find.ancestor(
+              of: find.byIcon(Icons.favorite),
+              matching: find.byType(IconButton),
+            ),
+          )
+          .onPressed,
       isNotNull,
     );
     expect(

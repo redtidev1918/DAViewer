@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/auth/personalized_session_status.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/notice/web_session_notice.dart';
+import '../../shared/widgets/app_notice_card.dart';
 
 /// Labels suspected-generic recommendation content directly on the home
 /// recommendations tab (P0-B, REG-022).
@@ -33,41 +34,15 @@ final class RecommendedDegradedBanner extends ConsumerWidget {
         .contains('personalized-session-degraded');
     if (!degraded || dismissed) return const SizedBox.shrink();
     final s = strings(ref.watch(appLanguageProvider));
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: scheme.secondaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Row(
-          children: <Widget>[
-            Icon(
-              Icons.label_outline,
-              size: 18,
-              color: scheme.onSecondaryContainer,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                s.recommendedSessionDegraded,
-                style: Theme.of(context).textTheme.bodySmall
-                    ?.copyWith(color: scheme.onSecondaryContainer),
-              ),
-            ),
-            TextButton(onPressed: onRetry, child: Text(s.retry)),
-            IconButton(
-              tooltip: s.done,
-              onPressed: () => ref
-                  .read(webSessionNoticeDismissalProvider.notifier)
-                  .dismiss('personalized-session-degraded'),
-              icon: Icon(
-                Icons.close,
-                size: 16,
-                color: scheme.onSecondaryContainer,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return AppNoticeCard(
+      inline: true,
+      message: s.recommendedSessionDegraded,
+      actionLabel: s.retry,
+      onAction: () => unawaited(onRetry()),
+      dismissLabel: s.close,
+      onDismiss: () => ref
+          .read(webSessionNoticeDismissalProvider.notifier)
+          .dismiss('personalized-session-degraded'),
     );
   }
 }

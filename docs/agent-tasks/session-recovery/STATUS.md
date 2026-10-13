@@ -1,5 +1,32 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-14: integrated runtime and notification verification
+
+UI branch `codex/notice-ux` integrates runtime fix `1de1c63564c46bac07274ea2f1ea906a439d4948`.
+Shared operation feedback migrated all existing Snackbar call sites, coalesces
+duplicates, replaces stale queued results, suppresses hidden route/tab late
+completions, and retains readable severity/action/close colors in both themes.
+Bottom-sheet operations now use the surviving page context. Session notices
+log actual presentation after dismissal filtering; stale login actions recheck
+the current verdict. No notification queue or new auth policy was introduced.
+Local final source: format complete, analyze clean, **544 tests PASS**, including
+feedback, narrow-screen/theme/update dismissal and all runtime boundary cases.
+Logs `D:\Android\setup\notice-final-*.log`. CI must correspond to the final
+pushed commit; prior 530 and ce32870 results are historical. Merge order remains
+#111 then #112; release-please and artifact/Pages checks follow. Android and
+Original Incident verification remain PENDING; retained account evidence absent.
+
+## 2026-10-14: isolated reminder UI follow-up
+
+User authorized reminder optimization while zcode continues the P0 runtime
+repair. UI workspace `C:\Users\12629\.codex\worktrees\notice-ux\DAViewer`, branch
+`codex/notice-ux`, based on `6a5856a`; the primary workspace is not edited.
+Scope, code locations and verification are in `docs/notice-ux.md`. Integrate
+the UI delta after P0 review, retaining newer auth/ownership fixes. Do not
+interpret UI tests or previews as original-incident or Android acceptance.
+Integrated updated P0 source `63ba115`. Local UI validation: format 0 changed,
+analyze clean, 530 tests PASS. The UI
+delta is ready for a separate draft PR; no merge or publication performed.
 ## 2026-10-14: final runtime review boundaries fixed
 
 R1 now uses committed main-document generations; SPA History and duplicate

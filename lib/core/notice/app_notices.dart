@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/legacy.dart';
 
+enum AppNoticeSeverity { info, warning, error }
+
 /// One reminder the shell may show. Persistent banners are deduplicated by
 /// [id]; pages never decide on their own whether a banner is already visible.
 final class AppNotice {
@@ -8,12 +10,14 @@ final class AppNotice {
     required this.message,
     this.actionLabel,
     this.action,
+    this.severity = AppNoticeSeverity.info,
   });
 
   final String id;
   final String message;
   final String? actionLabel;
   final void Function()? action;
+  final AppNoticeSeverity severity;
 }
 
 final class AppNoticeState {

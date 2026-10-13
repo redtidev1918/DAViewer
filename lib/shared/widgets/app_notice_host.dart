@@ -7,6 +7,7 @@ import '../../core/diagnostics/app_logger.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../core/notice/app_notices.dart';
 import '../../core/notice/web_session_notice.dart';
+import 'app_notice_card.dart';
 
 /// Renders the current notice as an overlay at the bottom of the page, so it
 /// never pushes or shifts the page layout. Pages never show their own
@@ -61,20 +62,21 @@ final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
     // recommendations tab, attached to the content it qualifies, with retry
     // and dismissal there (P0-B, 2026-10-13).
     final sessionNotice = _sessionNotice(session, s);
-    if (sessionNotice != null && !_loginNoticeLogged) {
-      _loginNoticeLogged = true;
-      AppLogger.instance.warning(
-        'notice',
-        'web-session login notice shown state=${session.state.name} '
-            'source=verdict-chain',
-      );
-    } else if (sessionNotice == null) {
-      _loginNoticeLogged = false;
-    }
     final visibleSessionNotice =
         sessionNotice != null && dismissedNoticeIds.contains(sessionNotice.id)
         ? null
         : sessionNotice;
+    if (visibleSessionNotice != null && !_loginNoticeLogged) {
+      _loginNoticeLogged = true;
+      AppLogger.instance.warning(
+        'notice',
+        'web-session login notice shown noticeId=${visibleSessionNotice.id} '
+            'state=${session.state.name} source=verdict-chain '
+            'generation=${ref.read(webSessionStatusProvider.notifier).generation}',
+      );
+    } else if (visibleSessionNotice == null) {
+      _loginNoticeLogged = false;
+    }
     final effective = visibleSessionNotice ?? notice;
     return Align(
       alignment: Alignment.bottomCenter,
@@ -82,10 +84,16 @@ final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
         top: false,
         child: effective == null
             ? const SizedBox.shrink()
-            : _NoticeCard(
-                notice: effective,
-                strings: s,
-                onDismiss: () => _dismiss(effective, sessionNotice),
+            : Padding(
+                padding: const EdgeInsets.all(8),
+                child: AppNoticeCard(
+                  message: effective.message,
+                  severity: effective.severity,
+                  actionLabel: effective.actionLabel,
+                  onAction: effective.action,
+                  dismissLabel: s.close,
+                  onDismiss: () => _dismiss(effective, sessionNotice),
+                ),
               ),
       ),
     );
@@ -102,10 +110,12 @@ final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
       message: message,
       actionLabel: s.login,
       action: _openWebLogin,
+      severity: AppNoticeSeverity.warning,
     );
   }
 
   void _openWebLogin() {
+    if (!mounted || !ref.read(webSessionStatusProvider).needsLogin) return;
     // The session notice uses the shell context; the router is available at
     // the root, so routing through the context captured by the state is safe.
     final router = GoRouter.of(context);
@@ -118,65 +128,5 @@ final class _AppNoticeHostState extends ConsumerState<AppNoticeHost> {
       return;
     }
     ref.read(appNoticeControllerProvider.notifier).clear(notice.id);
-  }
-}
-
-final class _NoticeCard extends StatelessWidget {
-  const _NoticeCard({
-    required this.notice,
-    required this.strings,
-    required this.onDismiss,
-  });
-
-  final AppNotice notice;
-  final AppStrings strings;
-  final VoidCallback onDismiss;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.all(8),
-      child: Material(
-        color: scheme.errorContainer,
-        elevation: 2,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: <Widget>[
-              Icon(
-                Icons.info_outline,
-                size: 18,
-                color: scheme.onErrorContainer,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  notice.message,
-                  style: Theme.of(context).textTheme.bodySmall
-                      ?.copyWith(color: scheme.onErrorContainer),
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (notice.actionLabel != null)
-                TextButton(
-                  onPressed: notice.action,
-                  child: Text(notice.actionLabel!),
-                ),
-              IconButton(
-                tooltip: strings.done,
-                onPressed: onDismiss,
-                icon: Icon(
-                  Icons.close,
-                  size: 16,
-                  color: scheme.onErrorContainer,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }

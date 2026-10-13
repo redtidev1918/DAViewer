@@ -1,5 +1,8 @@
 import 'package:dakit_flutter/dakit_flutter.dart';
 import 'package:flutter/material.dart';
+
+import '../../shared/widgets/app_feedback.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/web_session_refresher.dart';
@@ -240,8 +243,7 @@ final class _MoreLikeThisSectionState extends ConsumerState<MoreLikeThisSection>
           ? s.moreLikeThisUnchanged
           : s.moreLikeThisUpdated(currentIds.length);
       _lastCheckWasEmpty = currentIds.isEmpty;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+      showFeedback(context, message, source: 'related-feed-refresh');
     } on Object {
       // The provider exposes a source-specific error and recovery action.
     } finally {

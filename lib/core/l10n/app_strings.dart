@@ -126,8 +126,8 @@ final class AppStrings {
   String get noRecommendations =>
       _lang == AppLanguage.zh ? '暂无推荐' : 'No recommendations yet.';
   String get recommendedSignInHint => _lang == AppLanguage.zh
-      ? '个性化推荐需要 DeviantArt 网页会话 Cookie。当前会话尚未恢复，此标签暂不加载推荐；点击登录，在 App 内网页完成登录以恢复会话。'
-      : 'Personalized recommendations need the DeviantArt web-session Cookie. Until the web session is restored, this tab does not load recommendations. Tap Login and finish signing in on the in-app web page.';
+      ? '登录 DeviantArt 后即可查看推荐。'
+      : 'Sign in to DeviantArt to see recommendations.';
   String get recommendedFeedLoadFailure => _lang == AppLanguage.zh
       ? '推荐内容暂时无法加载。请下拉刷新，或在设置中检查网络代理。'
       : 'Recommendations could not load. Pull to refresh or check the proxy in Settings.';
@@ -135,8 +135,8 @@ final class AppStrings {
       ? '上次更新 $time（当前为缓存内容）'
       : 'Last updated $time (cached content)';
   String get webSessionBanner => _lang == AppLanguage.zh
-      ? 'DeviantArt 网页登录已失效或缺失。请在应用内重新登录，恢复个性化推荐和网页作品内容。'
-      : 'Your DeviantArt web sign-in has expired or is missing. Sign in again inside the app to restore personalized recommendations and website content.';
+      ? '网页登录不可用，推荐等网页功能暂时受限。请重新登录。'
+      : 'Web sign-in is unavailable. Sign in again to restore recommendations and website features.';
   String get noImage => _lang == AppLanguage.zh ? '暂无图片' : 'No image';
   String get imageLoadFailed =>
       _lang == AppLanguage.zh ? '图片加载失败' : 'Failed to load';
@@ -208,11 +208,11 @@ final class AppStrings {
       ? '检查更新失败，请检查网络后重试。'
       : 'Could not check for updates. Check your connection and try again.';
   String get recommendedSessionUnverified => _lang == AppLanguage.zh
-      ? '无法确认个性化推荐所需的网页会话。请稍后重试，或通过网页登录确认账号。'
-      : 'The web session for personalized recommendations could not be confirmed. Retry later or confirm your account through web sign-in.';
+      ? '暂时无法确认登录状态。请稍后重试。'
+      : 'Your session could not be verified right now. Try again shortly.';
   String get recommendedSessionDegraded => _lang == AppLanguage.zh
-      ? '账号已登录，但推荐接口疑似返回了通用内容：以下内容未经个性化确认。可重试；如持续出现，重新登录可刷新 Cookie。'
-      : 'You are signed in, but recommendations appear to have fallen back to generic content: the items below are not confirmed personalized. Retry, or sign in again to refresh the Cookie if it persists.';
+      ? '推荐服务暂时受限。已加载作品仍可浏览，也可重试。'
+      : 'Recommendations are temporarily limited. You can keep browsing loaded artwork or try again.';
   String newVersionAvailable(String version) => _lang == AppLanguage.zh
       ? '发现新版本 $version'
       : 'New version $version available';
@@ -222,6 +222,8 @@ final class AppStrings {
       ? '（暂无更新说明，可在下载页查看）'
       : '(No release notes here — see the download page.)';
   String get downloadUpdate => _lang == AppLanguage.zh ? '去下载' : 'Download';
+  String get viewUpdateDetails =>
+      _lang == AppLanguage.zh ? '查看更新' : "What's new";
   String get markAllRead => _lang == AppLanguage.zh ? '全部已读' : 'Mark all read';
   String get proxy => _lang == AppLanguage.zh ? '网络代理' : 'Proxy';
   String get diagnostics => _lang == AppLanguage.zh ? '日志与诊断' : 'Diagnostics';

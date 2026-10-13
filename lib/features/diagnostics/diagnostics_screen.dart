@@ -2,6 +2,9 @@ import 'dart:io';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+
+import '../../shared/widgets/app_feedback.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
@@ -101,12 +104,11 @@ final class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
       );
     } on Object {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            chinese ? '日志导出失败，请重试' : 'Log export failed. Please retry.',
-          ),
-        ),
+      showFeedback(
+        context,
+        chinese ? '日志导出失败，请重试' : 'Log export failed. Please retry.',
+        source: 'diagnostic-export',
+        severity: AppNoticeSeverity.error,
       );
     }
   }

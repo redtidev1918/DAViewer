@@ -14,6 +14,7 @@ import 'core/runtime/runtime_provider.dart';
 import 'core/runtime/startup_stage.dart';
 import 'core/settings/app_preferences.dart';
 import 'core/theme/theme_mode_provider.dart';
+import 'shared/widgets/app_feedback.dart';
 
 String _globalProxyDirective = 'DIRECT';
 
@@ -36,8 +37,11 @@ void _showDownloadComplete(String path) {
     context,
     listen: false,
   ).read(appLanguageProvider);
-  messenger.showSnackBar(
-    SnackBar(content: Text('${strings(language).savedToPrefix}$path')),
+  showFeedback(
+    context,
+    '${strings(language).savedToPrefix}$path',
+    source: 'download-completed',
+    messenger: messenger,
   );
 }
 
