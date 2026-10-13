@@ -5,6 +5,7 @@ import 'package:daviewer/core/auth/web_session_refresher.dart'
     hide webSessionProbeProvider;
 import 'package:daviewer/core/auth/web_session_status.dart';
 import 'package:daviewer/core/auth/web_session_verifier.dart';
+import 'package:daviewer/core/auth/web_session_diagnostics.dart';
 import 'package:daviewer/core/data/web_session.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -81,6 +82,7 @@ final class _GatedHtmlAdapter implements HttpClientAdapter {
   _GatedHtmlAdapter(this.completer);
 
   final Completer<ResponseBody> completer;
+  final entered = Completer<void>();
 
   @override
   void close({bool force = false}) {}
@@ -90,22 +92,31 @@ final class _GatedHtmlAdapter implements HttpClientAdapter {
     RequestOptions options,
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
-  ) => completer.future;
+  ) {
+    if (!entered.isCompleted) entered.complete();
+    return completer.future;
+  }
 }
 
 ProviderContainer _containerWith(
   HttpClientAdapter adapter, {
   Future<WebSessionProbeResult> Function()? probe,
+  List<Cookie>? cookies,
+  DateTime Function()? now,
 }) {
   final container = ProviderContainer(
     retry: (_, _) => null,
     overrides: <Override>[
+      if (now != null) webSessionClockProvider.overrideWithValue(now),
       webSessionProvider.overrideWithValue(
         WebSession(
-          () => _FakeCookieManager(<Cookie>[
-            Cookie(name: 'userinfo', value: 'saved-user'),
-            Cookie(name: 'csrf', value: 'token'),
-          ]),
+          () => _FakeCookieManager(
+            cookies ??
+                <Cookie>[
+                  Cookie(name: 'userinfo', value: 'saved-user'),
+                  Cookie(name: 'csrf', value: 'token'),
+                ],
+          ),
         ),
       ),
       webSessionControllerProvider.overrideWith(
@@ -291,6 +302,128 @@ void main() {
   });
 
   group('WebSessionStatusController.check server verification', () {
+    test('corroborated browser logout with empty native credentials remains authoritative', () async {
+      final container = _containerWith(
+        _CountingHtmlAdapter(_anonymousHomeHtml),
+        cookies: [],
+        probe: () async => WebSessionProbeResult.anonymous(
+          credentialFingerprint: cookieHeaderFingerprint(''),
+        ),
+      );
+      addTearDown(container.dispose);
+      final owner = container.read(webSessionStatusProvider.notifier);
+      owner.markHealthy(serverUsername: 'artist');
+      await owner.check(force: true, browser: true);
+      expect(container.read(webSessionStatusProvider).needsLogin, isTrue);
+      expect(
+        container.read(webSessionStatusProvider).state,
+        WebSessionStatusState.anonymous,
+      );
+    });
+    test('a later Cookie read cannot authenticate credentials absent from the browser transaction', () async {
+      final cookies = [
+        Cookie(name: 'userinfo', value: 'saved-user'),
+        Cookie(name: 'csrf', value: 'token'),
+      ];
+      final oldFingerprint = cookieHeaderFingerprint(
+        'userinfo=saved-user; csrf=token',
+      );
+      final container = _containerWith(
+        _CountingHtmlAdapter(_signedInHomeHtml),
+        cookies: cookies,
+        probe: () async {
+          cookies[1] = Cookie(name: 'csrf', value: 'unverified-later-store');
+          return WebSessionProbeResult.confirmed(
+            csrf: 'token',
+            username: 'artist',
+            credentialFingerprint: oldFingerprint,
+          );
+        },
+      );
+      addTearDown(container.dispose);
+      final owner = container.read(webSessionStatusProvider.notifier);
+      await owner.check(force: true, browser: true);
+      expect(container.read(webSessionStatusProvider).isHealthy, isFalse);
+      expect(owner.verifiedCredentialFingerprint, isNull);
+      expect(container.read(webSessionStatusProvider).needsLogin, isFalse);
+    });
+    test('credentials-superseded early return cannot preserve an expired healthy lease', () async {
+      var now = DateTime.now();
+      final gate = Completer<ResponseBody>();
+      final adapter = _GatedHtmlAdapter(gate);
+      final cookies = [
+        Cookie(name: 'userinfo', value: 'saved-user'),
+        Cookie(name: 'csrf', value: 'token'),
+      ];
+      final container = _containerWith(
+        adapter,
+        cookies: cookies,
+        now: () => now,
+      );
+      addTearDown(container.dispose);
+      final owner = container.read(webSessionStatusProvider.notifier);
+      owner.markHealthy(serverUsername: 'artist');
+      now = now.add(const Duration(minutes: 6));
+      final pending = owner.check(force: true);
+      await adapter.entered.future;
+      cookies[1] = Cookie(name: 'csrf', value: 'rotated');
+      gate.complete(ResponseBody.fromString(_signedInHomeHtml, 200));
+      await pending;
+      expect(
+        container.read(webSessionStatusProvider).state,
+        WebSessionStatusState.unverified,
+      );
+      expect(container.read(webSessionStatusProvider).needsLogin, isFalse);
+      expect(container.read(webSessionControllerProvider).username, 'artist');
+    });
+    test(
+      'empty Cookie reads retain only the existing bounded healthy lease',
+      () async {
+        var now = DateTime.now();
+        final adapter = _CountingHtmlAdapter(_signedInHomeHtml);
+        final container = _containerWith(adapter, cookies: [], now: () => now);
+        addTearDown(container.dispose);
+        final owner = container.read(webSessionStatusProvider.notifier);
+        owner.markHealthy(serverUsername: 'artist');
+        final confirmedAt = container
+            .read(webSessionStatusProvider)
+            .lastCheckedAt;
+        await owner.check(force: true);
+        expect(container.read(webSessionStatusProvider).isHealthy, isTrue);
+        expect(
+          container.read(webSessionStatusProvider).lastCheckedAt,
+          confirmedAt,
+        );
+        now = now.add(const Duration(minutes: 6));
+        await owner.check(force: true);
+        expect(
+          container.read(webSessionStatusProvider).state,
+          WebSessionStatusState.unavailable,
+        );
+        expect(container.read(webSessionStatusProvider).needsLogin, isFalse);
+        expect(container.read(webSessionControllerProvider).username, 'artist');
+        expect(adapter.calls, 0);
+      },
+    );
+
+    test(
+      'media 403 reuses the lease but does not conceal real browser logout',
+      () async {
+        final adapter = _CountingHtmlAdapter(_anonymousHomeHtml);
+        final container = _containerWith(
+          adapter,
+          probe: () async => const WebSessionProbeResult.anonymous(),
+        );
+        addTearDown(container.dispose);
+        final owner = container.read(webSessionStatusProvider.notifier);
+        owner.markHealthy(serverUsername: 'artist');
+        await owner.recheckAfterWebSignal('media-image-403');
+        expect(adapter.calls, 0);
+        expect(container.read(webSessionStatusProvider).isHealthy, isTrue);
+        await owner.check(force: true, source: 'explicit-verification');
+        expect(container.read(webSessionStatusProvider).needsLogin, isTrue);
+      },
+    );
     test(
       'marks healthy only when the server confirms the claimed user',
       () async {
@@ -513,9 +646,35 @@ void main() {
 
         expect(
           container.read(webSessionStatusProvider).state,
-          WebSessionStatusState.unverified,
+          WebSessionStatusState.healthy,
         );
         expect(container.read(webSessionStatusProvider).needsLogin, isFalse);
+      },
+    );
+
+    test(
+      'credential rotation discards old HTTP logout evidence before escalation',
+      () async {
+        final gate = Completer<ResponseBody>();
+        final adapter = _GatedHtmlAdapter(gate);
+        var browserCalls = 0;
+        final container = _containerWith(
+          adapter,
+          probe: () async {
+            browserCalls++;
+            return const WebSessionProbeResult.anonymous();
+          },
+        );
+        addTearDown(container.dispose);
+        final controller = container.read(webSessionStatusProvider.notifier);
+        controller.markHealthy(serverUsername: 'artist');
+        final pending = controller.check(force: true);
+        await adapter.entered.future;
+        controller.observeCredentials(cookieHeader: 'rotated', csrf: 'rotated');
+        gate.complete(ResponseBody.fromString(_anonymousHomeHtml, 200));
+        await pending;
+        expect(browserCalls, 0);
+        expect(container.read(webSessionStatusProvider).isHealthy, isTrue);
       },
     );
 

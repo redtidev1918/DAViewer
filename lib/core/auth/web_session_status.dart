@@ -20,6 +20,9 @@ export 'session_state.dart' show webSessionProvider;
 /// "web session healthy" — the health verdict lives exclusively in
 /// [webSessionStatusProvider] and is produced by the verification chain.
 final webSessionReadyProvider = StateProvider<bool>((ref) => false);
+final webSessionClockProvider = Provider<DateTime Function()>(
+  (ref) => DateTime.now,
+);
 
 /// Single source of truth for the DeviantArt web session.
 enum WebSessionStatusState {
@@ -94,7 +97,8 @@ final webSessionProbeProvider =
     );
 WebSessionStatusState emptyLiveCookieStatus({
   required int persistedCookieCount,
-}) => persistedCookieCount == 0
+  bool claimedSignedIn = false,
+}) => persistedCookieCount == 0 && !claimedSignedIn
     ? WebSessionStatusState.anonymous
     : WebSessionStatusState.unavailable;
 
@@ -112,6 +116,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         unawaited(_ref.read(webSessionRefresherProvider).accountChanged());
         _lastSuccess = null;
         _lastRestrictionCheck = null;
+        _verifiedCredentialFingerprint = null;
         if (mounted) state = const WebSessionStatus();
         final epoch = _accountEpoch;
         if (next.$1 == true && next.$2.isNotEmpty) {
@@ -126,6 +131,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   }
 
   final Ref _ref;
+  DateTime _now() => _ref.read(webSessionClockProvider)();
 
   static const Duration _cacheDuration = Duration(minutes: 5);
   static const List<Duration> _backoff = <Duration>[
@@ -147,6 +153,15 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   int _credentialRevision = 0;
   String? _credentialFingerprint;
   int get credentialRevision => _credentialRevision;
+
+  /// The cookie-header fingerprint the last server-confirmed healthy verdict
+  /// was issued under. A credential rotation is *verified* when the live
+  /// header still matches this fingerprint: the verdict chain (bare probe or
+  /// real-browser probe) accepted exactly those credentials. Feed responses
+  /// fetched before such a rotation may be adopted; an unverified rotation
+  /// (restore, unexpected store change) keeps the conservative rejection.
+  String? _verifiedCredentialFingerprint;
+  String? get verifiedCredentialFingerprint => _verifiedCredentialFingerprint;
 
   int observeCredentials({required String cookieHeader, required String csrf}) {
     final fingerprint = cookieHeaderFingerprint('$cookieHeader\u0000$csrf');
@@ -191,7 +206,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       );
       return active;
     }
-    final now = DateTime.now();
+    final now = _now();
     final previous = _lastRestrictionCheck;
     if (previous != null &&
         now.difference(previous) < const Duration(seconds: 30)) {
@@ -202,12 +217,16 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       'auth',
       'web verification requested source=$source',
     );
-    await check(force: true);
+    await check(force: !source.startsWith('media-'), source: source);
   }
 
   /// Verifies the web session through the HTTP and real-browser evidence chain.
   /// Normal checks reuse recent success and respect transient backoff.
-  Future<void> check({bool force = false, bool browser = false}) async {
+  Future<void> check({
+    bool force = false,
+    bool browser = false,
+    String source = 'session-check',
+  }) async {
     if (_interactive) return;
     final active = _activeCheck;
     if (active != null) return active;
@@ -215,7 +234,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     if (!force &&
         last != null &&
         state.isHealthy &&
-        DateTime.now().difference(last) < _cacheDuration) {
+        _now().difference(last) < _cacheDuration) {
       return;
     }
     if (!force && state.inCooldown) return;
@@ -226,7 +245,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     final epoch = _accountEpoch;
     AppLogger.instance.info(
       'auth',
-      'recovery created recoveryId=$_recoveryId accountEpoch=$_accountEpoch sessionGeneration=$generation force=$force',
+      'recovery created eventId=$_recoveryId recoveryId=$_recoveryId accountEpoch=$_accountEpoch sessionGeneration=$generation credentialRevision=$_credentialRevision triggerSource=$source force=$force',
     );
     late final Future<void> tracked;
     tracked =
@@ -245,6 +264,26 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
 
   bool _isCurrent(int generation) =>
       mounted && _ref.mounted && generation == _generation;
+
+  Future<bool> _probeCredentialsCurrent(
+    WebSessionProbeResult probe,
+    int generation,
+  ) async {
+    final observed = probe.credentialFingerprint;
+    if (observed == null) return _isCurrent(generation);
+    final live = await _ref.read(webSessionProvider).cookieHeader();
+    if (!_isCurrent(generation)) return false;
+    if ((live.isNotEmpty ||
+            probe.outcome == WebSessionProbeOutcome.anonymous) &&
+        cookieHeaderFingerprint(live) == observed) {
+      return true;
+    }
+    _setTransient(
+      WebSessionStatusState.unverified,
+      'browser-credentials-superseded',
+    );
+    return false;
+  }
 
   /// The only entry point that turns evidence into a verdict. Everything the
   /// controller (or a future coordinator) learns about the session must pass
@@ -277,12 +316,12 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     if (nextState != null) {
       switch (nextState) {
         case WebSessionStatusState.healthy:
-          _lastSuccess = DateTime.now();
+          _lastSuccess = _now();
           _failures = 0;
           final next = WebSessionStatus(
             state: nextState,
             serverUsername: decision.serverUsername,
-            lastCheckedAt: DateTime.now(),
+            lastCheckedAt: _now(),
           );
           _logTransition(next, evidence.source.name);
           state = next;
@@ -317,18 +356,19 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         _ref.read(webSessionRefresherProvider).recoveryId = recoveryId;
         final probe = await _ref.read(webSessionProbeProvider)();
         if (!_isCurrent(generation)) return;
+        if (!await _probeCredentialsCurrent(probe, generation)) return;
         final last = _lastSuccess;
         if (probe.outcome == WebSessionProbeOutcome.unavailable &&
             state.isHealthy &&
             last != null &&
-            DateTime.now().difference(last) < _cacheDuration) {
+            _now().difference(last) < _cacheDuration) {
           AppLogger.instance.info(
             'auth',
             'recovery inconclusive recoveryId=$recoveryId retained=healthy_lease',
           );
           return;
         }
-        applyVerification(
+        final browserDecision = applyVerification(
           WebSessionEvidence(
             source: WebSessionEvidenceSource.realBrowserProbe,
             outcome: probe.outcome,
@@ -336,6 +376,9 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
             generation: generation,
           ),
         );
+        if (browserDecision.nextState == WebSessionStatusState.healthy) {
+          _verifiedCredentialFingerprint = probe.credentialFingerprint;
+        }
         return;
       }
       // Restore the persisted snapshot if the live WebView store lost it
@@ -387,6 +430,9 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       }
       final before = await webSession.snapshot(source: 'check-before-verify');
       AppLogger.instance.info('auth', before.logLine());
+      final verificationCredentialRevision = _credentialRevision;
+      final verificationCsrf = _ref.read(webSessionControllerProvider).csrf;
+      String? verifiedFingerprint = cookieHeaderFingerprint(cookieHeader);
       // The persisted snapshot only exists because a previous session was
       // confirmed during an actual WebView login. The home page answer decides
       // whether that session is still who the server thinks it is, but a bare
@@ -400,6 +446,23 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       // A newer login/lockout superseded this check; never let a stale answer
       // overwrite the newer session state.
       if (!_isCurrent(generation)) return;
+      final currentHeader = await webSession.cookieHeader();
+      if (!_isCurrent(generation)) return;
+      if (verificationCredentialRevision != _credentialRevision ||
+          verificationCsrf != _ref.read(webSessionControllerProvider).csrf ||
+          currentHeader != cookieHeader) {
+        AppLogger.instance.info(
+          'auth',
+          'recovery discarded recoveryId=$recoveryId accountEpoch=$accountEpoch '
+              'sessionGeneration=$generation credentialRevision=$_credentialRevision '
+              'evidenceSource=bareProbe decisionReason=credentials_superseded',
+        );
+        _setTransient(
+          WebSessionStatusState.unverified,
+          'credentials-superseded',
+        );
+        return;
+      }
       var decision = applyVerification(
         WebSessionEvidence(
           source: WebSessionEvidenceSource.bareProbe,
@@ -433,6 +496,8 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         // real-browser evidence and apply it as a separate observation.
         final probe = await _ref.read(webSessionProbeProvider)();
         if (!_isCurrent(generation)) return;
+        if (!await _probeCredentialsCurrent(probe, generation)) return;
+        verifiedFingerprint = probe.credentialFingerprint;
         decision = applyVerification(
           WebSessionEvidence(
             source: WebSessionEvidenceSource.realBrowserProbe,
@@ -449,6 +514,25 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         }
       }
       if (decision.nextState == WebSessionStatusState.healthy) {
+        // Record the credential set this healthy verdict was issued under:
+        // for the plain path `confirmedCookies` equals the verified header
+        // (the credentials-superseded guard above rejected any rotation),
+        // for the escalated path it is the post-probe store the probe itself
+        // authenticated. Feed-side rotation adoption keys off this value.
+        _verifiedCredentialFingerprint = verifiedFingerprint;
+        // Snapshot collection is another asynchronous read. A rotation after
+        // the verdict must not persist an unverified replacement credential set.
+        if (verifiedFingerprint == null ||
+            cookieHeaderFingerprint(
+                  WebSession.cookieHeaderFrom(confirmedCookies),
+                ) !=
+                verifiedFingerprint) {
+          AppLogger.instance.info(
+            'auth',
+            'confirmed snapshot skipped reason=credentials_superseded',
+          );
+          return;
+        }
         // Persist only a server-confirmed live cookie set. An unconfirmed
         // health check must never overwrite the snapshot: a degraded live
         // store during a WAF challenge can still carry a matching
@@ -488,7 +572,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
 
   void markHealthy({required String serverUsername}) {
     _generation++;
-    _lastSuccess = DateTime.now();
+    _lastSuccess = _now();
     _lastRestrictionCheck = null;
     _failures = 0;
     applyVerification(
@@ -502,7 +586,12 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   }
 
   void _setEmptyLiveCookieState({required int persistedCount}) {
-    if (persistedCount == 0) {
+    final claimed = _ref.read(webSessionControllerProvider).isLoggedIn == true;
+    if (emptyLiveCookieStatus(
+          persistedCookieCount: persistedCount,
+          claimedSignedIn: claimed,
+        ) ==
+        WebSessionStatusState.anonymous) {
       _setAnonymous(source: 'cookie-store');
     } else {
       _setUnavailable(source: 'cookie-store');
@@ -535,11 +624,25 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       _setTransient(WebSessionStatusState.unavailable, source);
 
   void _setTransient(WebSessionStatusState state, String source) {
+    final last = _lastSuccess;
+    if (this.state.isHealthy &&
+        last != null &&
+        _now().difference(last) < _cacheDuration) {
+      AppLogger.instance.info(
+        'auth',
+        'recovery inconclusive recoveryId=$_recoveryId accountEpoch=$_accountEpoch '
+            'sessionGeneration=$_generation credentialRevision=$_credentialRevision '
+            'evidenceSource=$source decisionReason=retained_unexpired_lease',
+      );
+      // Do not renew the lease: persistent inconclusive evidence eventually
+      // becomes unverified, while an authoritative logout takes effect now.
+      return;
+    }
     _failures += 1;
     final index = (_failures - 1).clamp(0, _backoff.length - 1);
     final next = WebSessionStatus(
       state: state,
-      cooldownUntil: DateTime.now().add(_backoff[index]),
+      cooldownUntil: _now().add(_backoff[index]),
     );
     _logTransition(next, source);
     this.state = next;

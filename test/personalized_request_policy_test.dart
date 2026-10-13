@@ -31,7 +31,10 @@ void main() {
   test('same-account confirmation alone does not waste a usable response', () {
     expect(decision(generation: false), isNull);
   });
-  test('unconfirmed credential rotation is still rejected', () {
+  test('an unverified credential rotation is rejected (R2)', () {
+    // The caller passes sameCredentials=false only for a rotation the verdict
+    // chain has NOT confirmed (no matching verifiedCredentialFingerprint);
+    // verified same-session rotations arrive as sameCredentials=true.
     expect(decision(credentials: false), 'credentials_changed');
   });
   test('account switch including away-and-back rejects stale response', () {

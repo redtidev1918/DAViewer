@@ -1,5 +1,97 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-14: final runtime review boundaries fixed
+
+R1 now uses committed main-document generations; SPA History and duplicate
+load-stop events only invalidate samples, never corroborate anonymous. R2
+credentials-superseded paths retain only an unexpired lease, otherwise move to
+unverified. R3 uses URI hostname parsing for root/subdomain/explicit-port URLs,
+excluding CDN and unidentifiable text. R4 binds native Cookie fingerprints to
+the page sampling transaction (reads before/after), checks them at delivery,
+and never persists a later unverified replacement set.
+
+Local final source: analyze clean, full suite **534 PASS**, including native
+Headless callback wiring and the reviewer boundary cases. Format run completed;
+fresh commit CI remains required. Logs: `D:\Android\setup\p0-final-*.log`.
+19 accidentally tracked historical audits/screenshots/test dumps/patches were
+removed from the PR index, preserved locally and copied to
+`D:\Android\setup\p0-historical-audits-backup-2026-10-14`.
+Only the current causal-path audit stays in this PR. No old stash applied.
+Next: push #111, verify current-SHA CI/SDK/three-platform candidates, merge;
+integrate #112 and run fresh checks before release-please publication.
+Android Verified / Original Incident Verified remain PENDING. Older entries
+below are historical checkpoints, not approval of the previously failing R1-R4.
+
+## 2026-10-14: Codex takes implementation and release ownership
+
+User authorized Codex to complete the interrupted zcode fixes, push, merge,
+publish and update documentation after fresh verification. Main workspace
+`D:\Code\DAViewer`, branch `codex/runtime-session-stability`, HEAD `63ba115`.
+Three inherited uncommitted files: observer, refresher, media signal. Diff
+backup `D:\Android\setup\p0-zcode-handoff-2026-10-14.patch`; old stash retained.
+UI worktree `C:\Users\12629\.codex\worktrees\notice-ux\DAViewer` on
+`codex/notice-ux`, HEAD `2215e1a`, contains pending feedback-helper migration;
+diff and new helper backed up outside repository. Do not drop that work.
+Next: finish committed-document fencing, expired superseded-probe handling,
+typed URL attribution and transaction-owned browser credentials; migrate tests
+to the new observer epoch API, run reviewer probes plus full regression. Then
+finish UI feedback tests, integrate via PRs #111/#112, fresh CI and release.
+Prior 525/530 passing suites and previous CI do not verify these new changes.
+Android/Original Incident remain PENDING; no data/cookie reset, no timeout or
+retry inflation, no unrelated SDK refactor. Historic evidence is preserved.
+
+## 2026-10-14: active P0 — runtime session verdict and misleading recovery UI
+
+- Workspace `D:\Code\DAViewer`; branch `codex/runtime-session-stability`;
+  baseline `5257454d609a5263a8ca57d5015ff2d80a6a0db7` (main, v0.5.17 released).
+- Full new user taskbook copied verbatim to `RUNTIME-STABILITY-SPEC.md`.
+- Implementation COMPLETE on this branch (2026-10-14, two concurrent sessions
+  merged: verdict/status/coordinator/UI fixes + probe corroboration, media
+  host attribution, same-generation rotation adoption). Full causal-path audit:
+  `audits/runtime-session-causal-paths.md`; regression record:
+  `docs/regressions/024-runtime-session-misjudge.md` (root causes RC1-RC4,
+  fixes F1-F5, invariant mapping).
+- Local validation: `dart format --set-exit-if-changed lib test` 0 changed;
+  `flutter analyze` clean; `flutter test --dart-define=DAVIEWER_VERSION=0.5.17`
+  **525 PASS** (was 511; new/updated regression tests included).
+- Review round 1 (2026-10-14 user feedback) addressed on the same branch:
+  (1) anonymous corroboration now binds to a strictly newer navigation
+  sequence — `BrowserSessionObserver` delivers each evidence with its navSeq
+  and `webSessionProbeSampleDecision` gained a `wait` outcome for samples
+  read before the reload lands; (2) credential-rotation adoption is
+  verification-gated — the status controller records
+  `verifiedCredentialFingerprint` on every server-confirmed healthy verdict
+  and the feed adopts a rotated response only on fingerprint match;
+  unverified rotations keep the `credentials_changed` rejection. Three
+  boundary tests added: reload-not-landed (wait), unverified rotation
+  (reject), expired lease (transitions to unavailable after the 5-minute
+  lease, clock-injected). PR #111 checks re-run after push.
+- PR #111 (https://github.com/redtidev1918/DAViewer/pull/111) all checks
+  PASS on review-fix commit `ee7f01d`: Analyze and test, branch-contract,
+  quality (macOS/ubuntu/windows candidate builds), release build-plan.
+  CI Verified: PASS. Review continues (reviewer is focused-verifying the
+  evidence boundaries); do not merge before review concludes. Release
+  Verified: PENDING (release jobs correctly skip on the PR branch).
+- Key code-level facts (confirmed): a single anonymous browser-probe sample
+  used to complete an authoritative logout (A4) while media-image 403 regex
+  matching, rfy's own 403, WAF-unavailable escalation and timeout retries all
+  reached that probe during scrolling; group-2 cursors independently raised
+  the user-visible degraded banner; same-generation cookie rotation discarded
+  in-flight pages (`credentials_changed`); empty local cookies with a claimed
+  signed-in session could write anonymous directly. All addressed; real logout
+  still completes via the corroborated second anonymous sample.
+- UNVERIFIED: the exact on-device page shape that produced the original
+  incident (no failure trace exists — the 23:44 log is a success control);
+  group-2 protocol semantics. Diagnostic fields added for recurrence capture.
+- Retained original stash and historical untracked audit/import files unchanged.
+  Code Verified: PASS (local). CI/Release: PENDING (PR next). Android/Original
+  Incident: PENDING — do not claim device resolution from widget tests.
+- Next: commit, push, PR against main, verify CI, then release workflow per
+  repo conventions (original-phone gate removed by user 2026-10-13; disclose
+  PENDING acceptance honestly).
+- Recovery: read AGENTS/SPEC/this checkpoint and RUNTIME-STABILITY-SPEC, inspect
+  Git before edits, retain original stash; no data clearing or retry inflation.
+
 ## 2026-10-13: active P0 — v0.5.16 cached-preview pagination lock
 
 - Latest phase: implementation/review/publication complete; device acceptance

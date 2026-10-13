@@ -10,6 +10,8 @@ import '../runtime/runtime_provider.dart';
 import 'browser_session_observer.dart';
 import 'web_session_controller.dart';
 import 'web_session_platform.dart';
+import 'session_state.dart' show webSessionProvider;
+import 'web_session_diagnostics.dart';
 
 enum WebSessionProbeOutcome { confirmed, anonymous, unavailable }
 
@@ -17,31 +19,88 @@ final class WebSessionProbeResult {
   const WebSessionProbeResult.confirmed({
     required this.csrf,
     required this.username,
+    this.credentialFingerprint,
   }) : outcome = WebSessionProbeOutcome.confirmed;
-  const WebSessionProbeResult.anonymous({this.csrf = ''})
-    : outcome = WebSessionProbeOutcome.anonymous,
-      username = '';
-  const WebSessionProbeResult.unavailable({this.csrf = ''})
-    : outcome = WebSessionProbeOutcome.unavailable,
-      username = '';
+  const WebSessionProbeResult.anonymous({
+    this.csrf = '',
+    this.credentialFingerprint,
+  }) : outcome = WebSessionProbeOutcome.anonymous,
+       username = '';
+  const WebSessionProbeResult.unavailable({
+    this.csrf = '',
+    this.credentialFingerprint,
+  }) : outcome = WebSessionProbeOutcome.unavailable,
+       username = '';
   final WebSessionProbeOutcome outcome;
   final String csrf;
   final String username;
+  final String? credentialFingerprint;
   bool get succeeded => outcome == WebSessionProbeOutcome.confirmed;
 }
 
 WebSessionProbeResult webSessionProbeResultFromPage({
   required String? pageUsername,
   required String csrf,
+  String? credentialFingerprint,
 }) {
   final username = pageUsername?.trim();
   if (username == null || username.isEmpty) {
     return WebSessionProbeResult.unavailable(csrf: csrf);
   }
   if (username == 'anonymous') {
-    return WebSessionProbeResult.anonymous(csrf: csrf);
+    return WebSessionProbeResult.anonymous(
+      csrf: csrf,
+      credentialFingerprint: credentialFingerprint,
+    );
   }
-  return WebSessionProbeResult.confirmed(csrf: csrf, username: username);
+  return WebSessionProbeResult.confirmed(
+    csrf: csrf,
+    username: username,
+    credentialFingerprint: credentialFingerprint,
+  );
+}
+
+/// What a probe transaction should do with one identity-bearing page sample.
+enum WebSessionProbeSampleDecision {
+  /// The sample decides the transaction.
+  complete,
+
+  /// A first anonymous sample: arm one corroborating reload.
+  corroborateAnonymous,
+
+  /// An anonymous sample that did not come from a new navigation (the reload
+  /// has not landed / the same stale document was re-read). The transaction
+  /// keeps waiting; its deadline resolves `unavailable`.
+  wait,
+}
+
+/// A first anonymous sample is weak evidence: a redirect intermediate state,
+/// an anonymous shell before session cookies re-attach, or a challenge
+/// variant can all render `isLoggedIn: false` while the Cookie session is
+/// alive. The first anonymous sample arms one corroborating reload instead of
+/// completing the probe. Completion then requires the anonymous verdict to be
+/// delivered under a strictly newer COMMITTED-document generation than the
+/// arming sample — `corroborationPending` proves nothing about whether a new
+/// page loaded, and neither does an invalidation-sequence bump: an SPA
+/// history event or a rotated CSRF re-reads the same document and is not
+/// independent negative evidence (review R1, 2026-10-14). A confirmed sample
+/// always completes immediately, so a live session is never delayed
+/// (invariant 2 stays intact).
+WebSessionProbeSampleDecision webSessionProbeSampleDecision(
+  WebSessionProbeResult result, {
+  required bool corroborationPending,
+  int evidenceDocument = 0,
+  int armedDocument = 0,
+}) {
+  if (result.outcome == WebSessionProbeOutcome.anonymous) {
+    if (!corroborationPending) {
+      return WebSessionProbeSampleDecision.corroborateAnonymous;
+    }
+    if (evidenceDocument <= armedDocument) {
+      return WebSessionProbeSampleDecision.wait;
+    }
+  }
+  return WebSessionProbeSampleDecision.complete;
 }
 
 final webSessionRefresherProvider = Provider<WebSessionRefresher>((ref) {
@@ -51,6 +110,35 @@ final webSessionRefresherProvider = Provider<WebSessionRefresher>((ref) {
   );
   return host;
 });
+
+/// Bind page identity to the exact native credential set observed during its
+/// sampling transaction. A later read must not retroactively authenticate a
+/// different set. Changing/unreadable credentials remain inconclusive.
+Future<BrowserSessionEvidence> readBrowserEvidenceWithCredentials({
+  required Future<String> Function() cookieHeader,
+  required Future<BrowserSessionEvidence> Function() readPage,
+}) async {
+  final before = await cookieHeader();
+  final page = await readPage();
+  final after = await cookieHeader();
+  final explicitlyAnonymous =
+      page.initialized &&
+      (page.loggedIn == false || page.username == 'anonymous');
+  if (before != after || (before.isEmpty && !explicitlyAnonymous)) {
+    return const BrowserSessionEvidence();
+  }
+  return BrowserSessionEvidence(
+    username: page.username,
+    loggedIn: page.loggedIn,
+    csrf: page.csrf,
+    initialized: page.initialized,
+    blocked: page.blocked,
+    challenge: page.challenge,
+    parseFailed: page.parseFailed,
+    identitySource: page.identitySource,
+    credentialFingerprint: cookieHeaderFingerprint(before),
+  );
+}
 
 final webSessionProbeProvider =
     Provider<Future<WebSessionProbeResult> Function()>(
@@ -63,6 +151,7 @@ final class WebSessionRefresher {
   WebSessionRefresher(this._ref);
   final Ref _ref;
   HeadlessInAppWebView? _headless;
+  InAppWebViewController? _probeController;
   BrowserSessionObserver? _observer;
   Timer? _timeout;
   Completer<WebSessionProbeResult>? _completion;
@@ -70,6 +159,22 @@ final class WebSessionRefresher {
   String recoveryId = 'metadata';
   String _activeRecoveryId = 'metadata';
   int _activeIdentityEpoch = 0;
+
+  /// A single anonymous page sample is weak evidence: a redirect intermediate
+  /// state, an anonymous shell before session cookies re-attach, or a challenge
+  /// variant can all render `isLoggedIn: false` while the Cookie session is
+  /// alive. The first anonymous sample therefore only arms one corroborating
+  /// reload; the verdict completes on an anonymous sample delivered under a
+  /// NEW committed main-frame document (see `_corroborateAnonymous` and
+  /// `_anonymousArmedDocument`).
+  bool _anonymousCorroborationPending = false;
+
+  /// The committed-document generation the arming anonymous sample was read
+  /// under. A corroborating anonymous sample must arrive under a strictly
+  /// greater generation — the reload actually committed a new main frame.
+  /// SPA history events and CSRF rotations advance the invalidation sequence
+  /// only and never count (review R1, 2026-10-14).
+  int _anonymousArmedDocument = 0;
 
   Future<WebSessionProbeResult> refresh() {
     final active = _completion;
@@ -121,18 +226,22 @@ final class WebSessionRefresher {
         ),
         onWebViewCreated: (controller) {
           if (!_current(completion)) return;
+          _probeController = controller;
           _observer = BrowserSessionObserver(
-            read: () => readBrowserSessionEvidence(
-              getUrl: () async => (await controller.getUrl())?.uriValue,
-              evaluate: () => controller.evaluateJavascript(
-                source: browserSessionEvidenceScript,
+            read: () => readBrowserEvidenceWithCredentials(
+              cookieHeader: _ref.read(webSessionProvider).cookieHeader,
+              readPage: () => readBrowserSessionEvidence(
+                getUrl: () async => (await controller.getUrl())?.uriValue,
+                evaluate: () => controller.evaluateJavascript(
+                  source: browserSessionEvidenceScript,
+                ),
+                getHtml: controller.getHtml,
               ),
-              getHtml: controller.getHtml,
             ),
-            onEvidence: (evidence) {
+            onEvidence: (evidence, epoch) {
               if (!_current(completion)) return;
               _log(
-                'classification=${evidence.classification} identitySource=${evidence.identitySource} csrfPresent=${evidence.csrf.isNotEmpty}',
+                'classification=${evidence.classification} identitySource=${evidence.identitySource} csrfPresent=${evidence.csrf.isNotEmpty} navSeq=${epoch.invalidation} docSeq=${epoch.committedDocument}',
               );
               if (evidence.csrf.isNotEmpty) {
                 unawaited(
@@ -149,17 +258,43 @@ final class WebSessionRefresher {
               }
               if (evidence.blocked) {
                 unawaited(_dispose(null, completion, 'blocked'));
-              } else if (!evidence.challenge && evidence.hasIdentity) {
-                unawaited(
-                  _dispose(
-                    webSessionProbeResultFromPage(
-                      pageUsername: evidence.username,
-                      csrf: evidence.csrf,
-                    ),
-                    completion,
-                    evidence.classification,
-                  ),
+              } else if (!evidence.challenge &&
+                  (evidence.hasIdentity ||
+                      (evidence.initialized && evidence.loggedIn == false))) {
+                final result = webSessionProbeResultFromPage(
+                  pageUsername:
+                      evidence.initialized && evidence.loggedIn == false
+                      ? 'anonymous'
+                      : evidence.username,
+                  csrf: evidence.csrf,
+                  credentialFingerprint: evidence.credentialFingerprint,
                 );
+                switch (webSessionProbeSampleDecision(
+                  result,
+                  corroborationPending: _anonymousCorroborationPending,
+                  evidenceDocument: epoch.committedDocument,
+                  armedDocument: _anonymousArmedDocument,
+                )) {
+                  case WebSessionProbeSampleDecision.corroborateAnonymous:
+                    _anonymousCorroborationPending = true;
+                    _anonymousArmedDocument = epoch.committedDocument;
+                    _log(
+                      'anonymous_sample_unconfirmed event=reload_for_corroboration docSeq=${epoch.committedDocument}',
+                    );
+                    unawaited(_corroborateAnonymous(completion));
+                  case WebSessionProbeSampleDecision.wait:
+                    // No committed main-frame document has arrived since the
+                    // arming sample: an SPA history event or a rotated CSRF
+                    // re-read the same document. Keep waiting; the deadline
+                    // resolves unavailable — never a logged-out verdict.
+                    _log(
+                      'anonymous_sample_same_document event=ignored navSeq=${epoch.invalidation} docSeq=${epoch.committedDocument}',
+                    );
+                  case WebSessionProbeSampleDecision.complete:
+                    unawaited(
+                      _dispose(result, completion, evidence.classification),
+                    );
+                }
               }
             },
             onDeadline: () =>
@@ -205,6 +340,27 @@ final class WebSessionRefresher {
   /// A new account must never join a browser belonging to the old account.
   Future<void> accountChanged() => _dispose(null, null, 'account_changed');
 
+  /// Reloads the page once so a second, independent page load can corroborate
+  /// (or refute) a first anonymous sample. The observer keeps running across
+  /// the reload: a signed-in sample completes `confirmed` immediately, a second
+  /// anonymous sample completes `anonymous`, and anything else falls to the
+  /// original transaction deadline as `unavailable` — never a logged-out
+  /// verdict from missing evidence.
+  Future<void> _corroborateAnonymous(
+    Completer<WebSessionProbeResult> completion,
+  ) async {
+    try {
+      await _probeController?.reload();
+    } on Object {
+      if (_current(completion)) {
+        _log('anonymous_corroboration_reload_failed');
+      }
+      // Without a navigation the observer's deduplicated sampler may stay
+      // silent; the transaction deadline then resolves `unavailable`, which
+      // is the required inconclusive outcome.
+    }
+  }
+
   Future<void> _dispose([
     WebSessionProbeResult? result,
     Completer<WebSessionProbeResult>? expected,
@@ -218,6 +374,9 @@ final class WebSessionRefresher {
     _timeout = null;
     _observer?.dispose();
     _observer = null;
+    _probeController = null;
+    _anonymousCorroborationPending = false;
+    _anonymousArmedDocument = 0;
     final headless = _headless;
     _headless = null;
     final completion = _completion;

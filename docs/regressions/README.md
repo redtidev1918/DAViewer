@@ -44,6 +44,14 @@ has a failing reproduction on the exact v0.5.16 commit and passing host
 Widget/Provider regressions after repair. Physical Android pagination acceptance
 remains PENDING; do not confuse this with on-device incident closure.
 
+REG-024: [runtime session misjudge and pagination-time login UI](024-runtime-session-misjudge.md)
+closes the code-level causes of the two 2026-10-13 user reports (group-2 weak
+evidence warning; single-anonymous-sample logout with high-frequency media/403
+trigger surface). Code Verified locally (522 tests); the on-device trigger
+sample was never captured, so Original Incident Verified stays PENDING and the
+new diagnostic fields (triggerSource, decisionReason, probe sample events) are
+the evidence path for any recurrence.
+
 2026-10-12: v0.5.13 failed the original Android cold-start incident despite its
 automated checks. REG-018/019 describe earlier coverage, not closure of that
 incident. See [REG-021](021-android-session-recovery.md) for the shared observer,

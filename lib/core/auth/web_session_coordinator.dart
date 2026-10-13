@@ -31,8 +31,9 @@ final webSessionCoordinatorProvider = Provider<WebSessionCoordinator>((ref) {
         ref.mounted &&
         ref.read(webSessionControllerProvider).isLoggedIn == true &&
         !ref.read(webSessionStatusProvider).needsLogin,
-    verify: (forced, source) =>
-        forced ? status.recheckAfterWebSignal(source) : status.check(),
+    verify: (forced, source) => forced
+        ? status.recheckAfterWebSignal(source)
+        : status.check(source: source),
   );
   ref.onDispose(coordinator.dispose);
   return coordinator;

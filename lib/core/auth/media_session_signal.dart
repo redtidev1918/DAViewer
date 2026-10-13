@@ -33,12 +33,31 @@ final webSessionSignalReporterProvider = Provider<void Function(String source)>(
 final class MediaSessionSignal {
   const MediaSessionSignal._();
 
-  static final RegExp _httpStatusPattern = RegExp(r'\b(401|403)\b');
+  static final RegExp _httpStatusPattern = RegExp(
+    r'\b(?:status(?:code)?|response(?: code)?|http(?: error)?)[\s:=]*(401|403)\b',
+    caseSensitive: false,
+  );
+  static final RegExp _urlPattern = RegExp(
+    r'''https?://[^\s'"<>]+''',
+    caseSensitive: false,
+  );
 
-  /// Forwards [error] to the verdict chain when it looks like an
-  /// authentication rejection. Network failures, timeouts and 404s are ignored.
+  /// The site hosts whose 401/403 may feed the global web-session verdict
+  /// chain. Resource hosts (wixmp.com, deviantart.net media subdomains)
+  /// answer for themselves and are deliberately absent.
+  static const Set<String> _siteHosts = <String>{
+    'deviantart.com',
+    'www.deviantart.com',
+  };
+
+  /// Forwards [error] to the verdict chain only when it is an authentication
+  /// rejection attributable to the DeviantArt site itself. Network failures,
+  /// timeouts and 404s are ignored; so are CDN/media-host 403s (wixmp signed
+  /// URL expiry, paid-content blur proxies) and errors whose text carries no
+  /// attributable URL — one expired thumbnail must never start a global
+  /// session re-verification.
   static void report(BuildContext context, Object error, String source) {
-    if (!isAuthRejection(error)) return;
+    if (!isWebSessionAuthRejection(error)) return;
     ProviderContainer container;
     try {
       container = ProviderScope.containerOf(context, listen: false);
@@ -61,5 +80,30 @@ final class MediaSessionSignal {
       return error.statusCode == 401 || error.statusCode == 403;
     }
     return _httpStatusPattern.hasMatch(error.toString());
+  }
+
+  /// An auth rejection that names a DeviantArt site host. The URL is extracted
+  /// from the error text and parsed with [Uri] before comparing `uri.host` —
+  /// a raw string comparison misattributes root domains, explicit ports and
+  /// mixed-case hosts. Unattributable errors prove nothing about the session.
+  static bool isWebSessionAuthRejection(Object error) {
+    if (!isAuthRejection(error)) return false;
+    final uri = _urlOf(error);
+    if (uri == null) return false;
+    final host = uri.host.toLowerCase();
+    if (host.isEmpty) return false;
+    return _siteHosts.contains(host) || host.endsWith('.deviantart.com');
+  }
+
+  static Uri? _urlOf(Object error) {
+    // `uri` is inherited from dart:io HttpException; matching the concrete
+    // cache-manager type avoids a direct dart:io import in this file.
+    if (error is HttpExceptionWithStatus) {
+      return error.uri;
+    }
+    final match = _urlPattern.firstMatch(error.toString());
+    if (match == null) return null;
+    final text = match.group(0)!.replaceFirst(RegExp(r'[),.;\]}]+$'), '');
+    return Uri.tryParse(text);
   }
 }

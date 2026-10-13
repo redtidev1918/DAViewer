@@ -36,6 +36,7 @@ final class BrowserSessionEvidence {
     this.challenge = false,
     this.parseFailed = false,
     this.identitySource = 'page_global',
+    this.credentialFingerprint,
   });
 
   final String? username;
@@ -49,6 +50,9 @@ final class BrowserSessionEvidence {
   final bool challenge;
   final bool parseFailed;
   final String identitySource;
+
+  /// Host-captured credential context; never supplied by page JavaScript.
+  final String? credentialFingerprint;
 
   bool get hasIdentity => username != null && username!.isNotEmpty;
   String get classification => blocked
@@ -101,7 +105,12 @@ Future<BrowserSessionEvidence> readBrowserSessionEvidence({
     return const BrowserSessionEvidence();
   }
   final page = BrowserSessionEvidence.decode(await evaluate());
-  if (page.hasIdentity || page.blocked || page.challenge || page.csrf.isEmpty) {
+  if (await getUrl() != before) return const BrowserSessionEvidence();
+  if (page.hasIdentity ||
+      page.blocked ||
+      page.challenge ||
+      page.csrf.isEmpty ||
+      (page.initialized && page.loggedIn == false)) {
     return page;
   }
   String? html;
@@ -123,6 +132,24 @@ Future<BrowserSessionEvidence> readBrowserSessionEvidence({
   );
 }
 
+/// The navigation epoch a page sample was read under.
+///
+/// [invalidation] advances on ANY navigation or history event — it invalidates
+/// in-flight reads and dedup keys. [committedDocument] advances ONLY on
+/// a main-frame load stop following a load start: an SPA history update,
+/// repeated stop callback or a CSRF rotation re-reads the same
+/// document and must never count as independent page evidence. Corroboration
+/// logic binds to [committedDocument], never to [invalidation] alone.
+final class BrowserSampleEpoch {
+  const BrowserSampleEpoch({
+    required this.invalidation,
+    required this.committedDocument,
+  });
+
+  final int invalidation;
+  final int committedDocument;
+}
+
 /// One bounded observation window spanning load stops, redirects and SPA
 /// history updates. Events wake the same sampler; they never grant a verdict.
 /// Navigation invalidates reads already in progress. Only one read runs at once.
@@ -136,7 +163,13 @@ final class BrowserSessionObserver {
   });
 
   final Future<BrowserSessionEvidence> Function() read;
-  final void Function(BrowserSessionEvidence) onEvidence;
+
+  /// Receives each distinct evidence together with the epoch it was read
+  /// under. Consumers deciding whether a sample constitutes *new* page
+  /// evidence must compare [BrowserSampleEpoch.committedDocument], not the
+  /// invalidation sequence.
+  final void Function(BrowserSessionEvidence evidence, BrowserSampleEpoch epoch)
+  onEvidence;
   final void Function() onDeadline;
   final Duration budget;
   final Duration interval;
@@ -146,6 +179,7 @@ final class BrowserSessionObserver {
   bool _reading = false;
   bool _loading = false;
   int _navigation = 0;
+  int _committedDocument = 0;
   String? _lastEvidence;
   bool get isDisposed => _disposed;
 
@@ -176,6 +210,7 @@ final class BrowserSessionObserver {
   /// A full navigation may still expose the previous document while loading.
   /// SPA history updates invalidate reads without pausing asynchronous sampling.
   void navigationCommitted() {
+    if (_loading) _committedDocument++;
     _loading = false;
     _navigation++;
     _lastEvidence = null;
@@ -184,7 +219,10 @@ final class BrowserSessionObserver {
   Future<void> sample() async {
     if (_disposed || _reading || _loading) return;
     _reading = true;
-    final navigation = _navigation;
+    final epoch = BrowserSampleEpoch(
+      invalidation: _navigation,
+      committedDocument: _committedDocument,
+    );
     try {
       BrowserSessionEvidence evidence;
       try {
@@ -192,13 +230,13 @@ final class BrowserSessionObserver {
       } on Object {
         evidence = const BrowserSessionEvidence(parseFailed: true);
       }
-      if (_disposed || navigation != _navigation) return;
+      if (_disposed || epoch.invalidation != _navigation) return;
       // Token rotation must still reach the consumer without logging its value.
       final key =
           '${evidence.classification}:${evidence.username}:${evidence.csrf}';
       if (_lastEvidence == key) return;
       _lastEvidence = key;
-      onEvidence(evidence);
+      onEvidence(evidence, epoch);
     } finally {
       _reading = false;
     }
