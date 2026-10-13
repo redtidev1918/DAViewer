@@ -234,6 +234,13 @@ final class UpdateCheckController extends StateNotifier<UpdateCheckState> {
   final Ref _ref;
   DateTime? _lastSuccess;
   Future<void>? _activeCheck;
+  String? _dismissedVersion;
+
+  UpdateCheckState _visiblePrevious(UpdateCheckState previous) =>
+      previous.latestVersion != null &&
+          previous.latestVersion == _dismissedVersion
+      ? const UpdateCheckState()
+      : previous;
 
   Future<void> check({bool force = false}) {
     final active = _activeCheck;
@@ -258,7 +265,7 @@ final class UpdateCheckController extends StateNotifier<UpdateCheckState> {
     if (!_ref.mounted) return;
     final currentVersion = _ref.read(runningAppVersionProvider);
     if (!isSemver(currentVersion)) return;
-    final previous = state;
+    final previous = _visiblePrevious(state);
     state = UpdateCheckState(
       checking: true,
       latestVersion: previous.latestVersion,
@@ -267,13 +274,13 @@ final class UpdateCheckController extends StateNotifier<UpdateCheckState> {
     try {
       final dio = _ref.read(runtimeProvider).dio;
       if (dio == null) {
-        state = previous;
+        state = _visiblePrevious(previous);
         return;
       }
       final info = await fetchLatestReleaseInfo(dio: dio);
       if (!_ref.mounted) return;
       if (info == null) {
-        state = previous;
+        state = _visiblePrevious(previous);
         return;
       }
       // Cache only within this process: a persisted timestamp without a
@@ -285,19 +292,21 @@ final class UpdateCheckController extends StateNotifier<UpdateCheckState> {
       }
       final dismissed = await AppPreferences.loadDismissedUpdateVersion();
       if (!_ref.mounted) return;
-      if (dismissed == info.version) {
+      if (dismissed == info.version || _dismissedVersion == info.version) {
         state = const UpdateCheckState();
         return;
       }
       state = UpdateCheckState(latestVersion: info.version, notes: info.notes);
     } on Object {
       // The update check must never surface an error to the user.
-      if (_ref.mounted) state = previous;
+      if (_ref.mounted) state = _visiblePrevious(previous);
     }
   }
 
   Future<void> dismiss(String version) async {
-    await AppPreferences.saveDismissedUpdateVersion(version);
+    // Closing a reminder must not wait on filesystem/plugin availability.
+    _dismissedVersion = version;
     state = const UpdateCheckState();
+    await AppPreferences.saveDismissedUpdateVersion(version);
   }
 }

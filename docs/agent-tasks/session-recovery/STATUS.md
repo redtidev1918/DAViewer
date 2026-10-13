@@ -1,5 +1,16 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-14: isolated reminder UI follow-up
+
+User authorized reminder optimization while zcode continues the P0 runtime
+repair. UI workspace `C:\Users\12629\.codex\worktrees\notice-ux\DAViewer`, branch
+`codex/notice-ux`, based on `6a5856a`; the primary workspace is not edited.
+Scope, code locations and verification are in `docs/notice-ux.md`. Integrate
+the UI delta after P0 review, retaining newer auth/ownership fixes. Do not
+interpret UI tests or previews as original-incident or Android acceptance.
+Local UI validation: format 0 changed, analyze clean, 527 tests PASS. The UI
+delta is ready for a separate draft PR; no merge or publication performed.
+
 ## 2026-10-14: active P0 — runtime session verdict and misleading recovery UI
 
 - Workspace `D:\Code\DAViewer`; branch `codex/runtime-session-stability`;

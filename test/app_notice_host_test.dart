@@ -42,8 +42,8 @@ void main() {
       // The degraded label is attached to the content it qualifies (P0-B,
       // REG-022): it states the account is signed in and the items are not
       // confirmed personalized, and offers a retry — never a login CTA.
-      expect(find.textContaining('通用内容'), findsOneWidget);
-      expect(find.textContaining('账号已登录'), findsOneWidget);
+      expect(find.textContaining('推荐服务暂时受限'), findsOneWidget);
+      expect(find.textContaining('账号已登录'), findsNothing);
       expect(find.text('重试'), findsOneWidget);
       expect(container.read(webSessionStatusProvider).needsLogin, isFalse);
       await tester.tap(find.text('重试'));
@@ -57,7 +57,7 @@ void main() {
         serverUsername: 'artist',
       );
       await tester.pump();
-      expect(find.textContaining('通用内容'), findsNothing);
+      expect(find.textContaining('推荐服务暂时受限'), findsNothing);
       expect(
         container.read(personalizedSessionStatusProvider).needsRecovery,
         isTrue,
@@ -73,7 +73,7 @@ void main() {
         serverUsername: 'artist',
       );
       await tester.pump();
-      expect(find.textContaining('通用内容'), findsNothing);
+      expect(find.textContaining('推荐服务暂时受限'), findsNothing);
 
       identity.markHealthy(serverUsername: 'artist');
       await tester.pump();
@@ -83,7 +83,7 @@ void main() {
         generation: identity.generation,
       );
       await tester.pump();
-      expect(find.textContaining('通用内容'), findsOneWidget);
+      expect(find.textContaining('推荐服务暂时受限'), findsOneWidget);
     },
   );
 

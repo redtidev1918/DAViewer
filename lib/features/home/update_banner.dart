@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/l10n/app_strings.dart';
 import '../../core/updates/update_checker.dart';
+import '../../shared/widgets/app_notice_card.dart';
 
 const String _releasesUrl = 'https://github.com/redtidev1918/DAViewer/releases';
 
@@ -18,52 +19,17 @@ final class UpdateBanner extends ConsumerWidget {
     final update = ref.watch(updateCheckControllerProvider);
     if (!update.hasUpdate) return const SizedBox.shrink();
     final s = strings(ref.watch(appLanguageProvider));
-    final theme = Theme.of(context);
     final version = update.latestVersion!;
-    final color = theme.colorScheme.secondaryContainer;
-    final onColor = theme.colorScheme.onSecondaryContainer;
-    return Material(
-      color: color,
-      child: SafeArea(
-        bottom: false,
-        child: InkWell(
-          onTap: () => _showUpdateDialog(context, s, version, update.notes),
-          child: Padding(
-            padding: const EdgeInsets.only(left: 12, right: 4),
-            child: Row(
-              children: <Widget>[
-                Icon(Icons.system_update_alt, size: 18, color: onColor),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    s.newVersionAvailable('v$version'),
-                    style: theme.textTheme.bodyMedium?.copyWith(color: onColor),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => launchUrl(
-                    Uri.parse(_releasesUrl),
-                    mode: LaunchMode.externalApplication,
-                  ),
-                  child: Text(s.downloadUpdate),
-                ),
-                IconButton(
-                  tooltip: s.close,
-                  onPressed: () => ref
-                      .read(updateCheckControllerProvider.notifier)
-                      .dismiss(version),
-                  icon: const Icon(
-                    Icons.close,
-                    size: 18,
-                    color: Colors.white70,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+    return SafeArea(
+      bottom: false,
+      child: AppNoticeCard(
+        inline: true,
+        message: s.newVersionAvailable('v$version'),
+        actionLabel: s.viewUpdateDetails,
+        onAction: () => _showUpdateDialog(context, s, version, update.notes),
+        dismissLabel: s.close,
+        onDismiss: () =>
+            ref.read(updateCheckControllerProvider.notifier).dismiss(version),
       ),
     );
   }

@@ -765,7 +765,8 @@ void main() {
       // anonymous session gets, and it must not even send the request.
       expect(rfyAdapter.calls, 0);
       expect(find.byType(FilledButton), findsOneWidget);
-      expect(find.textContaining('Cookie'), findsOneWidget);
+      expect(find.text('登录 DeviantArt 后即可查看推荐。'), findsOneWidget);
+      expect(find.textContaining('Cookie'), findsNothing);
     },
   );
 }
