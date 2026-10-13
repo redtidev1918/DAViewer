@@ -1,5 +1,24 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-14: v0.5.18 publication in progress
+
+PRs #111/#112/#113 merged in dependency order. Release source
+`08295a192227a5748cbdafa24fc6279bd53f219e`, version 0.5.18+230. Release PR
+head `16eea73df2ee38ef2bc12ebf6f7261fd8bc6bcb5` passed analyze/test, fixed-SDK
+quality, all three SDK candidates/desktop startup, three publication dry-run
+builds and finalize. Runs: CI `38445279370`, SDK `38445279371`, dry-run
+`38445280058`. Local final release-version suite 544 PASS, format 0 changed,
+analyze clean. Superseded e71cbab dry-run was cancelled, not used as verification.
+
+Primary workspace now uses `codex/release-verification-0.5.18` based on release
+source; old runtime/notice/release branches and stash retained. Removed historical
+audit files remain untracked locally and backed up outside the repository.
+Formal build run `38447619267` is in progress; main CI `38447618889` must be
+checked on release source. Next: verify tag and official assets, compare all
+checksums and Android production cert/version/compiled revision, inspect
+download-page update and Pages deployment, finalize documentation checkpoint.
+Code/PR CI PASS; Release Verified PENDING; Android/Original Incident PENDING.
+
 ## 2026-10-14: runtime/UI merged, v0.5.18 release preparation
 
 PR #111 source `1de1c63564c46bac07274ea2f1ea906a439d4948` merged as `793ce8d`;
