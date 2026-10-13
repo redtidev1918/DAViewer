@@ -2,6 +2,12 @@
 
 ## 2026-10-13: active P0 — v0.5.16 cached-preview pagination lock
 
+- Latest phase: implementation/review complete; formal v0.5.17 publication
+  IN PROGRESS. PR #109 passed all checks and merged to release source
+  `360fce097dcca8619650e3c61e762a68ab5e1cf8`; release run `38419603553`.
+  Reporting branch `codex/pagination-release-report` was created from that
+  source. Implementation branch/reference information below is historical.
+
 - Workspace `D:\Code\DAViewer`; branch `codex/rfy-scroll-pagination` from
   current main `642e2f477aa4f9f18c953c674ad561171ea6faef`.
   Candidate source HEAD `c810e2167461a048fba20f777200bc1b6eb1aefb`;
