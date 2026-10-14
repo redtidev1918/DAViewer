@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.20](https://github.com/redtidev1918/DAViewer/compare/v0.5.19...v0.5.20) (2026-10-14)
+
+
+### Bug Fixes
+
+* **artwork:** stop reporting a web-session 403 as an official API failure in More Like This ([#116](https://github.com/redtidev1918/DAViewer/issues/116)) ([5da32c1](https://github.com/redtidev1918/DAViewer/commit/5da32c1e05960acb27dda89732f4fc5899646e98))
+* **session:** surface a detected WAF lockout instead of a false healthy lease, and make the cookie-restore decision visible ([#118](https://github.com/redtidev1918/DAViewer/issues/118)) ([67dfaba](https://github.com/redtidev1918/DAViewer/commit/67dfaba846010aa8e2ae56faf7f17ac4f9b0568d))
+
 ## [0.5.19](https://github.com/redtidev1918/DAViewer/compare/v0.5.18...v0.5.19) (2026-10-14)
 
 
