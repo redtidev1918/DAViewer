@@ -1,5 +1,41 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-15: v0.5.21 published (both fixes)
+
+User ordered push/merge/release/deploy/docs. Merge chain (squash, all checks
+green incl. three-platform candidates before each merge):
+
+- #122 `f49cbf4` RFY transport failures out of browser recovery (REG-025).
+- #125 `a2e1bf5` 0.5.21 notes extended to cover the cookie-restore fix
+  (notes-first, per the 0.5.14/0.5.16 lessons).
+- #123 `0075fe4` persisted-cookie restore repair (REG-026). STATUS conflict
+  with the merged REG-025 entry resolved by keeping both entries; the merged
+  tree re-verified locally: **590 PASS** (586 + 4), format 0, analyze clean.
+- #124 `2f6ac8b` `chore(main): release 0.5.21` — release-please had
+  auto-updated its changelog to list BOTH fixes before merge.
+
+Release run `38613398106` SUCCESS. Tag `v0.5.21` (annotated `1795baf`,
+source `2f6ac8bb`), published 2026-10-14T18:29:22Z, draft=false. Assets:
+APK 67,182,318 B, Windows zip 14,661,698 B, macOS zip 25,358,366 B,
+SHA256SUMS, RELEASE-METADATA.json. APK downloaded and independently
+re-hashed `3322da74…cab7` = SHA256SUMS = metadata = GitHub digest. APK
+identity: `app.daviewer` versionName 0.5.21 versionCode **234** (installs
+over v0.5.20); signer DN `C=CN, O=redtidev1918, CN=DAViewer`, SHA-256
+`686474b3…7141` — identical to every release since v0.5.16.
+
+Download-page workflow `38615645454` and Pages deploy `38615669002` SUCCESS
+(automation commit `7f23f87`); the live site serves `download.md` with
+`本页版本：v0.5.21` and all three asset links (verified against the deployed
+markdown, not the repo copy).
+
+Gate status: Code Verified PASS (merged tree, 590 tests). Release Verified
+PASS (this entry). **Android Verified: PENDING** — no device run of 0.5.21;
+expected new evidence after install: `restore candidate` / `restore verified`
+lines on cold start. **Original Incident Verified: PENDING** — the 00:35 log
+showed 9 live cookies with the server still answering anonymous; cookie-name
+completeness ≠ server-accepted credentials. The release notes disclose both
+limits. Local verify artifacts: `D:\Android\setup\release-v0.5.21-verify\`.
+
 ## 2026-10-15: REG-026 — persisted-cookie restore was dead (double parse)
 
 Branch `codex/web-session-restore-decode-fix`, baseline main `a422edaf`.
