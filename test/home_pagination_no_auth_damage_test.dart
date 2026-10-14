@@ -10,6 +10,7 @@ import 'package:daviewer/core/auth/web_session_refresher.dart'
 import 'package:daviewer/core/auth/web_session_status.dart';
 import 'package:daviewer/core/data/web_session.dart';
 import 'package:daviewer/core/diagnostics/app_logger.dart';
+import 'package:daviewer/core/feed/artwork_feed_cache.dart';
 import 'package:daviewer/core/runtime/app_runtime.dart';
 import 'package:daviewer/core/runtime/runtime_provider.dart';
 import 'package:daviewer/features/home/home_providers.dart';
@@ -42,6 +43,9 @@ final class _RfyPaginationAdapter implements HttpClientAdapter {
   final bool failPaginationAlways;
   int pagination403s = 0;
   int paginationSuccesses = 0;
+  DioExceptionType? networkFailure;
+  int calls = 0;
+  Future<void>? gate;
 
   @override
   void close({bool force = false}) {}
@@ -52,6 +56,21 @@ final class _RfyPaginationAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    calls += 1;
+    await gate;
+    final failure = networkFailure;
+    if (failure != null) {
+      throw DioException(
+        requestOptions: options,
+        type: failure,
+        error: failure == DioExceptionType.connectionError
+            ? const SocketException(
+                'Connection refused',
+                osError: OSError('Connection refused', 111),
+              )
+            : null,
+      );
+    }
     if (!options.uri.path.endsWith('/rfy/deviations')) {
       throw DioException(
         requestOptions: options,
@@ -118,6 +137,7 @@ final _sharedTransfers = BackgroundTransferManager(
 ProviderContainer _container({
   required _RfyPaginationAdapter adapter,
   required List<WebSessionProbeResult> Function() probeResults,
+  Directory? cache,
 }) {
   final runtime = AppRuntime(
     clientId: 'test-client',
@@ -127,9 +147,8 @@ ProviderContainer _container({
     dio: Dio()..httpClientAdapter = adapter,
   );
   var probeCall = 0;
-  final cacheDirectory = Directory.systemTemp.createTempSync(
-    'daviewer-feed-cache-',
-  );
+  final cacheDirectory =
+      cache ?? Directory.systemTemp.createTempSync('daviewer-feed-cache-');
   addTearDown(() {
     cacheDirectory.deleteSync(recursive: true);
   });
@@ -164,6 +183,211 @@ ProviderContainer _container({
 }
 
 void main() {
+  test(
+    'offline cold-start cache survives until explicit network recovery',
+    () async {
+      final saved = Completer<void>();
+      final previousPrint = debugPrint;
+      debugPrint = (message, {wrapWidth}) {
+        previousPrint(message, wrapWidth: wrapWidth);
+        if (message?.contains('personalized feed cache saved') == true &&
+            !saved.isCompleted) {
+          saved.complete();
+        }
+      };
+      addTearDown(() => debugPrint = previousPrint);
+      final cache = Directory.systemTemp.createTempSync(
+        'daviewer-offline-cache-',
+      );
+      final store = ArtworkFeedCacheStore(directory: cache);
+      await store.write('artist', [
+        Artwork(
+          id: 'cached-1',
+          title: 'Previously loaded',
+          author: const UserProfile(id: 'artist', username: 'artist'),
+          pageUri: Uri.parse(
+            'https://www.deviantart.com/artist/art/previous-1',
+          ),
+          media: const [],
+        ),
+      ]);
+      final adapter = _RfyPaginationAdapter(failPaginationAlways: false)
+        ..networkFailure = DioExceptionType.connectionError
+        ..pagination403s = 1;
+      var probes = 0;
+      final container = _container(
+        adapter: adapter,
+        cache: cache,
+        probeResults: () {
+          probes++;
+          return const [WebSessionProbeResult.unavailable()];
+        },
+      );
+      addTearDown(container.dispose);
+      final hydrated = Completer<void>();
+      container.listen(personalizedFeedProvider, (_, next) {
+        if (next.items.any((item) => item.id == 'cached-1') &&
+            !hydrated.isCompleted) {
+          hydrated.complete();
+        }
+      });
+      final controller = container.read(personalizedFeedProvider.notifier);
+      await controller.refresh();
+      await hydrated.future.timeout(const Duration(seconds: 5));
+      expect(
+        container.read(personalizedFeedProvider).items.single.id,
+        'cached-1',
+      );
+      expect((await store.read('artist'))!.items.single.id, 'cached-1');
+      expect(container.read(webSessionStatusProvider).needsLogin, isFalse);
+      expect(adapter.calls, 1);
+      adapter.networkFailure = null;
+      await controller.forceRefresh();
+      await controller.loadMore();
+      expect(container.read(personalizedFeedProvider).items, hasLength(2));
+      expect(adapter.calls, 3);
+      expect(probes, 0);
+      // Persistence is deliberately fire-and-forget; wait before removing its
+      // temporary directory so Windows never deletes an open cache file.
+      await saved.future.timeout(const Duration(seconds: 5));
+    },
+  );
+
+  for (final failure in [
+    DioExceptionType.connectionError,
+    DioExceptionType.connectionTimeout,
+    DioExceptionType.receiveTimeout,
+    DioExceptionType.sendTimeout,
+    DioExceptionType.badCertificate,
+  ]) {
+    testWidgets(
+      'network $failure preserves the feed and recovers without an auth probe',
+      (tester) async {
+        final adapter = _RfyPaginationAdapter(failPaginationAlways: false)
+          ..pagination403s = 1;
+        var probes = 0;
+        final container = _container(
+          adapter: adapter,
+          probeResults: () {
+            probes++;
+            return const [WebSessionProbeResult.unavailable()];
+          },
+        );
+        addTearDown(container.dispose);
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(home: Scaffold(body: PersonalizedFeed())),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final controller = container.read(personalizedFeedProvider.notifier);
+        final original = container.read(personalizedFeedProvider);
+        expect(original.items, hasLength(1));
+        adapter.networkFailure = failure;
+        unawaited(controller.loadMore());
+        await tester.pumpAndSettle();
+        expect(container.read(personalizedFeedProvider).items, original.items);
+        expect(
+          container.read(personalizedFeedProvider).nextCursor,
+          original.nextCursor,
+        );
+        expect(container.read(personalizedFeedProvider).error, isNotNull);
+        expect(container.read(webSessionControllerProvider).isLoggedIn, isTrue);
+        expect(container.read(webSessionStatusProvider).needsLogin, isFalse);
+        expect(container.read(webSessionStatusProvider).isLocked, isFalse);
+        expect(
+          probes,
+          0,
+          reason: 'A transport failure supplies no authentication evidence',
+        );
+        expect(adapter.calls, 2, reason: 'No hidden authentication retry');
+        await tester.pump(const Duration(seconds: 30));
+        expect(adapter.calls, 2, reason: 'No unattended retry loop');
+
+        // A failed first-page refresh must retain the same usable list too.
+        unawaited(controller.forceRefresh());
+        await tester.pumpAndSettle();
+        expect(container.read(personalizedFeedProvider).items, original.items);
+        expect(
+          container.read(personalizedFeedProvider).lastRefreshError,
+          isNotNull,
+        );
+        expect(probes, 0);
+        expect(adapter.calls, 3);
+
+        adapter.networkFailure = null;
+        final recovery = Completer<void>();
+        adapter.gate = recovery.future;
+        for (var i = 0; i < 10; i++) {
+          unawaited(controller.forceRefresh());
+        }
+        for (var i = 0; i < 20 && adapter.calls < 4; i++) {
+          await tester.pump(const Duration(milliseconds: 10));
+        }
+        expect(
+          adapter.calls,
+          4,
+          reason: 'Concurrent recovery intents share one request',
+        );
+        recovery.complete();
+        await tester.pumpAndSettle();
+        expect(
+          container.read(personalizedFeedProvider).lastRefreshError,
+          isNull,
+        );
+        for (var i = 0; i < 10; i++) {
+          unawaited(controller.loadMore());
+        }
+        await tester.pumpAndSettle();
+        final restored = container.read(personalizedFeedProvider);
+        expect(adapter.calls, 5);
+        expect(restored.items, hasLength(2));
+        expect(restored.items.map((item) => item.id).toSet(), hasLength(2));
+        expect(restored.error, isNull);
+        expect(probes, 0);
+      },
+    );
+  }
+
+  testWidgets(
+    'real anonymous browser evidence stops RFY retry instead of retrying the network',
+    (tester) async {
+      final adapter = _RfyPaginationAdapter(failPaginationAlways: true);
+      var probes = 0;
+      final container = _container(
+        adapter: adapter,
+        probeResults: () {
+          probes++;
+          return const [WebSessionProbeResult.anonymous()];
+        },
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: Scaffold(body: PersonalizedFeed())),
+        ),
+      );
+      await tester.pumpAndSettle();
+      unawaited(container.read(personalizedFeedProvider.notifier).loadMore());
+      await tester.pumpAndSettle();
+      expect(
+        container.read(webSessionStatusProvider).state,
+        WebSessionStatusState.anonymous,
+      );
+      expect(container.read(webSessionStatusProvider).needsLogin, isTrue);
+      expect(adapter.pagination403s, 1);
+      expect(probes, 1);
+      await tester.pump(const Duration(seconds: 30));
+      expect(
+        adapter.calls,
+        2,
+        reason: 'Confirmed expiry must not loop on transport retries',
+      );
+    },
+  );
+
   testWidgets(
     'a pagination 403 plus an unavailable probe refresh never damages auth',
     (tester) async {

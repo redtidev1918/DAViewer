@@ -1,5 +1,30 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-15: bounded network-recovery acceptance and REG-025
+
+Branch `codex/p0-network-recovery-acceptance`, baseline main `a422edaf`.
+Reproduced four failures against baseline: refused connection and three timeout
+types unnecessarily trigger one browser probe and a second RFY transport.
+Minimal fix propagates transport failures to the existing controller; genuine
+HTTP/authentication evidence remains unchanged. See `docs/regressions/025-network-failure-auth-retry.md`.
+Full local suite: **586 PASS** (578 + 8); no SDK/lock/version change. Added cache,
+recovery/concurrency, certificate and numeric detail tests; OAuth remains usable
+after confirmed web expiry. Existing stale-request/account tests still pass.
+Original two stashes and historical untracked files untouched.
+
+User authorized formal publication in this session, without another manual APK
+round. Next: final static checks, implementation PR/CI/candidates, release-please
+0.5.21, formal signed artifacts and download-page verification. No gate bypass.
+
+New supplied Android log is **v0.5.20**, source `fa10b608`, not this patch:
+00:31 connection failures across API/web/media; 00:35 connectivity/OAuth and
+numeric description/More Like This recover, but two browser documents report
+explicit anonymous and RFY never reaches transport. This patch cannot be
+attributed as fixing that failure. No evidence of IP ban or exact proxy cause.
+ADB has no attached device. Android new-code acceptance and Original Incident
+Verified remain **PENDING**; P0 is open. Raw user attachment is not committed.
+
+
 ## 2026-10-14: Android single-run functional re-test — PASS (stability PENDING)
 
 **This is a single observed run on one device, not a completed acceptance.**

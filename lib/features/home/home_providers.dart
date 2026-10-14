@@ -432,8 +432,8 @@ final personalizedFeedProvider = StateNotifierProvider<ArtworkFeedController, Ar
 (bool?, String) personalizedFeedSessionIdentity(WebSessionState web) =>
     (web.isLoggedIn, web.username);
 
-/// Fetches one rfy page, or `null` when the web session is missing or the
-/// request failed (the caller then refreshes the session and retries).
+/// Fetches one rfy page. Transport failures propagate without authentication
+/// recovery; `null` lets the caller refresh a missing/rejected web context.
 Future<Page<Artwork>?> _tryFetchRfy(
   Dio dio,
   String csrf,
@@ -511,6 +511,22 @@ Future<Page<Artwork>?> _tryFetchRfy(
           'elapsedMs=${stopwatch.elapsedMilliseconds} '
           'cursorPresent=${request.cursor != null} cursorFingerprint=${_cursorFingerprint(request.cursor)}',
     );
+    // No response means there is no server identity evidence. Opening a
+    // browser cannot repair a refused connection or timeout, and adds another
+    // request chain while the network is unavailable. Leave the existing feed
+    // and session intact; the controller exposes its normal retry entry point.
+    if (error is DioException &&
+        error.response == null &&
+        switch (error.type) {
+          DioExceptionType.connectionError ||
+          DioExceptionType.connectionTimeout ||
+          DioExceptionType.sendTimeout ||
+          DioExceptionType.receiveTimeout ||
+          DioExceptionType.badCertificate => true,
+          _ => false,
+        }) {
+      rethrow;
+    }
     return null;
   }
 }
