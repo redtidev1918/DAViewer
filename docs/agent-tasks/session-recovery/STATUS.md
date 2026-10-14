@@ -1,5 +1,113 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-14: Android single-run functional re-test — PASS (stability PENDING)
+
+**This is a single observed run on one device, not a completed acceptance.**
+Root cause is still unconfirmed, and the recovery is NOT attributable to any
+change in this repository.
+
+Device: internal diagnostic APK, source `d5095b52c6ec12d735cc8b3495e0afad34c70cf0`,
+versionCode 232, signed with the release certificate (verified equal to
+v0.5.19). No data cleared, no logout — the original failing Cookie state was
+kept, as required.
+
+Observed in that run (user-supplied log):
+
+| Item | Result |
+| --- | --- |
+| Web cookie snapshot | `count=9`, includes `auth` and `auth_secure` |
+| Web session verifier | HTTP 200, `classification=signedIn` |
+| RFY first page | 24 items, `transport_succeeded` + `accepted` |
+| RFY second page | +24 appended, 48 total (`pagination appended`) |
+| Numeric-id description | 2 successes, `failure=none`, parsed from `web_init_tiptap` |
+| More Like This (official) | 2 × HTTP 200 |
+
+Before this run the live set was 7 cookies and missing `auth`/`auth_secure`,
+while the web verifier returned 403. So the three previously failing features
+(RFY, numeric-id descriptions, numeric-id More Like This) are now working on a
+real device.
+
+### What this does NOT establish
+
+- **Attribution.** No `restore candidates` and no `restore verified` line
+  appears in the supplied excerpt. So there is no evidence that PR #118 (or any
+  repo change) restored the cookies: the pre-existing restore logic may have
+  succeeded this time, and the earlier failure may itself have been transient
+  (server/WAF/network). Contributing changes: PR #116 merged `5da32c1`
+  (error attribution), PR #118 merged `67dfaba` (blocked/challenge pass-through,
+  lockout → locked instead of a retained healthy lease, restore decision
+  logging). None of them is shown to have caused the recovery.
+  Note the PR #118 restore logging should emit either `restore candidates` or
+  `restore skipped reason=nothing_missing` whenever that path is reached, so the
+  absence is itself informative and should be confirmed against the full log
+  (`grep '\[web-session\]'`).
+- **Personalization.** RFY reported `genericFallback=true` and
+  `personalization=unknown`. Items load and paginate, but this does not prove
+  the stream is the account's personalized recommendations rather than the
+  site's generic fallback.
+- **Stability.** One run only. Whether `auth`/`auth_secure` survive a cold
+  start and sustained use is untested.
+- **Root cause.** Still unknown. No response-body evidence exists for the
+  earlier 403 (the internal `/p0 diagnostic` workflow was built for exactly that
+  capture, and the earlier 403 run predates it).
+- `deviation/download` returned HTTP 400 twice in the same log. That is a
+  **separate** request chain and must not be folded into the 403 investigation.
+
+### Release (authorised by the user after this run)
+
+PR #117 (`chore(main): release 0.5.20`) merged as `fa10b60`. The pending release
+was raised to `0.5.20+233` first, so the formal build stays strictly higher than
+the diagnostic APK (versionCode 232) and can still install over it.
+
+- Release workflow run `38572895894` -> **v0.5.20 published** (tag `v0.5.20`),
+  assets: APK 67,182,318 B, Windows zip 14,662,118 B, macOS zip 25,352,134 B,
+  `SHA256SUMS`, `RELEASE-METADATA.json`. All three platform checksums
+  independently recomputed and `OK`.
+- Released APK verified locally: `package=app.daviewer` `versionCode=233`
+  `versionName=0.5.20`; signer DN `C=CN, O=redtidev1918, CN=DAViewer`,
+  SHA-256 `686474b3…7141` — identical to v0.5.19.
+- `docs/download.md` regenerated for v0.5.20 and Pages redeployed; the live
+  download page serves `本页版本：v0.5.20` with all three asset links.
+
+The changelog intentionally contains only the two robustness fixes (#116 error
+attribution, #118 lockout surfacing). It does **not** claim to restore
+recommendations, because that is not established — see the attribution gap
+above. No root-cause story was invented to justify the release.
+
+### Not done
+
+No behavioural code change was made while the cause is unknown, and no
+narrative was invented to justify the release. Chasing a root-cause conclusion
+still requires evidence, not edits.
+
+### Next: stability verification with the same APK
+
+Do not switch proxy, log out, or clear data.
+
+1. Fully close and cold-start DAViewer; check RFY first page and pagination.
+2. Open several more numeric-id artworks; confirm description and More Like This
+   keep working.
+3. Test again after a longer interval; watch whether `auth`/`auth_secure` drop
+   out of the live set again.
+4. Keep watching `genericFallback` / `personalization`, and judge whether the
+   items match the account's actual interests.
+
+Capture per run: the `[web-session]` restore lines, the live cookie `names=[...]`,
+the `[home] rfy` phases (`accepted` / `transport_failed`) and the `genericFallback`
+value, plus description/More Like This outcomes.
+
+Gate status: Code Verified PASS (local, unchanged). CI PASS for #116/#118/#120.
+Release Verified PASS for v0.5.20 (tag, assets, independent checksums, APK
+identity/signature, download page and Pages all confirmed).
+**Android Verified: single functional re-test PASS; stability PENDING; not a
+completed acceptance.** Original Incident Verified: **PENDING** — recovery is
+observed but not attributed, and the 403 cause is unexplained.
+
+Reminder for the next session: the installed diagnostic APK is versionCode 232
+and v0.5.20 is 233, so upgrading to the release works normally. Reverting to
+v0.5.19 (231) is **not** possible via `adb install -r`; a pre-#118 comparison
+would need a ≥233 build from the v0.5.19 source.
+
 ## 2026-10-14: v0.5.19 Android 403 — root-cause investigation (continued)
 
 Continuation of the RFY/web-session 403 triage. Two real defects fixed
