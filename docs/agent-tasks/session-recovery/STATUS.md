@@ -31,6 +31,27 @@ candidate` / `restore verified` lines are now expected to appear).
 PR #122 / v0.5.21 (workflow A) untouched: still OPEN, three candidate builds
 were pending at last check; no merge or release action taken by this session.
 
+Community cross-check (2026-10-15, design reference only, no code copied):
+- `flutter_inappwebview` 6.1.5 / `flutter_inappwebview_android` 1.1.3
+  (installed, pub-cache source verified): `setCookie` appends `Domain` only
+  when supplied (host-only stays host-only), calls `CookieManager.flush()`
+  after every write, so re-injected cookies persist across restarts;
+  `getCookies` returns full metadata via `CookieManagerCompat` on modern
+  WebViews and null domain/path on older ones — exactly the shapes
+  `missingSavedWebCookies` tolerates. No defect found.
+- `cookie_jar` 4.0.9: expiry semantics `!expires.isAfter(now)` identical to
+  ours; PersistCookieJar drops expired cookies on load by default as we do;
+  our structured JSON serialization is stronger than its string-concat
+  format, and we keep a corrupt snapshot instead of deleting it. No change.
+- `gallery-dl` (mikf, master): load-bearing cookie triple
+  `("auth","auth_secure","userinfo")` on `.deviantart.com`, CSRF read from
+  `window.__CSRF_TOKEN__` and paired with every `/_puppy` call, and
+  redirect-to-login treated as server-rejected auth — all consistent with
+  this app's restore set and verifier design. gallery-dl gates on cookie
+  presence and surfaces server rejection downstream; DAViewer additionally
+  classifies the server verdict. No change.
+No evidenced defect emerged from the comparison; no speculative edits made.
+
 ## 2026-10-14: Android single-run functional re-test — PASS (stability PENDING)
 
 **This is a single observed run on one device, not a completed acceptance.**
