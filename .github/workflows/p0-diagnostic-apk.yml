@@ -1,0 +1,150 @@
+# INTERNAL — P0 diagnostic APK builder (manual, never automatic).
+#
+# Purpose: produce a **release-signed** Android APK from an already-reviewed
+# commit so a device run can `adb install -r` it over the published build and
+# keep the existing app data, which a debug-signed local build cannot do.
+#
+# Guard rails:
+#   * workflow_dispatch only. There is no `pull_request` / `push` trigger, so
+#     code from an untrusted PR never reaches the signing secrets.
+#   * the requested commit is rejected unless it is an ancestor of `main`
+#     (reviewed history), and that check runs before any secret is used.
+#   * this workflow creates no tag, no GitHub Release and does not touch the
+#     download page. It only uploads a short-lived artifact.
+#   * signing reuses the existing release credentials exactly as
+#     `scripts/build-release` does; no new key is introduced and no secret is
+#     ever printed.
+name: P0 diagnostic APK (internal)
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Reviewed commit already on main (blank = current main)"
+        required: false
+        type: string
+      build_number:
+        description: "Android versionCode; must be >= the installed build (v0.5.19 = 231)"
+        required: false
+        default: "900"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic-apk:
+    name: Internal P0 diagnostic APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.sha != '' && inputs.sha || 'main' }}
+          fetch-depth: 0
+
+      - name: Vet the target commit before using any secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          sha=$(git rev-parse HEAD)
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "::error::refusing to build $sha: it is not an ancestor of main"
+            exit 1
+          fi
+          short=$(git rev-parse --short=12 "$sha")
+          echo "Reviewed commit $sha ($short) is on main."
+          echo "SOURCE_SHA=$sha" >> "$GITHUB_ENV"
+          echo "SOURCE_SHORT=$short" >> "$GITHUB_ENV"
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: 3.47.1
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if flutter pub get; then exit 0; fi
+            echo "::warning::flutter pub get failed (attempt $attempt/5), retrying in 15s"
+            sleep 15
+          done
+          exit 1
+
+      - name: Materialize the release signing material
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_PROPERTIES: ${{ secrets.KEYSTORE_PROPERTIES }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_B64:-}" ] || [ -z "${KEYSTORE_PROPERTIES:-}" ]; then
+            echo "::error::KEYSTORE_B64 / KEYSTORE_PROPERTIES are unavailable; cannot build a signed diagnostic APK."
+            echo "::error::Do not fall back to an unsigned or debug-signed build: it cannot install over the published app."
+            exit 1
+          fi
+          # Same paths and format as scripts/build-release. Contents are never logged.
+          echo "$KEYSTORE_B64" | base64 --decode > android/app/upload-keystore.p12
+          printf '%s' "$KEYSTORE_PROPERTIES" > android/key.properties
+
+      - name: Build the signed diagnostic APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(python3 -c 'import json; print(json.load(open(".release-please-manifest.json"))["."])')
+          echo "App version label: $version; versionCode: ${{ inputs.build_number }}"
+          flutter build apk --release \
+            --build-number="${{ inputs.build_number }}" \
+            --dart-define="DAVIEWER_VERSION=$version" \
+            --dart-define="DAVIEWER_REVISION=$SOURCE_SHA"
+
+      - name: Verify signing certificate, package id and versionCode
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=build/app/outputs/flutter-apk/app-release.apk
+          test -f "$apk" || { echo "::error::APK not produced"; exit 1; }
+          ls -l "$apk"
+          build_tools=$(ls -d "${ANDROID_SDK_ROOT:-$ANDROID_HOME}"/build-tools/* 2>/dev/null | sort -V | tail -1)
+          echo "build-tools: $build_tools"
+          echo "--- signer certificate(s) ---"
+          "$build_tools/apksigner" verify --print-certs "$apk" | grep -Ei 'Signer #1 certificate (DN|SHA-256)' || true
+          echo "--- package identity ---"
+          if ! "$build_tools/aapt" dump badging "$apk" 2>/dev/null | head -1; then
+            "$build_tools/aapt2" dump badging "$apk" | head -1
+          fi
+
+      - name: Diagnostic instructions
+        shell: bash
+        run: |
+          {
+            echo "## INTERNAL / P0 DIAGNOSTIC build — not a release"
+            echo ""
+            echo "- Source commit: \`$SOURCE_SHA\` (on main, reviewed)"
+            echo "- versionCode: \`${{ inputs.build_number }}\` (installed v0.5.19 is 231)"
+            echo "- No tag, no Release, no download-page change."
+            echo ""
+            echo "### Install WITHOUT losing app data"
+            echo '```'
+            echo "# 1. Confirm the signer matches the installed app, then stop if it does not."
+            echo "adb shell dumpsys package app.daviewer | grep -i -m1 'versionCode\\|signatures'"
+            echo "# 2. Replace in place; never uninstall."
+            echo "adb install -r DAViewer-diagnostic-$SOURCE_SHORT.apk"
+            echo '```'
+            echo ""
+            echo "### Evidence to capture"
+            echo "- \`restore candidates\`, \`restore skipped reason=\`, \`restore verified\` lines"
+            echo "- the \`savedNames\` / \`liveNames\` cookie-name lists"
+            echo "- RFY: HTTP status and whether real items render"
+            echo "- a numeric-id artwork: description + More Like This"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.0
+        with:
+          name: INTERNAL-P0-DIAGNOSTIC-DAViewer-${{ env.SOURCE_SHORT }}
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 7
