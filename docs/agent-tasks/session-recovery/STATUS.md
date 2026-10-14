@@ -1,5 +1,49 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-15: 02:59 device log — restore confirmed alive; 403 diagnostics round
+
+The 02:59 v0.5.21 log is the first real-device evidence that REG-026 works:
+`restore candidate` and `restore candidates count=2 names=[auth,auth_secure]`
+appear, live cookies return to 9, and `recovery joined recovery-1` shows
+single-flight recovery. RFY is still blocked: the web verifier answers
+**HTTP 403 / unavailable** (previously 200 / anonymous), browser probes end at
+`page_uninitialized` timeouts, numeric-id web paths 403, UUID/OAuth paths
+stay 200, and the 24-item RFY cache is preserved. `restore verified` did NOT
+appear — the read-back outcome was invisible (the old code logged nothing
+outside the success branch). No `buildRevision` in the excerpt; the full log
+file's first lines always carry it (app_logger writes it at init).
+
+Diagnostics round (`codex/web-403-diagnostics`, small scope per user
+direction — no new state machine, no OAuth change, no cookie clearing, no
+more aggressive retries):
+
+1. Restore outcome forensics (`web_session_controller.dart`): skip reasons
+   logged (`no_persisted_cookies`, `no_saved_username`), read-back outcomes
+   logged (`cookie_store_unavailable` / `no_identity` with names+`userinfoPresent`
+   / `identity_changed injected=N`), injected-exception `errorType` logged,
+   and `setCookie` boolean return now checked (`cookie write rejected name=`).
+   Next capture must show exactly one of these branches instead of silence.
+2. Verifier 403 forensics (`web_session_verifier.dart`): non-200 and
+   marker-less-200 responses now log contentType, contentLength, redirect
+   count, final host (never path/query), the two verified PerimeterX markers
+   (pxBlocked/pxChallenge) and `initialState` presence; transport failures
+   log `errorType` + `dioType`. Only repo-verified markers reused; no
+   speculative WAF strings.
+3. Adaptive-retrigger audit (no change needed): restore fires on cold start,
+   before the server check, and on a feed retry ONLY with an empty cookie
+   header; with all 9 cookies live + 403 it hits `nothing_missing` and
+   injects nothing. Server-confirmed identity remains the RFY gate
+   (independent of the local restore read-back). Anti-loop mapping: local
+   loss→restore; transient network→PR #122 keeps content, no cookie writes;
+   403/uninitialized→unverified + existing cooldown, no injection; server
+   anonymous→visible WebView re-login then fresh snapshot.
+
+Local gates: format 0 changed, analyze clean, **595 tests PASS** (590 + 5:
+403/PX-block verifier classification, transport-failure verifier mapping,
+read-back-no-identity, no-snapshot, no-username boundaries).
+Android Verified / Original Incident Verified remain **PENDING**; the open
+question is the web-layer 403 itself, not cookie persistence.
+
 ## 2026-10-15: v0.5.21 published (both fixes)
 
 User ordered push/merge/release/deploy/docs. Merge chain (squash, all checks

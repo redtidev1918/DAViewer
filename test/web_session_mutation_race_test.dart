@@ -292,6 +292,48 @@ void main() {
     expect(cookies.events, isEmpty);
   });
 
+  test('restore injects but leaves identity untouched when the read-back names no account', () async {
+    // Incident follow-up (2026-10-15 02:59): injection ran (9 live cookies)
+    // but no restore-verified line appeared. An unparseable read-back
+    // userinfo is one such outcome; the injected cookies must stay and the
+    // in-memory identity must not be overwritten.
+    await saveRestorableSnapshot();
+    cookies.values['userinfo'] = 'not-json';
+    await controller.initialize();
+    expect(cookies.events, ['set:auth', 'set:auth_secure']);
+    expect(cookies.values, hasLength(9));
+    expect(controller.state.username, 'artist');
+    expect(controller.state.isLoggedIn, true);
+    // The persisted snapshot was not rewritten by the unverified read-back.
+    expect(await controller.persistedCookies(), hasLength(9));
+  });
+
+  test('cold start without any persisted snapshot injects nothing', () async {
+    await controller.initialize();
+    expect(cookies.events, isEmpty);
+    expect(cookies.values, hasLength(1));
+  });
+
+  test('a cookie snapshot without a saved username never injects', () async {
+    container.read(authControllerProvider.notifier).state = const AuthState(
+      status: AuthStatus.signedIn,
+      account: UserProfile(id: 'artist', username: 'artist'),
+    );
+    await store.update(
+      isLoggedIn: true,
+      cookies: [
+        PersistedWebCookie(
+          name: 'auth',
+          value: 'synthetic-auth',
+          domain: '.deviantart.com',
+          expiresDate: DateTime.utc(2030),
+        ),
+      ],
+    );
+    await controller.restorePersistedCookies();
+    expect(cookies.events, isEmpty);
+  });
+
   test(
     'concurrent restores share native writes and logout fences the remainder',
     () async {

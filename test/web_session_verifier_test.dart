@@ -139,4 +139,55 @@ void main() {
       expect(result.isAnonymous, isFalse);
     },
   );
+
+  test(
+    'verify treats an HTTP 403 with a PerimeterX block page as unavailable',
+    () async {
+      // Incident shape (2026-10-15 02:59): web paths answer 403 while OAuth
+      // stays 200. A block page must never classify as anonymous.
+      final dio = Dio()
+        ..httpClientAdapter = _StatusAdapter(
+          403,
+          html:
+              '<html><body>Max challenge attempts exceeded'
+              '<div id="px-captcha"></div></body></html>',
+        );
+      final result = await WebSessionVerifier(dio)
+          .verify(cookieHeader: 'userinfo=saved');
+
+      expect(result.state, WebSessionVerificationState.unavailable);
+      expect(result.isAnonymous, isFalse);
+    },
+  );
+
+  test('verify maps a transport failure to unavailable', () async {
+    final dio = Dio()
+      ..httpClientAdapter = _ThrowingAdapter(
+        DioException.connectionError(
+          requestOptions: RequestOptions(path: '/'),
+          reason: 'synthetic',
+        ),
+      );
+    final result = await WebSessionVerifier(dio)
+        .verify(cookieHeader: 'userinfo=saved');
+
+    expect(result.state, WebSessionVerificationState.unavailable);
+    expect(result.isAnonymous, isFalse);
+  });
+}
+
+final class _ThrowingAdapter implements HttpClientAdapter {
+  _ThrowingAdapter(this.error);
+
+  final Object error;
+
+  @override
+  void close({bool force = false}) {}
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async => throw error;
 }
