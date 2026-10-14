@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.19](https://github.com/redtidev1918/DAViewer/compare/v0.5.18...v0.5.19) (2026-10-14)
+
+
+### Bug Fixes
+
+* **media, artwork:** honour explicit video pause and restore missing descriptions ([#114](https://github.com/redtidev1918/DAViewer/issues/114)) ([6bf1146](https://github.com/redtidev1918/DAViewer/commit/6bf1146aa4b0294e40657354a4234722ae858923))
+
 ## [0.5.18](https://github.com/redtidev1918/DAViewer/compare/v0.5.17...v0.5.18) (2026-10-13)
 
 
