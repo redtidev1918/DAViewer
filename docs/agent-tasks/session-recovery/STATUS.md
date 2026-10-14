@@ -1,5 +1,78 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-14: v0.5.19 Android incident — RFY/web-session 403 triage
+
+User-reported P0 on the published v0.5.19 APK: watch feed, watch-feed
+descriptions, artist gallery and UUID detail pages all load, but the
+personalized RFY feed, numeric-id artwork descriptions and numeric-id
+More Like This all fail.
+
+Evidence chain from the supplied device log (2026-10-14 18:37–18:38):
+
+- Official OAuth paths succeed: `browse/deviantsyouwatch` 200,
+  `deviation/metadata` 200 (+885-char HTML description for the UUID work),
+  `gallery/all` 200, `browse/morelikethis/preview` 200.
+- Web-session paths fail: `rfy/deviations` (403 after retry), web session
+  verifier 403, headless probe `classification=page_uninitialized`
+  `csrfPresent=false`, probe to `reason=deadline`, recovery
+  `inconclusive retained=healthy_lease`.
+- RFY is the **website** `/_puppy/dabrowse/networkbar/rfy/deviations`
+  endpoint (Cookie + CSRF), not an official endpoint, so it inherits the web
+  session's failure. Numeric-id descriptions and related artwork resolve the
+  OAuth UUID through the same web `dadeviation/init` call.
+- Cookie context: PerimeterX cookies (`_px`, `_pxvid`, `pxcts`) are present,
+  and the persisted snapshot (9) exceeds the live set (7). The page carries
+  no `@@publicSession`, so the server is not rendering a session for those
+  requests. The app's own curated message for this condition already exists
+  (`webLoginChallengeExceeded`, detected from the page text
+  "Max challenge attempts exceeded" and `#px-captcha`); the observer did not
+  classify `blocked`/`challenge` here, so this was not the PX max-attempt
+  page. Definitive server attribution needs a response-body classification
+  that the current log does not record.
+- Environment: the device runs behind a local proxy (`[proxy] Android:
+  detected <host>:7892`). Not treated as proven cause.
+
+Version differential verified with Git (not from memory):
+
+- `v0.5.17 -> v0.5.18`: session stack changed — `browser_session_observer`,
+  `web_session_refresher` (+209), `web_session_status` (+129),
+  `web_session_verdict`, `web_session_coordinator`, `personalized_session_status`,
+  `media_session_signal`, `personalized_request_policy`, `home_providers` (27+/26-).
+- `v0.5.18 -> v0.5.19`: only `artwork_detail_providers.dart` changed.
+- `artwork_web_repository.dart` unchanged across v0.5.17–v0.5.19.
+- The v0.5.18 `home_providers` delta only touches post-success **acceptance**
+  (generic-fallback labelling, credential-rotation adoption). The 403 occurs in
+  `_tryFetchRfy` transport, before any of that code. So no v0.5.18/0.5.19 code
+  change is shown to cause the 403; the reproduction boundary remains the
+  unusable web session, not a confirmed code regression.
+
+Confirmed code defect fixed (PR pending): `moreLikeThisProvider` resolved the
+OAuth UUID inside the same `try` as the official request, so for numeric ids a
+web-session 403 was reported as `officialError`. The device log therefore
+claimed `official: 403` although the official endpoint was never called (and
+was proven healthy for UUID works in the same run). The UUID resolution is now
+performed first and its failure is attributed to the website source; when it
+fails, the official request is skipped and `officialError` stays null.
+Regression test `test/more_like_this_attribution_test.dart` fails against the
+previous code with `officialError` holding the web 403.
+
+Local gates on the fix commit: `dart format --set-exit-if-changed lib test`
+0 changed; `flutter analyze` clean; `flutter test` **573 PASS** (571 + 2 new).
+
+Gate status: Code Verified PASS (local). CI/Release PENDING (PR next).
+**Android Verified: PENDING / FAIL for v0.5.19** — the reported device symptom
+is unresolved by this fix, which is diagnosability only. The functional failure
+is attributed to an unusable DeviantArt web session for those requests; no app
+change can restore RFY while the web endpoint answers 403 and the page renders
+no session. Original Incident Verified: PENDING. No user data, Cookie or
+credential was cleared; no timeout or retry inflation was added. Retained stash
+`backup-local-edits-before-update-2026-10-12` untouched.
+
+Next: push the fix, verify CI, merge; keep R1-R4 boundaries. If the incident
+recurs, capture a redacted response-body classification for the web 403 and a
+`restore candidate`/cookie-name timeline so the missing two cookies and the
+server verdict can be identified without guessing.
+
 ## 2026-10-14: runtime/UI merged, v0.5.18 release preparation
 
 PR #111 source `1de1c63564c46bac07274ea2f1ea906a439d4948` merged as `793ce8d`;
