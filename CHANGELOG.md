@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.21](https://github.com/redtidev1918/DAViewer/compare/v0.5.20...v0.5.21) (2026-10-14)
+
+
+### Bug Fixes
+
+* **auth:** repair the dead persisted-cookie cold-start restore ([#123](https://github.com/redtidev1918/DAViewer/issues/123)) ([0075fe4](https://github.com/redtidev1918/DAViewer/commit/0075fe4f07e4519b31505ccc2cffb345881befa9))
+* avoid browser recovery for RFY network failures ([#122](https://github.com/redtidev1918/DAViewer/issues/122)) ([f49cbf4](https://github.com/redtidev1918/DAViewer/commit/f49cbf4c0675934aae193949a42d6b77ebdca555))
+
 ## [0.5.20](https://github.com/redtidev1918/DAViewer/compare/v0.5.19...v0.5.20) (2026-10-14)
 
 
