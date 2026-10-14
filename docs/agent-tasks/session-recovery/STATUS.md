@@ -1,5 +1,36 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-15: REG-026 — persisted-cookie restore was dead (double parse)
+
+Branch `codex/web-session-restore-decode-fix`, baseline main `a422edaf`.
+Root cause found for the missing `restore candidate` lines in every device log
+since PR #118 added them: `WebSessionStore.read()` decodes `cookies` into
+`List<PersistedWebCookie>`, but three controller consumers re-parsed that
+decoded list; `parsePersistedCookies` only accepts JSON maps, so the restore
+saw an empty snapshot and returned silently **before any logging**. Introduced
+`058edd0` (2026-09-22); v0.5.14–v0.5.20 all ship it (ancestry verified). The
+store's own tests bypass `store.read()` via a raw-JSON helper, which is how a
+586-test green suite never exercised the broken composition.
+
+The interrupted WIP (`test/web_session_mutation_race_test.dart`, 4 tests)
+completed: on the old code the cold-start test fails (`persistedCookies()`
+`[]` vs 9) and the concurrent-restore test times out. Minimal fix: consumers
+use the already-parsed list; write path, account matching, expiry filtering,
+logout tombstone and epoch fencing untouched. One test-fake defect fixed
+(`expiresDate` rebuilt without `isUtc`). Fixtures are written through the
+production store, not reverse-engineered from the parser.
+
+Full local gates on this branch: format 0 changed, analyze clean,
+**582 tests PASS** (578 main-equivalent + 4 new; PR #122's 8 tests are not on
+this main-based branch). REG-026
+written. Android Verified / Original Incident Verified remain **PENDING**:
+this restores the client-side re-injection path only — the 00:35 log showed
+9 live cookies with the server still answering anonymous, so server
+acceptance of restored credentials needs a real device run (`restore
+candidate` / `restore verified` lines are now expected to appear).
+PR #122 / v0.5.21 (workflow A) untouched: still OPEN, three candidate builds
+were pending at last check; no merge or release action taken by this session.
+
 ## 2026-10-14: Android single-run functional re-test — PASS (stability PENDING)
 
 **This is a single observed run on one device, not a completed acceptance.**
