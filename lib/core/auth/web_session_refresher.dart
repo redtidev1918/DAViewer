@@ -20,21 +20,31 @@ final class WebSessionProbeResult {
     required this.csrf,
     required this.username,
     this.credentialFingerprint,
-  }) : outcome = WebSessionProbeOutcome.confirmed;
+  }) : outcome = WebSessionProbeOutcome.confirmed,
+       blocked = false;
   const WebSessionProbeResult.anonymous({
     this.csrf = '',
     this.credentialFingerprint,
   }) : outcome = WebSessionProbeOutcome.anonymous,
-       username = '';
+       username = '',
+       blocked = false;
   const WebSessionProbeResult.unavailable({
     this.csrf = '',
     this.credentialFingerprint,
+    this.blocked = false,
   }) : outcome = WebSessionProbeOutcome.unavailable,
        username = '';
   final WebSessionProbeOutcome outcome;
   final String csrf;
   final String username;
   final String? credentialFingerprint;
+
+  /// The page was DeviantArt's explicit WAF lockout. This is not a credential
+  /// question: it must not be retained as a healthy lease or shown as a generic
+  /// "temporarily unavailable", because the only recovery is user action
+  /// (wait, refresh once, or switch network/proxy node).
+  final bool blocked;
+
   bool get succeeded => outcome == WebSessionProbeOutcome.confirmed;
 }
 
@@ -121,6 +131,25 @@ Future<BrowserSessionEvidence> readBrowserEvidenceWithCredentials({
   final before = await cookieHeader();
   final page = await readPage();
   final after = await cookieHeader();
+  // An explicit server-side block or human-verification challenge makes no
+  // identity claim about the credential set, so a credential rotation during
+  // the read must not mask it. Folding these into an empty sample classified a
+  // WAF lockout as `page_uninitialized` and hid the actionable state behind a
+  // stale `retained=healthy_lease`, which is how the 2026-10-14 Android run
+  // kept retrying a blocked network with no user-visible explanation.
+  if (page.blocked || page.challenge) {
+    return BrowserSessionEvidence(
+      blocked: page.blocked,
+      challenge: page.challenge,
+      initialized: page.initialized,
+      loggedIn: page.loggedIn,
+      username: page.username,
+      csrf: page.csrf,
+      parseFailed: page.parseFailed,
+      identitySource: page.identitySource,
+      credentialFingerprint: cookieHeaderFingerprint(after),
+    );
+  }
   final explicitlyAnonymous =
       page.initialized &&
       (page.loggedIn == false || page.username == 'anonymous');
@@ -257,7 +286,13 @@ final class WebSessionRefresher {
                 );
               }
               if (evidence.blocked) {
-                unawaited(_dispose(null, completion, 'blocked'));
+                unawaited(
+                  _dispose(
+                    const WebSessionProbeResult.unavailable(blocked: true),
+                    completion,
+                    'blocked',
+                  ),
+                );
               } else if (!evidence.challenge &&
                   (evidence.hasIdentity ||
                       (evidence.initialized && evidence.loggedIn == false))) {

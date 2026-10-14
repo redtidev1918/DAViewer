@@ -356,6 +356,22 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         _ref.read(webSessionRefresherProvider).recoveryId = recoveryId;
         final probe = await _ref.read(webSessionProbeProvider)();
         if (!_isCurrent(generation)) return;
+        if (probe.blocked) {
+          // DeviantArt served its explicit WAF lockout. That is a statement
+          // about this network, not a stale-credential question, so it is
+          // checked before credential currency and must not be swallowed by a
+          // previous healthy lease or reported as a generic "temporarily
+          // unavailable": surface the actionable state and stop the retry
+          // loop. Recovering needs user action (wait, refresh once, or switch
+          // network/proxy node).
+          AppLogger.instance.warning(
+            'auth',
+            'recovery blocked recoveryId=$recoveryId '
+                'classification=challenge_lockout',
+          );
+          markLocked();
+          return;
+        }
         if (!await _probeCredentialsCurrent(probe, generation)) return;
         final last = _lastSuccess;
         if (probe.outcome == WebSessionProbeOutcome.unavailable &&
