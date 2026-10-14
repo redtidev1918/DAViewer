@@ -245,6 +245,20 @@ final class AppStrings {
       _lang == AppLanguage.zh ? '下载原图' : 'Download original';
   String get original => _lang == AppLanguage.zh ? '原图' : 'Original';
   String get description => _lang == AppLanguage.zh ? '作品描述' : 'Description';
+  String get descriptionLoadFailed => _lang == AppLanguage.zh
+      ? '作品描述加载失败，请重试。'
+      : 'Could not load the description. Please retry.';
+  String get descriptionExcerpt => _lang == AppLanguage.zh
+      ? '摘要（完整描述尚未加载）'
+      : 'Excerpt (full description not loaded)';
+  String get videoPlay => _lang == AppLanguage.zh ? '播放' : 'Play';
+  String get videoMute => _lang == AppLanguage.zh ? '静音' : 'Mute';
+  String get videoUnmute => _lang == AppLanguage.zh ? '取消静音' : 'Unmute';
+  String get videoPlaybackSpeed =>
+      _lang == AppLanguage.zh ? '播放速度' : 'Playback speed';
+  String get videoFullscreen => _lang == AppLanguage.zh ? '全屏' : 'Fullscreen';
+  String get videoExitFullscreen =>
+      _lang == AppLanguage.zh ? '退出全屏' : 'Exit fullscreen';
   String get about => _lang == AppLanguage.zh ? '关于' : 'About';
   String get githubRepository =>
       _lang == AppLanguage.zh ? 'GitHub 仓库' : 'GitHub repository';

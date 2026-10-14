@@ -11,6 +11,7 @@ import '../../core/l10n/app_strings.dart';
 import '../../shared/route_observer.dart';
 import '../../shared/widgets/full_screen_image_viewer.dart';
 import 'artwork_navigation.dart';
+import 'video_controls.dart';
 
 /// Picks the single asset to display inline from an artwork's [media]:
 /// a playable video first, then an animation, then the largest resampled
@@ -519,11 +520,17 @@ final class _VideoPlayerState extends State<_VideoPlayer>
   ChewieController? _chewie;
   Object? _error;
   int _loadGeneration = 0;
+  bool _wantsPlayback = true;
+  bool _routeCovered = false;
+  bool _appActive = true;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _appActive =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     _initialize();
   }
 
@@ -541,6 +548,7 @@ final class _VideoPlayerState extends State<_VideoPlayer>
 
   Future<void> _initialize() async {
     final generation = ++_loadGeneration;
+    _wantsPlayback = true;
     final oldChewie = _chewie;
     final oldController = _controller;
     _chewie = null;
@@ -550,7 +558,16 @@ final class _VideoPlayerState extends State<_VideoPlayer>
     if (!mounted || generation != _loadGeneration) return;
     setState(() => _error = null);
 
-    final controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    final controller = VideoPlayerController.networkUrl(
+      Uri.parse(widget.url),
+      // Sole playback ownership: this stops video_player from registering its
+      // private lifecycle observer, whose stale `_wasPlayingBeforePause` flag
+      // could call play() on resume and override an explicit user pause.
+      // Background pausing is handled by didChangeAppLifecycleState below,
+      // which pauses on every non-resumed state (inactive arrives before the
+      // app is truly backgrounded on Android/iOS).
+      videoPlayerOptions: VideoPlayerOptions(allowBackgroundPlayback: true),
+    );
     _controller = controller;
     try {
       await controller.initialize();
@@ -565,12 +582,16 @@ final class _VideoPlayerState extends State<_VideoPlayer>
           videoPlayerController: controller,
           // Videos play automatically and loop, matching the inline,
           // social-feed style of the rest of the media viewer.
-          autoPlay: true,
+          // The host owns autoplay so initialization cannot start hidden media.
+          autoPlay: false,
           looping: true,
           allowFullScreen: true,
           allowMuting: true,
           allowPlaybackSpeedChanging: true,
           showControlsOnInitialize: true,
+          customControls: ArtworkVideoControls(
+            onTogglePlayback: _togglePlayback,
+          ),
           materialProgressColors: ChewieProgressColors(
             playedColor: Colors.red,
             handleColor: Colors.red,
@@ -578,6 +599,7 @@ final class _VideoPlayerState extends State<_VideoPlayer>
           ),
         );
       });
+      _syncPlayback();
     } on Object catch (error) {
       if (!mounted ||
           generation != _loadGeneration ||
@@ -596,17 +618,38 @@ final class _VideoPlayerState extends State<_VideoPlayer>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed) _controller?.pause();
+    _appActive = state == AppLifecycleState.resumed;
+    _syncPlayback();
   }
 
   @override
-  void didPushNext() => _controller?.pause();
+  void didPushNext() {
+    // Chewie moves the same player into its fullscreen route. This is not a
+    // navigation away, and controls there must retain the current user intent.
+    if (_chewie?.isFullScreen ?? false) return;
+    _routeCovered = true;
+    _syncPlayback();
+  }
 
   @override
   void didPopNext() {
+    _routeCovered = false;
+    _syncPlayback();
+  }
+
+  void _togglePlayback() {
+    _wantsPlayback = !(_controller?.value.isPlaying ?? false);
+    _syncPlayback();
+  }
+
+  void _syncPlayback() {
     final controller = _controller;
     if (controller != null && controller.value.isInitialized) {
-      controller.play();
+      if (_wantsPlayback && _appActive && !_routeCovered) {
+        if (!controller.value.isPlaying) controller.play();
+      } else if (controller.value.isPlaying) {
+        controller.pause();
+      }
     }
   }
 
