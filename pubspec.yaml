@@ -35,6 +35,7 @@ dev_dependencies:
   flutter_launcher_icons: ^0.14.4
   flutter_lints: ^6.0.0
   path_provider_platform_interface: ^2.1.3
+  video_player_platform_interface: ^6.9.0
 
 # flutter_html 3.0.0 imports html's internal query-selector API, whose
 # `matches` signature changed to SelectorGroup in html 0.15.7 and no longer

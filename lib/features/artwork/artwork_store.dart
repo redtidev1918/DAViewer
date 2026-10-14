@@ -150,6 +150,13 @@ Artwork mergeArtwork({
 }) {
   if (cached == null) return incoming;
   var merged = incoming;
+  if ((merged.description?.trim().isEmpty ?? true) &&
+      (cached.description?.trim().isNotEmpty ?? false)) {
+    merged = merged.copyWith(description: cached.description);
+  }
+  if (merged.textContent == null && cached.textContent != null) {
+    merged = merged.copyWith(textContent: cached.textContent);
+  }
   if (merged.tags.isEmpty && cached.tags.isNotEmpty) {
     merged = merged.copyWith(tags: cached.tags);
   }

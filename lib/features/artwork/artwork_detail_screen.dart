@@ -429,6 +429,9 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
     final descriptionHtml = ref.watch(
       artworkDescriptionHtmlProvider(widget.artworkId),
     );
+    final descriptionResolution = ref.watch(
+      artworkDescriptionResolutionProvider(widget.artworkId),
+    );
     final journalHtml = ref.watch(journalHtmlProvider(widget.artworkId));
     final additionalMedia = ref.watch(
       additionalMediaProvider(widget.artworkId),
@@ -533,6 +536,12 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
                     transfer,
                     description: description.value,
                     descriptionHtml: descriptionHtml.value,
+                    descriptionLoading: descriptionResolution.isLoading,
+                    descriptionError:
+                        descriptionResolution.hasError ||
+                        descriptionResolution.value?.failureCategory != null,
+                    descriptionExcerpt:
+                        descriptionResolution.value?.isExcerpt ?? false,
                     journalHtml: journalHtml.value,
                     additionalMedia:
                         additionalMedia.value ?? const <MediaAsset>[],
@@ -564,6 +573,9 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
     TransferSnapshot? transfer, {
     String? description,
     String? descriptionHtml,
+    bool descriptionLoading = false,
+    bool descriptionError = false,
+    bool descriptionExcerpt = false,
     String? journalHtml,
     List<MediaAsset> additionalMedia = const <MediaAsset>[],
     List<MediaAsset> additionalOriginals = const <MediaAsset>[],
@@ -638,6 +650,15 @@ final class _ArtworkDetailScreenState extends ConsumerState<ArtworkDetailScreen>
             journalHtml: journalHtml,
             descriptionHtml: descriptionHtml,
             description: description,
+            isLoading: descriptionLoading,
+            hasError: descriptionError,
+            isExcerpt: descriptionExcerpt,
+            onRetry: () {
+              ref.invalidate(webArtworkInitPayloadProvider(widget.artworkId));
+              ref.invalidate(
+                artworkDescriptionResolutionProvider(widget.artworkId),
+              );
+            },
             onOpenLink: _openLink,
           ),
           if (tags.isNotEmpty) ArtworkTagsSection(tags: tags),

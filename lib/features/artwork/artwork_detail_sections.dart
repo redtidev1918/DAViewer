@@ -184,6 +184,10 @@ final class ArtworkDescriptionSection extends StatelessWidget {
     this.journalHtml,
     this.descriptionHtml,
     this.description,
+    this.isLoading = false,
+    this.hasError = false,
+    this.isExcerpt = false,
+    this.onRetry,
     super.key,
   });
 
@@ -193,9 +197,30 @@ final class ArtworkDescriptionSection extends StatelessWidget {
   final String? journalHtml;
   final String? descriptionHtml;
   final String? description;
+  final bool isLoading;
+  final bool hasError;
+  final bool isExcerpt;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        if (isLoading) const LinearProgressIndicator(),
+        if (isExcerpt) Text(s.descriptionExcerpt),
+        _buildContent(context),
+        if (hasError) ...<Widget>[
+          Text(s.descriptionLoadFailed),
+          if (onRetry != null)
+            TextButton(onPressed: onRetry, child: Text(s.retry)),
+          const SizedBox(height: 16),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
     final titleStyle = Theme.of(context).textTheme.titleMedium;
 
     if (isJournal && journalHtml != null && journalHtml!.trim().isNotEmpty) {
@@ -210,9 +235,7 @@ final class ArtworkDescriptionSection extends StatelessWidget {
       );
     }
 
-    if (!isJournal &&
-        descriptionHtml != null &&
-        descriptionHtml!.trim().isNotEmpty) {
+    if (descriptionHtml != null && descriptionHtml!.trim().isNotEmpty) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
