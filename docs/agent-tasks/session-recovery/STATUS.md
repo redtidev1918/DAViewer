@@ -1,5 +1,69 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-14: v0.5.19 Android 403 — root-cause investigation (continued)
+
+Continuation of the RFY/web-session 403 triage. Two real defects fixed
+(PR #118); the functional failure is NOT restored.
+
+Evidence established this round:
+
+- The log splits by **credential type**, not by client: Bearer/OAuth paths
+  return 200 (`browse/deviantsyouwatch`, `deviation/metadata`, `gallery/all`,
+  `browse/morelikethis/preview`) while cookie+CSRF paths fail
+  (`/_puppy/dabrowse/networkbar/rfy/deviations`, `dadeviation/init`, home
+  verify). So neither the client nor the official API is globally down.
+- The live cookie names were `_px,_pxvid,g_state,pxcts,td,tpc,userinfo` — no
+  `auth`, no `auth_secure`. Community evidence for this exact 403 identifies
+  the load-bearing session cookies as `userinfo` + `auth` + `auth_secure`
+  (gallery-dl #8810; its accepted workaround supplies that full dump plus a
+  matching browser UA). This repo already documents the shape above
+  `missingSavedWebCookies`: "Android can retain `userinfo` while losing auth
+  cookies". `userinfo` alone still satisfies `isValidCookieSnapshot`, which is
+  consistent with an app that believes it is signed in while the server serves
+  an anonymous page. **Leading hypothesis, not yet proven** — confirming it
+  needs the missing-cookie names from a device run.
+- Request construction is unchanged across v0.5.17–v0.5.19 for RFY / init /
+  moreLikeThis; v0.5.18 changed the session stack and post-success acceptance
+  only, and the 403 occurs in the `_tryFetchRfy` transport before that code.
+  No regression is *demonstrated*; identical source does not by itself exclude
+  a shared-session-layer regression, so an isolated old-APK comparison remains
+  outstanding (needs a device/account/proxy this environment lacks).
+
+Fixed in PR #118 (both verified to fail against the pre-fix code):
+
+1. `readBrowserEvidenceWithCredentials` discarded the whole page sample when
+   the cookie header rotated, so a WAF block/challenge page was re-classified
+   as the generic `page_uninitialized` — the exact classification logged on the
+   device. Block/challenge now survive credential churn; the identity-binding
+   discard rule is unchanged and test-covered.
+2. The probe's `blocked` outcome was completed as a plain `unavailable`, which
+   `WebSessionStatusController` deliberately covers with a retained healthy
+   lease — so a lockout became `recovery inconclusive retained=healthy_lease`
+   and `markLocked()` was reachable only from the login WebView. The blocked
+   check now runs before lease retention, giving the actionable
+   "switch network/proxy node" state and stopping retries.
+
+Also: the persisted-cookie restore returned silently in several places; it now
+logs counts and cookie **names** only (never values), which is what will answer
+the 9-vs-7 snapshot question on the next device run.
+
+Local gates on PR #118: format 0 changed; `flutter analyze` clean;
+`flutter test` **578 PASS** (573 + 5 new).
+
+Gate status: Code Verified PASS (local). CI PENDING (PR #118).
+**Android Verified: PENDING.** RFY / numeric-id description / numeric-id More
+Like This remain **FAIL on v0.5.19** — nothing here restores them. No cookie or
+user data cleared, no re-login forced, no retry/timeout inflation. PR #117
+(release 0.5.20) is intentionally left unmerged: it carries only the #116
+attribution fix and must not be presented as the P0 fix. Retained stash
+`backup-local-edits-before-update-2026-10-12` untouched.
+
+Next, in priority order: (1) one device run of PR #118's build to read the
+`restore ...` lines and settle the cookie-name/hypothesis question; (2) if the
+live store is missing `auth`/`auth_secure`, fix why the restore does not repair
+it (that is the actionable app-layer defect); (3) isolated old-APK comparison
+under identical account/network/proxy.
+
 ## 2026-10-14: v0.5.19 Android incident — RFY/web-session 403 triage
 
 User-reported P0 on the published v0.5.19 APK: watch feed, watch-feed
