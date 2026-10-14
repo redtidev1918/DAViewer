@@ -5,6 +5,8 @@ import 'package:dakit_flutter/dakit_flutter.dart';
 import 'package:daviewer/core/auth/auth_controller.dart';
 import 'package:daviewer/core/auth/auth_state.dart';
 import 'package:daviewer/core/auth/web_session_status.dart';
+import 'package:daviewer/core/auth/web_session_verdict.dart';
+import 'package:daviewer/core/auth/web_session_refresher.dart';
 import 'package:daviewer/core/diagnostics/app_logger.dart';
 import 'package:daviewer/core/runtime/app_runtime.dart';
 import 'package:daviewer/core/runtime/runtime_provider.dart';
@@ -186,6 +188,25 @@ void main() {
         isTrue,
       );
       expect(dioAdapter.requests.length, requestsBeforeWebChanges);
+      webStatus.applyVerification(
+        WebSessionEvidence(
+          source: WebSessionEvidenceSource.realBrowserProbe,
+          outcome: WebSessionProbeOutcome.anonymous,
+          generation: webStatus.generation,
+        ),
+      );
+      expect(container.read(webSessionStatusProvider).needsLogin, isTrue);
+      expect(
+        container.read(authControllerProvider).status,
+        AuthStatus.signedIn,
+      );
+      expect(tokenStore.tokens, isNotNull);
+      await favourites.forceRefresh();
+      expect(container.read(currentFavouritesProvider).error, isNull);
+      expect(
+        dioAdapter.requests.where((path) => path == 'collections/all'),
+        hasLength(2),
+      );
     },
   );
 
