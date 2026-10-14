@@ -61,6 +61,7 @@ class _Cookies extends Fake implements CookieManager {
   final values = <String, String>{'userinfo': '{"username":"artist"}'};
   final events = <String>[];
   final written = <PersistedWebCookie>[];
+  final rejectNames = <String>{};
   final writeStarted = Completer<void>();
   Future<void>? writeGate;
   Future<void>? readGate;
@@ -107,6 +108,7 @@ class _Cookies extends Fake implements CookieManager {
         isHttpOnly: isHttpOnly == true,
       ),
     );
+    if (rejectNames.contains(name)) return false;
     values[name] = value;
     return true;
   }
@@ -307,6 +309,20 @@ void main() {
     // The persisted snapshot was not rewritten by the unverified read-back.
     expect(await controller.persistedCookies(), hasLength(9));
   });
+
+  test(
+    'a platform-rejected cookie write leaves the live store unchanged',
+    () async {
+      // Counting accuracy: rejected native writes must not be reported as
+      // injected, and the live store must reflect only accepted writes.
+      await saveRestorableSnapshot();
+      cookies.rejectNames.addAll(['auth', 'auth_secure']);
+      await controller.initialize();
+      expect(cookies.events, ['set:auth', 'set:auth_secure']);
+      expect(cookies.values, hasLength(7));
+      expect(cookies.values.containsKey('auth'), isFalse);
+    },
+  );
 
   test('cold start without any persisted snapshot injects nothing', () async {
     await controller.initialize();

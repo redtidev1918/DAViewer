@@ -333,8 +333,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
         var injected = 0;
         for (final cookie in toRestore) {
           if (!mounted || !_ref.mounted || epoch != _identityEpoch) return;
-          await _setCookie(cookieManager, cookie);
-          injected++;
+          if (await _setCookie(cookieManager, cookie)) injected++;
         }
         final restored = await _ref.read(webSessionProvider).readData();
         if (!mounted || !_ref.mounted || epoch != _identityEpoch) {
@@ -753,8 +752,9 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
   /// Writes one persisted cookie back into the WebView store. Host-only
   /// `www.deviantart.com` cookies are restored without a domain attribute so
   /// they stay host-only; parent-domain cookies (`.deviantart.com`) keep their
-  /// domain, path, expiry, and security flags.
-  Future<void> _setCookie(
+  /// domain, path, expiry, and security flags. Returns whether the platform
+  /// store accepted the write, so callers can count real writes, not attempts.
+  Future<bool> _setCookie(
     CookieManager cookieManager,
     PersistedWebCookie cookie,
   ) async {
@@ -780,6 +780,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
         'cookie write rejected name=${cookie.name}',
       );
     }
+    return accepted == true;
   }
 
   Future<void> clear() async {

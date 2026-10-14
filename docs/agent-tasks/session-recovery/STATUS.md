@@ -21,7 +21,8 @@ more aggressive retries):
    logged (`no_persisted_cookies`, `no_saved_username`), read-back outcomes
    logged (`cookie_store_unavailable` / `no_identity` with names+`userinfoPresent`
    / `identity_changed injected=N`), injected-exception `errorType` logged,
-   and `setCookie` boolean return now checked (`cookie write rejected name=`).
+   and `setCookie` boolean return now checked (`cookie write rejected name=`);
+   `injected=N` counts only writes the platform store accepted, never attempts.
    Next capture must show exactly one of these branches instead of silence.
 2. Verifier 403 forensics (`web_session_verifier.dart`): non-200 and
    marker-less-200 responses now log contentType, contentLength, redirect
@@ -38,9 +39,10 @@ more aggressive retries):
    403/uninitialized→unverified + existing cooldown, no injection; server
    anonymous→visible WebView re-login then fresh snapshot.
 
-Local gates: format 0 changed, analyze clean, **595 tests PASS** (590 + 5:
+Local gates: format 0 changed, analyze clean, **596 tests PASS** (590 + 6:
 403/PX-block verifier classification, transport-failure verifier mapping,
-read-back-no-identity, no-snapshot, no-username boundaries).
+read-back-no-identity, platform-rejected write, no-snapshot, no-username
+boundaries).
 Android Verified / Original Incident Verified remain **PENDING**; the open
 question is the web-layer 403 itself, not cookie persistence.
 
