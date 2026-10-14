@@ -72,7 +72,8 @@ final class WebSessionVerifier {
         AppLogger.instance.info(
           'auth',
           'web session verifier response status=$status '
-              'classification=${WebSessionVerificationState.unavailable.name}',
+              'classification=${WebSessionVerificationState.unavailable.name} '
+              '${_responseForensics(response)}',
         );
         return const WebSessionVerification.unavailable();
       }
@@ -81,7 +82,8 @@ final class WebSessionVerifier {
         AppLogger.instance.info(
           'auth',
           'web session verifier response status=$status '
-              'classification=${WebSessionVerificationState.unavailable.name}',
+              'classification=${WebSessionVerificationState.unavailable.name} '
+              '${_responseForensics(response)}',
         );
         return const WebSessionVerification.unavailable();
       }
@@ -97,9 +99,38 @@ final class WebSessionVerifier {
             'classification=${result.state.name}',
       );
       return result;
-    } on Object {
+    } on Object catch (error) {
+      // The type (never the message: Dio messages embed URLs) separates
+      // transport timeouts from connection failures in device captures.
+      final dioType = error is DioException
+          ? ' dioType=${error.type.name}'
+          : '';
+      AppLogger.instance.info(
+        'auth',
+        'web session verifier error errorType=${error.runtimeType}$dioType',
+      );
       return const WebSessionVerification.unavailable();
     }
+  }
+
+  /// Non-credential forensics for captures where the server rejects the web
+  /// session: structural facts plus the two PerimeterX markers already
+  /// verified in `browserSessionEvidenceScript` — media type, body size,
+  /// redirect count, final host (never path or query, which can carry
+  /// tokens), and whether the identity initializer rendered at all. New body
+  /// markers must come from a captured document first; nothing speculative.
+  static String _responseForensics(Response<String> response) {
+    final contentType =
+        response.headers.value(Headers.contentTypeHeader)?.trim() ?? 'unknown';
+    final body = response.data ?? '';
+    final finalHost = response.realUri.host;
+    return 'contentType=$contentType '
+        'contentLength=${body.length} '
+        'redirects=${response.redirects.length} '
+        'finalHost=${finalHost.isEmpty ? 'unknown' : finalHost} '
+        'pxBlocked=${body.contains('Max challenge attempts exceeded')} '
+        'pxChallenge=${body.contains('#px-captcha') || body.contains('challenge-container')} '
+        'initialState=${body.contains(_marker)}';
   }
 
   Future<String> username({required String cookieHeader}) async {

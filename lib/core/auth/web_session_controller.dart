@@ -235,9 +235,25 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
     final cookies = rawCookies is List<PersistedWebCookie>
         ? rawCookies
         : parsePersistedCookies(rawCookies);
-    if (cookies.isEmpty) return;
+    if (cookies.isEmpty) {
+      // Distinguishes "no persisted cookie snapshot at all" from a snapshot
+      // that exists but cannot be decoded; both previously returned silently.
+      AppLogger.instance.info(
+        'web-session',
+        'restore skipped reason=no_persisted_cookies',
+      );
+      return;
+    }
     final savedUsername = (saved['username'] as String?)?.trim() ?? '';
-    if (savedUsername.isEmpty) return;
+    if (savedUsername.isEmpty) {
+      // A cookie snapshot without a saved username can never pass the account
+      // match below; surface it instead of returning silently.
+      AppLogger.instance.warning(
+        'web-session',
+        'restore skipped reason=no_saved_username count=${cookies.length}',
+      );
+      return;
+    }
     AppLogger.instance.info(
       'web-session',
       'restore candidate savedUsername=$savedUsername '
@@ -314,16 +330,41 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
           );
           return;
         }
+        var injected = 0;
         for (final cookie in toRestore) {
           if (!mounted || !_ref.mounted || epoch != _identityEpoch) return;
-          await _setCookie(cookieManager, cookie);
+          if (await _setCookie(cookieManager, cookie)) injected++;
         }
         final restored = await _ref.read(webSessionProvider).readData();
-        if (!mounted || !_ref.mounted || epoch != _identityEpoch) return;
-        if (restored?.username.isNotEmpty == true) {
+        if (!mounted || !_ref.mounted || epoch != _identityEpoch) {
+          // The identity epoch moved (logout or a different account report)
+          // while the writes were in flight.
           AppLogger.instance.info(
             'web-session',
-            'restore verified username=${restored!.username} '
+            'restore readback skipped reason=identity_changed '
+                'injected=$injected',
+          );
+          return;
+        }
+        if (restored == null) {
+          AppLogger.instance.warning(
+            'web-session',
+            'restore readback failed reason=cookie_store_unavailable '
+                'injected=$injected',
+          );
+        } else if (restored.username.isEmpty) {
+          // The store accepted the writes but the read-back no longer names an
+          // identity (e.g. Android truncating the userinfo value). Names only.
+          AppLogger.instance.warning(
+            'web-session',
+            'restore readback no_identity count=${restored.cookies.length} '
+                'names=[${(restored.cookies.map((c) => c.name).toList()..sort()).join(',')}] '
+                'userinfoPresent=${restored.cookies.any((c) => c.name == 'userinfo')}',
+          );
+        } else {
+          AppLogger.instance.info(
+            'web-session',
+            'restore verified username=${restored.username} '
                 'count=${restored.cookies.length} '
                 'fingerprint=${restored.fingerprint}',
           );
@@ -341,8 +382,14 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
             isCurrent: () => _isCurrentIdentity(epoch),
           );
         }
-      } on Object {
+      } on Object catch (error) {
         // Best effort; a failed restore only means the user signs in again.
+        // The type (never the message) is recorded so the next device capture
+        // can distinguish a store write failure from a read failure.
+        AppLogger.instance.warning(
+          'web-session',
+          'restore failed errorType=${error.runtimeType}',
+        );
       }
     });
   }
@@ -705,8 +752,9 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
   /// Writes one persisted cookie back into the WebView store. Host-only
   /// `www.deviantart.com` cookies are restored without a domain attribute so
   /// they stay host-only; parent-domain cookies (`.deviantart.com`) keep their
-  /// domain, path, expiry, and security flags.
-  Future<void> _setCookie(
+  /// domain, path, expiry, and security flags. Returns whether the platform
+  /// store accepted the write, so callers can count real writes, not attempts.
+  Future<bool> _setCookie(
     CookieManager cookieManager,
     PersistedWebCookie cookie,
   ) async {
@@ -714,7 +762,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
         cookie.domain == null ||
         cookie.domain!.isEmpty ||
         cookie.domain == 'www.deviantart.com';
-    await cookieManager.setCookie(
+    final accepted = await cookieManager.setCookie(
       url: WebUri('https://www.deviantart.com/'),
       name: cookie.name,
       value: cookie.value,
@@ -724,6 +772,15 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
       isSecure: cookie.isSecure,
       isHttpOnly: cookie.isHttpOnly,
     );
+    if (accepted != true) {
+      // The platform store can refuse a write; record the name only and let
+      // the read-back decide the overall outcome.
+      AppLogger.instance.warning(
+        'web-session',
+        'cookie write rejected name=${cookie.name}',
+      );
+    }
+    return accepted == true;
   }
 
   Future<void> clear() async {

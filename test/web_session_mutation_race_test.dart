@@ -61,6 +61,7 @@ class _Cookies extends Fake implements CookieManager {
   final values = <String, String>{'userinfo': '{"username":"artist"}'};
   final events = <String>[];
   final written = <PersistedWebCookie>[];
+  final rejectNames = <String>{};
   final writeStarted = Completer<void>();
   Future<void>? writeGate;
   Future<void>? readGate;
@@ -107,6 +108,7 @@ class _Cookies extends Fake implements CookieManager {
         isHttpOnly: isHttpOnly == true,
       ),
     );
+    if (rejectNames.contains(name)) return false;
     values[name] = value;
     return true;
   }
@@ -287,6 +289,62 @@ void main() {
     container.read(authControllerProvider.notifier).state = const AuthState(
       status: AuthStatus.signedIn,
       account: UserProfile(id: 'other', username: 'other'),
+    );
+    await controller.restorePersistedCookies();
+    expect(cookies.events, isEmpty);
+  });
+
+  test('restore injects but leaves identity untouched when the read-back names no account', () async {
+    // Incident follow-up (2026-10-15 02:59): injection ran (9 live cookies)
+    // but no restore-verified line appeared. An unparseable read-back
+    // userinfo is one such outcome; the injected cookies must stay and the
+    // in-memory identity must not be overwritten.
+    await saveRestorableSnapshot();
+    cookies.values['userinfo'] = 'not-json';
+    await controller.initialize();
+    expect(cookies.events, ['set:auth', 'set:auth_secure']);
+    expect(cookies.values, hasLength(9));
+    expect(controller.state.username, 'artist');
+    expect(controller.state.isLoggedIn, true);
+    // The persisted snapshot was not rewritten by the unverified read-back.
+    expect(await controller.persistedCookies(), hasLength(9));
+  });
+
+  test(
+    'a platform-rejected cookie write leaves the live store unchanged',
+    () async {
+      // Counting accuracy: rejected native writes must not be reported as
+      // injected, and the live store must reflect only accepted writes.
+      await saveRestorableSnapshot();
+      cookies.rejectNames.addAll(['auth', 'auth_secure']);
+      await controller.initialize();
+      expect(cookies.events, ['set:auth', 'set:auth_secure']);
+      expect(cookies.values, hasLength(7));
+      expect(cookies.values.containsKey('auth'), isFalse);
+    },
+  );
+
+  test('cold start without any persisted snapshot injects nothing', () async {
+    await controller.initialize();
+    expect(cookies.events, isEmpty);
+    expect(cookies.values, hasLength(1));
+  });
+
+  test('a cookie snapshot without a saved username never injects', () async {
+    container.read(authControllerProvider.notifier).state = const AuthState(
+      status: AuthStatus.signedIn,
+      account: UserProfile(id: 'artist', username: 'artist'),
+    );
+    await store.update(
+      isLoggedIn: true,
+      cookies: [
+        PersistedWebCookie(
+          name: 'auth',
+          value: 'synthetic-auth',
+          domain: '.deviantart.com',
+          expiresDate: DateTime.utc(2030),
+        ),
+      ],
     );
     await controller.restorePersistedCookies();
     expect(cookies.events, isEmpty);
