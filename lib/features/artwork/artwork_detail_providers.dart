@@ -18,6 +18,7 @@ import 'package:dakit_web/dakit_web.dart';
 import '../../core/runtime/runtime_provider.dart';
 import '../../core/search/interest_store.dart';
 import 'artwork_store.dart';
+import 'artwork_description.dart';
 import 'artwork_access.dart';
 import 'artwork_access_controller.dart';
 import 'artwork_access_state.dart';
@@ -43,6 +44,7 @@ final artworkSessionRecoveryProvider = Provider<void Function()>((ref) {
     ref.invalidate(artworkDetailProvider);
     ref.invalidate(originalFileProvider);
     ref.invalidate(journalHtmlProvider);
+    ref.invalidate(artworkDescriptionResolutionProvider);
     ref.invalidate(moreLikeThisProvider);
   };
 });
@@ -468,79 +470,52 @@ final originalFileProvider = FutureProvider.autoDispose
       }
     });
 
-/// The full author description as plain text. For web-feed items it comes from
-/// `dadeviation/init`; for OAuth items from `deviation/content`. Falls back to
-/// the artwork's short excerpt when the full description is empty.
-final artworkDescriptionProvider = FutureProvider.autoDispose
-    .family<String?, String>((ref, artworkId) async {
+/// One request and one outcome for both rich and plain description consumers.
+/// Content is the journal/literature body; metadata is the author description.
+final artworkDescriptionResolutionProvider = FutureProvider.autoDispose
+    .family<ArtworkDescription, String>((ref, artworkId) async {
       final cached = ref.read(artworkStoreProvider)[artworkId];
-      if (isNumericDeviationId(artworkId)) {
-        try {
-          final init = await ref.watch(deviationInitProvider(artworkId).future);
-          final text = init?.description;
-          if (text != null && text.trim().isNotEmpty) return text;
-        } on Object catch (error) {
-          debugPrint('[desc] init fetch failed: $error');
-        }
-        return cached?.description;
-      }
-      final runtime = ref.watch(runtimeProvider);
-      final artwork = await ref.watch(artworkDetailProvider(artworkId).future);
+      ArtworkDescription result;
       try {
-        final content = await OfficialArtworkContentRepository(
-          runtime.transport!,
-        ).get(artworkId);
-        final html = content.html;
-        debugPrint('[desc] content html len=${html?.length ?? 0}');
-        if (html != null && html.trim().isNotEmpty) {
-          return htmlToPlainText(html);
-        }
-        // The rendered `html` is empty for some deviations; the description
-        // then lives in the tiptap `original_markup` document.
-        final markup = content.originalMarkup;
-        if (markup != null && markup.trim().isNotEmpty) {
-          final text = tiptapToPlainText(markup);
-          debugPrint('[desc] tiptap len=${text.length}');
-          if (text.isNotEmpty) return text;
+        if (isNumericDeviationId(artworkId)) {
+          final payload = await ref.watch(
+            webArtworkInitPayloadProvider(artworkId).future,
+          );
+          if (payload == null) {
+            throw const FormatException('Missing web description result.');
+          }
+          result = ArtworkDescriptionRepository.parseWeb(payload);
+        } else {
+          final runtime = ref.watch(runtimeProvider);
+          result = await ArtworkDescriptionRepository(runtime.transport!)
+              .get(artworkId);
         }
       } on Object catch (error) {
-        debugPrint('[desc] content fetch failed: $error');
+        result = ArtworkDescription.fallback(cached, error);
       }
-      return artwork.description;
+      AppLogger.instance.info(
+        'description',
+        'source=${result.source} numeric=${isNumericDeviationId(artworkId)} '
+            'htmlPresent=${result.html != null} htmlLength=${result.html?.length ?? 0} '
+            'textPresent=${result.text != null} textLength=${result.text?.length ?? 0} '
+            'excerpt=${result.isExcerpt} failure=${result.failureCategory ?? 'none'}',
+      );
+      return result;
     });
 
-/// The full author description as an HTML fragment (rich text, preserving
-/// links and inline formatting). Mirrors [artworkDescriptionProvider] but keeps
-/// the renderable markup instead of collapsing it to plain text.
+final artworkDescriptionProvider = FutureProvider.autoDispose
+    .family<String?, String>(
+      (ref, artworkId) async => (await ref.watch(
+        artworkDescriptionResolutionProvider(artworkId).future,
+      )).text,
+    );
+
 final artworkDescriptionHtmlProvider = FutureProvider.autoDispose
-    .family<String?, String>((ref, artworkId) async {
-      if (isNumericDeviationId(artworkId)) {
-        try {
-          final init = await ref.watch(deviationInitProvider(artworkId).future);
-          final html = init?.descriptionHtml;
-          if (html != null && html.trim().isNotEmpty) return html;
-        } on Object {
-          // Fall through to null; plain text remains available.
-        }
-        return null;
-      }
-      final runtime = ref.watch(runtimeProvider);
-      try {
-        final content = await OfficialArtworkContentRepository(
-          runtime.transport!,
-        ).get(artworkId);
-        final html = content.html;
-        if (html != null && html.trim().isNotEmpty) return html;
-        final markup = content.originalMarkup;
-        if (markup != null && markup.trim().isNotEmpty) {
-          final converted = tiptapToHtml(markup);
-          return converted.isNotEmpty ? converted : markup;
-        }
-      } on Object {
-        // Fall through to null.
-      }
-      return null;
-    });
+    .family<String?, String>(
+      (ref, artworkId) async => (await ref.watch(
+        artworkDescriptionResolutionProvider(artworkId).future,
+      )).html,
+    );
 
 /// "More Like This" — the current website's organic related blocks provide the
 /// artwork, while the official preview endpoint provides the featured/suggested
