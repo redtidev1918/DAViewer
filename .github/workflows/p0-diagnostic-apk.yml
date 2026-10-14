@@ -24,9 +24,9 @@ on:
         required: false
         type: string
       build_number:
-        description: "Android versionCode; must be >= the installed build (v0.5.19 = 231)"
+        description: "Android versionCode; must be >= the installed build (v0.5.19 = 231) and below the next release"
         required: false
-        default: "900"
+        default: "232"
         type: string
 
 permissions:
@@ -57,6 +57,34 @@ jobs:
           echo "Reviewed commit $sha ($short) is on main."
           echo "SOURCE_SHA=$sha" >> "$GITHUB_ENV"
           echo "SOURCE_SHORT=$short" >> "$GITHUB_ENV"
+
+      - name: Validate inputs before any secret is read
+        shell: bash
+        env:
+          RAW_DIAGNOSTIC_BUILD_NUMBER: ${{ inputs.build_number }}
+        run: |
+          set -euo pipefail
+          # The value is consumed as a shell argument, so reject anything that is
+          # not a plain integer instead of trusting the dispatch form.
+          case "$RAW_DIAGNOSTIC_BUILD_NUMBER" in
+            ''|*[!0-9]*)
+              echo "::error::build_number must be a positive integer, got '$RAW_DIAGNOSTIC_BUILD_NUMBER'"
+              exit 1
+              ;;
+          esac
+          # Java's PackageInfo rejects a versionCode above Integer.MAX_VALUE.
+          if [ "$RAW_DIAGNOSTIC_BUILD_NUMBER" -lt 1 ] || [ "$RAW_DIAGNOSTIC_BUILD_NUMBER" -gt 2100000000 ]; then
+            echo "::error::build_number $RAW_DIAGNOSTIC_BUILD_NUMBER is outside the accepted range"
+            exit 1
+          fi
+          # An Android update requires versionCode >= the installed build, and a
+          # diagnostic build must stay below the next release so it never blocks it.
+          if [ "$RAW_DIAGNOSTIC_BUILD_NUMBER" -lt 231 ]; then
+            echo "::error::build_number $RAW_DIAGNOSTIC_BUILD_NUMBER is below the installed v0.5.19 (231); the update would be refused"
+            exit 1
+          fi
+          echo "DIAGNOSTIC_BUILD_NUMBER=$RAW_DIAGNOSTIC_BUILD_NUMBER" >> "$GITHUB_ENV"
+          echo "Validated build_number=$RAW_DIAGNOSTIC_BUILD_NUMBER"
 
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -95,9 +123,9 @@ jobs:
         run: |
           set -euo pipefail
           version=$(python3 -c 'import json; print(json.load(open(".release-please-manifest.json"))["."])')
-          echo "App version label: $version; versionCode: ${{ inputs.build_number }}"
+          echo "App version label: $version; versionCode: $DIAGNOSTIC_BUILD_NUMBER"
           flutter build apk --release \
-            --build-number="${{ inputs.build_number }}" \
+            --build-number="$DIAGNOSTIC_BUILD_NUMBER" \
             --dart-define="DAVIEWER_VERSION=$version" \
             --dart-define="DAVIEWER_REVISION=$SOURCE_SHA"
 
@@ -124,7 +152,7 @@ jobs:
             echo "## INTERNAL / P0 DIAGNOSTIC build — not a release"
             echo ""
             echo "- Source commit: \`$SOURCE_SHA\` (on main, reviewed)"
-            echo "- versionCode: \`${{ inputs.build_number }}\` (installed v0.5.19 is 231)"
+            echo "- versionCode: \`$DIAGNOSTIC_BUILD_NUMBER\` (installed v0.5.19 is 231; next release is higher)"
             echo "- No tag, no Release, no download-page change."
             echo ""
             echo "### Install WITHOUT losing app data"
