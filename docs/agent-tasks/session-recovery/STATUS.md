@@ -1,5 +1,58 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-15: REG-026 — persisted-cookie restore was dead (double parse)
+
+Branch `codex/web-session-restore-decode-fix`, baseline main `a422edaf`.
+Root cause found for the missing `restore candidate` lines in every device log
+since PR #118 added them: `WebSessionStore.read()` decodes `cookies` into
+`List<PersistedWebCookie>`, but three controller consumers re-parsed that
+decoded list; `parsePersistedCookies` only accepts JSON maps, so the restore
+saw an empty snapshot and returned silently **before any logging**. Introduced
+`058edd0` (2026-09-22); v0.5.14–v0.5.20 all ship it (ancestry verified). The
+store's own tests bypass `store.read()` via a raw-JSON helper, which is how a
+586-test green suite never exercised the broken composition.
+
+The interrupted WIP (`test/web_session_mutation_race_test.dart`, 4 tests)
+completed: on the old code the cold-start test fails (`persistedCookies()`
+`[]` vs 9) and the concurrent-restore test times out. Minimal fix: consumers
+use the already-parsed list; write path, account matching, expiry filtering,
+logout tombstone and epoch fencing untouched. One test-fake defect fixed
+(`expiresDate` rebuilt without `isUtc`). Fixtures are written through the
+production store, not reverse-engineered from the parser.
+
+Full local gates on this branch: format 0 changed, analyze clean,
+**582 tests PASS** (578 main-equivalent + 4 new; PR #122's 8 tests are not on
+this main-based branch). REG-026
+written. Android Verified / Original Incident Verified remain **PENDING**:
+this restores the client-side re-injection path only — the 00:35 log showed
+9 live cookies with the server still answering anonymous, so server
+acceptance of restored credentials needs a real device run (`restore
+candidate` / `restore verified` lines are now expected to appear).
+At the time this entry was written PR #122 was still OPEN; it was merged as
+`f49cbf4` later the same day (see the REG-025 entry below and the newest
+entry for the merge/publication record).
+
+Community cross-check (2026-10-15, design reference only, no code copied):
+- `flutter_inappwebview` 6.1.5 / `flutter_inappwebview_android` 1.1.3
+  (installed, pub-cache source verified): `setCookie` appends `Domain` only
+  when supplied (host-only stays host-only), calls `CookieManager.flush()`
+  after every write, so re-injected cookies persist across restarts;
+  `getCookies` returns full metadata via `CookieManagerCompat` on modern
+  WebViews and null domain/path on older ones — exactly the shapes
+  `missingSavedWebCookies` tolerates. No defect found.
+- `cookie_jar` 4.0.9: expiry semantics `!expires.isAfter(now)` identical to
+  ours; PersistCookieJar drops expired cookies on load by default as we do;
+  our structured JSON serialization is stronger than its string-concat
+  format, and we keep a corrupt snapshot instead of deleting it. No change.
+- `gallery-dl` (mikf, master): load-bearing cookie triple
+  `("auth","auth_secure","userinfo")` on `.deviantart.com`, CSRF read from
+  `window.__CSRF_TOKEN__` and paired with every `/_puppy` call, and
+  redirect-to-login treated as server-rejected auth — all consistent with
+  this app's restore set and verifier design. gallery-dl gates on cookie
+  presence and surfaces server rejection downstream; DAViewer additionally
+  classifies the server verdict. No change.
+No evidenced defect emerged from the comparison; no speculative edits made.
+
 ## 2026-10-15: bounded network-recovery acceptance and REG-025
 
 Branch `codex/p0-network-recovery-acceptance`, baseline main `a422edaf`.
@@ -23,7 +76,6 @@ explicit anonymous and RFY never reaches transport. This patch cannot be
 attributed as fixing that failure. No evidence of IP ban or exact proxy cause.
 ADB has no attached device. Android new-code acceptance and Original Incident
 Verified remain **PENDING**; P0 is open. Raw user attachment is not committed.
-
 
 ## 2026-10-14: Android single-run functional re-test — PASS (stability PENDING)
 

@@ -60,6 +60,7 @@ class _Storage extends FlutterSecureStorage {
 class _Cookies extends Fake implements CookieManager {
   final values = <String, String>{'userinfo': '{"username":"artist"}'};
   final events = <String>[];
+  final written = <PersistedWebCookie>[];
   final writeStarted = Completer<void>();
   Future<void>? writeGate;
   Future<void>? readGate;
@@ -93,6 +94,19 @@ class _Cookies extends Fake implements CookieManager {
     if (!writeStarted.isCompleted) writeStarted.complete();
     await writeGate;
     events.add('set:$name');
+    written.add(
+      PersistedWebCookie(
+        name: name,
+        value: value,
+        domain: domain,
+        path: path,
+        expiresDate: expiresDate == null
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(expiresDate, isUtc: true),
+        isSecure: isSecure == true,
+        isHttpOnly: isHttpOnly == true,
+      ),
+    );
     values[name] = value;
     return true;
   }
@@ -146,6 +160,7 @@ void main() {
   late WebSessionController controller;
   late _Pending pending;
   late _Tokens tokens;
+  late WebSessionStore store;
 
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('daviewer-cookie-race-');
@@ -156,7 +171,7 @@ void main() {
     const channel = MethodChannel('plugins.flutter.io/path_provider');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (_) async => directory.path);
-    final store = WebSessionStore(
+    store = WebSessionStore(
       directoryFactory: () async => directory,
       storage: storage,
     );
@@ -204,6 +219,98 @@ void main() {
         );
     await directory.delete(recursive: true);
   });
+
+  Future<void> saveRestorableSnapshot({bool expired = false}) async {
+    container.read(authControllerProvider.notifier).state = const AuthState(
+      status: AuthStatus.signedIn,
+      account: UserProfile(id: 'artist', username: 'artist'),
+    );
+    // App-owned storage contract, written through the production store; no
+    // fixture reverse-engineered from parsePersistedCookies or network API.
+    for (final name in ['_px', '_pxvid', 'g_state', 'pxcts', 'td', 'tpc']) {
+      cookies.values[name] = 'synthetic';
+    }
+    await store.update(
+      csrf: 'saved-csrf',
+      isLoggedIn: true,
+      username: 'artist',
+      cookies: [
+        for (final entry in cookies.values.entries)
+          PersistedWebCookie(name: entry.key, value: entry.value),
+        for (final name in ['auth', 'auth_secure'])
+          PersistedWebCookie(
+            name: name,
+            value: 'synthetic-$name',
+            domain: '.deviantart.com',
+            path: '/',
+            isSecure: true,
+            isHttpOnly: true,
+            expiresDate: expired ? DateTime.utc(2020) : DateTime.utc(2030),
+          ),
+      ],
+    );
+  }
+
+  test('cold-start restores decoded saved authentication cookies with metadata', () async {
+    await saveRestorableSnapshot();
+    expect(cookies.values, hasLength(7));
+    expect(await controller.persistedCookies(), hasLength(9));
+    await controller.initialize();
+    expect(cookies.events, ['set:auth', 'set:auth_secure']);
+    expect(cookies.values, hasLength(9));
+    for (final cookie in cookies.written) {
+      expect(cookie.domain, '.deviantart.com');
+      expect(cookie.path, '/');
+      expect(cookie.expiresDate, DateTime.utc(2030));
+      expect(cookie.isSecure, isTrue);
+      expect(cookie.isHttpOnly, isTrue);
+    }
+    expect(controller.state.username, 'artist');
+    // Repeated cold starts retain the live cookies instead of overwriting them.
+    cookies.values['auth'] = 'rotated-live';
+    for (var i = 0; i < 10; i++) {
+      await controller.initialize();
+    }
+    expect(cookies.events, hasLength(2));
+    expect(cookies.values['auth'], 'rotated-live');
+  });
+
+  test('restoration rejects expired saved auth cookies', () async {
+    await saveRestorableSnapshot(expired: true);
+    await controller.initialize();
+    expect(cookies.events, isEmpty);
+    expect(cookies.values, hasLength(7));
+  });
+
+  test('restoration rejects a snapshot for another OAuth account', () async {
+    await saveRestorableSnapshot();
+    container.read(authControllerProvider.notifier).state = const AuthState(
+      status: AuthStatus.signedIn,
+      account: UserProfile(id: 'other', username: 'other'),
+    );
+    await controller.restorePersistedCookies();
+    expect(cookies.events, isEmpty);
+  });
+
+  test(
+    'concurrent restores share native writes and logout fences the remainder',
+    () async {
+      await saveRestorableSnapshot();
+      final gate = Completer<void>();
+      cookies.writeGate = gate.future;
+      final first = controller.restorePersistedCookies();
+      final second = controller.restorePersistedCookies();
+      expect(identical(first, second), isTrue);
+      await cookies.writeStarted.future.timeout(const Duration(seconds: 2));
+      final logout = controller.clear();
+      gate.complete();
+      await Future.wait([first, second, logout]);
+      expect(cookies.events, ['set:auth', 'clear']);
+      expect(cookies.values, isEmpty);
+      expect(storage.values, isEmpty);
+      expect(controller.state.isLoggedIn, isFalse);
+    },
+  );
 
   test('logout clears after an already-issued native write and stops the remaining import', () async {
     final gate = Completer<void>();

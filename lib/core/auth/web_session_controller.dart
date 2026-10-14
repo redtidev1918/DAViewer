@@ -228,7 +228,13 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
   Future<void> _restoreWebCookies(Map<String, Object?> saved) async {
     final epoch = _identityEpoch;
     final rawCookies = saved['cookies'];
-    final cookies = parsePersistedCookies(rawCookies);
+    // WebSessionStore.read() already decodes the snapshot (including the
+    // legacy name-value migration) into PersistedWebCookies. Re-parsing that
+    // decoded list returns an empty snapshot, which silently disabled the
+    // whole restore.
+    final cookies = rawCookies is List<PersistedWebCookie>
+        ? rawCookies
+        : parsePersistedCookies(rawCookies);
     if (cookies.isEmpty) return;
     final savedUsername = (saved['username'] as String?)?.trim() ?? '';
     if (savedUsername.isEmpty) return;
@@ -482,8 +488,11 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
       );
       return false;
     }
-    final persisted = parsePersistedCookies((await _store.read())['cookies']);
+    final savedCookies = (await _store.read())['cookies'];
     if (!_isCurrentIdentity(epoch)) return false;
+    final persisted = savedCookies is List<PersistedWebCookie>
+        ? savedCookies
+        : parsePersistedCookies(savedCookies);
     if (webSessionPersistedFingerprint(persisted) ==
         webSessionPersistedFingerprint(cookies)) {
       return true;
@@ -740,8 +749,12 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
   /// The persisted deviantart.com cookie snapshot, used as a fallback when the
   /// live WebView store cannot be read (e.g. cookie export during early
   /// startup). Returns an empty list when nothing is stored.
-  Future<List<PersistedWebCookie>> persistedCookies() async =>
-      parsePersistedCookies((await _store.read())['cookies']);
+  Future<List<PersistedWebCookie>> persistedCookies() async {
+    final cookies = (await _store.read())['cookies'];
+    return cookies is List<PersistedWebCookie>
+        ? cookies
+        : parsePersistedCookies(cookies);
+  }
 }
 
 /// Whether the persisted web session may be restored for the current OAuth
