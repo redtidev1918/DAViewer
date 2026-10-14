@@ -28,8 +28,9 @@ this restores the client-side re-injection path only — the 00:35 log showed
 9 live cookies with the server still answering anonymous, so server
 acceptance of restored credentials needs a real device run (`restore
 candidate` / `restore verified` lines are now expected to appear).
-PR #122 / v0.5.21 (workflow A) untouched: still OPEN, three candidate builds
-were pending at last check; no merge or release action taken by this session.
+At the time this entry was written PR #122 was still OPEN; it was merged as
+`f49cbf4` later the same day (see the REG-025 entry below and the newest
+entry for the merge/publication record).
 
 Community cross-check (2026-10-15, design reference only, no code copied):
 - `flutter_inappwebview` 6.1.5 / `flutter_inappwebview_android` 1.1.3
@@ -51,6 +52,30 @@ Community cross-check (2026-10-15, design reference only, no code copied):
   presence and surfaces server rejection downstream; DAViewer additionally
   classifies the server verdict. No change.
 No evidenced defect emerged from the comparison; no speculative edits made.
+
+## 2026-10-15: bounded network-recovery acceptance and REG-025
+
+Branch `codex/p0-network-recovery-acceptance`, baseline main `a422edaf`.
+Reproduced four failures against baseline: refused connection and three timeout
+types unnecessarily trigger one browser probe and a second RFY transport.
+Minimal fix propagates transport failures to the existing controller; genuine
+HTTP/authentication evidence remains unchanged. See `docs/regressions/025-network-failure-auth-retry.md`.
+Full local suite: **586 PASS** (578 + 8); no SDK/lock/version change. Added cache,
+recovery/concurrency, certificate and numeric detail tests; OAuth remains usable
+after confirmed web expiry. Existing stale-request/account tests still pass.
+Original two stashes and historical untracked files untouched.
+
+User authorized formal publication in this session, without another manual APK
+round. Next: final static checks, implementation PR/CI/candidates, release-please
+0.5.21, formal signed artifacts and download-page verification. No gate bypass.
+
+New supplied Android log is **v0.5.20**, source `fa10b608`, not this patch:
+00:31 connection failures across API/web/media; 00:35 connectivity/OAuth and
+numeric description/More Like This recover, but two browser documents report
+explicit anonymous and RFY never reaches transport. This patch cannot be
+attributed as fixing that failure. No evidence of IP ban or exact proxy cause.
+ADB has no attached device. Android new-code acceptance and Original Incident
+Verified remain **PENDING**; P0 is open. Raw user attachment is not committed.
 
 ## 2026-10-14: Android single-run functional re-test — PASS (stability PENDING)
 
