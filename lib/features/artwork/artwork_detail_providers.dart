@@ -576,8 +576,29 @@ final moreLikeThisProvider = FutureProvider.autoDispose
         }
       }
 
+      // Resolving the OAuth UUID is a *website* step for numeric ids: it calls
+      // `dadeviation/init` with the web session. Keep it out of the official
+      // request below so a resolution failure is never reported as an official
+      // API failure — when it fails, no official request is sent at all, and an
+      // "official: 403" in the log would be actively misleading.
+      String? uuid;
       try {
-        final uuid = await ref.watch(artworkUuidProvider(artworkId).future);
+        uuid = await ref.watch(artworkUuidProvider(artworkId).future);
+      } on Object catch (error) {
+        websiteError ??= error;
+        debugPrint(
+          '[moreLikeThis] uuid resolution failed for $artworkId '
+          '(web session, official request not attempted): $error',
+        );
+      }
+      if (uuid == null) {
+        if (webArtworks.isNotEmpty) {
+          return MoreLikeThisResult(artworks: webArtworks);
+        }
+        throw MoreLikeThisFailure(websiteError: websiteError);
+      }
+
+      try {
         final result = await OfficialDiscoveryRepository(runtime.transport!)
             .moreLikeThis(uuid);
         if (epoch != access.sessionEpoch) {
@@ -596,9 +617,9 @@ final moreLikeThisProvider = FutureProvider.autoDispose
       } on MoreLikeThisFailure {
         rethrow;
       } on Object catch (officialError) {
-        // The official source can be unreachable for numeric web-feed ids
-        // without a web session (no UUID to resolve). Keep the website artwork
-        // in that case, and only surface a combined failure when both are gone.
+        // Only a genuine official-endpoint failure reaches here. Keep the
+        // website artwork when the official source is unreachable, and surface
+        // a combined failure only when both sources are gone.
         if (webArtworks.isNotEmpty) {
           return MoreLikeThisResult(artworks: webArtworks);
         }
