@@ -280,9 +280,34 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
           current: current?.cookies ?? const <PersistedWebCookie>[],
           now: DateTime.now(),
         );
-        if (toRestore.isEmpty) return;
+        if (toRestore.isEmpty) {
+          // Previously silent. Live stores that keep a cookie *name* with a
+          // rotated or invalid value are not repaired by this path, so record
+          // the comparison inputs (names only, never values) to tell "nothing
+          // to restore" apart from "restore never reached the store".
+          AppLogger.instance.info(
+            'web-session',
+            'restore skipped reason=nothing_missing savedCount=${cookies.length} '
+                'liveCount=${current?.cookies.length ?? 0} '
+                'savedNames=[${(cookies.map((c) => c.name).toList()..sort()).join(',')}] '
+                'liveNames=[${((current?.cookies ?? const <PersistedWebCookie>[]).map((c) => c.name).toList()..sort()).join(',')}]',
+          );
+          return;
+        }
+        AppLogger.instance.info(
+          'web-session',
+          'restore candidates count=${toRestore.length} '
+              'names=[${(toRestore.map((c) => c.name).toList()..sort()).join(',')}]',
+        );
         final cookieManager = _nativeCookies;
-        if (cookieManager == null) return;
+        if (cookieManager == null) {
+          AppLogger.instance.warning(
+            'web-session',
+            'restore skipped reason=native_cookie_manager_unavailable '
+                'count=${toRestore.length}',
+          );
+          return;
+        }
         for (final cookie in toRestore) {
           if (!mounted || !_ref.mounted || epoch != _identityEpoch) return;
           await _setCookie(cookieManager, cookie);
