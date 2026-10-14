@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.22](https://github.com/redtidev1918/DAViewer/compare/v0.5.21...v0.5.22) (2026-10-14)
+
+
+### Bug Fixes
+
+* **diagnostics:** make restore read-back and web 403 outcomes visible ([#127](https://github.com/redtidev1918/DAViewer/issues/127)) ([d400dd2](https://github.com/redtidev1918/DAViewer/commit/d400dd280e83e29979cd5c5c51e878eeca976910))
+
 ## [0.5.21](https://github.com/redtidev1918/DAViewer/compare/v0.5.20...v0.5.21) (2026-10-14)
 
 
