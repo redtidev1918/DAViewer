@@ -1,5 +1,80 @@
 # DAViewer P0 session recovery — durable checkpoint
 
+## 2026-10-16: P0 closure — runtime-stability Phase 1 complete, v0.5.22 verified, maintenance mode
+
+Runtime-stability Phase 1 is COMPLETE and the P0 task is closed per the
+2026-10-15 user direction. Audit-driven fixes shipped in v0.5.21 (REG-025
+transport-failure isolation `f49cbf4`, REG-026 persisted-cookie restore
+`0075fe4`) and v0.5.22 (PR #127 restore read-back / 403 forensics `d400dd2`;
+596 tests). v0.5.22 is published and verified end to end:
+
+- Release run `38633976644` SUCCESS on `d2490b1`; annotated tag `v0.5.22`
+  published 2026-10-14T20:57:27Z, draft=false.
+- Assets: APK 67,182,318 B, Windows zip 14,663,452 B, macOS zip 25,360,238 B,
+  SHA256SUMS, RELEASE-METADATA.json. Independent APK SHA-256 `0ea7840b…ef04`
+  = SHA256SUMS = RELEASE-METADATA.json = GitHub digest; the two zips'
+  SHA256SUMS lines match their GitHub digests as well.
+- APK identity: `app.daviewer` versionName 0.5.22 versionCode **235**
+  (installs over v0.5.21/234); APK Signature Scheme v2 signer SHA-256
+  `686474b3…7141`, DN `CN=DAViewer, O=redtidev1918, C=CN` — identical to
+  every release since v0.5.16. The signer was read from the v2 signing block
+  directly; keytool only validates v1 JAR signatures.
+- Deployed download pages (zh+en) both serve `v0.5.22` with all three asset
+  links, verified against the live Pages markdown rather than the repo copy.
+- Local verify artifacts: `D:\Android\setup\release-v0.5.22-verify\`.
+
+**Development: Maintenance Mode** (user-directed freeze, ≥60 days from
+2026-10-15): no new debugging, features, refactors or diagnostics work;
+STATUS checkpoints only record publication/verification facts like this one.
+
+**Known Limitation (open, not a regression):** the web layer still answers
+HTTP 403 on the verifier/browser-probe paths while 9 cookies are live and the
+cookie restore demonstrably works (02:59 v0.5.21 log), which blocks RFY at
+transport. The cause is server-side and UNVERIFIED (PerimeterX/WAF or endpoint
+change); v0.5.22's forensics exist to capture it. Numeric-id web paths 403;
+UUID/OAuth paths stay 200.
+
+**Android Verified: PENDING** — no device run of 0.5.22. **Original Incident
+Verified: PENDING** — no retained-account evidence. Publication is not device
+evidence; both remain PENDING until real evidence exists.
+
+Upstream this round: DAKit #47 merged / #46 closed stale (entry below), and
+issue #48 (`tiptapToPlainText` dropped the inline nodes `tiptapToHtml`
+renders, losing `da-mention` usernames) fixed by deriving plain text from
+`tiptapToHtml` — PR #49 `9914fb4` with regression fixtures reduced from a
+real 2026-10-14 capture, workspace suite 269 PASS — then published as
+`dakit_web` 0.3.1 via version PR #50 `8021083`, component tag
+`dakit_web-v0.3.1` and OIDC publish (pub.dev latest confirmed 0.3.1,
+2026-10-15T18:55:43Z). DAViewer's existing
+`htmlToPlainText(tiptapToHtml(...))` composition now matches the SDK
+behavior; no app change required.
+
+The AGENTS.md active-task pointer is archived per its own completion clause;
+SPEC.md, RUNTIME-STABILITY-SPEC.md, SDK-INTEGRATION.md and this file remain
+the permanent record.
+
+## 2026-10-16: DAKit open PR cleanup
+
+User requested resolution of DAKit's open PRs. PR #47 (contract design seed,
+no runtime/API/dependency changes) merged as `41d9b9c98584d35d39f8812e02d0664a8048c926`.
+Reviewed all six changed files and verified the captured sample SHA256 against
+its manifest. Its exact-head CI, three native example builds and five CLI
+candidate builds passed before merge.
+
+PR #46 was closed as a stale duplicate release proposal, not merged. Its
+core 3.0.0 proposal broke the existing `<3.0.0` dependency constraints. The PR
+was generated during publication run 38340065798 before component tags existed.
+After #47 merged, Release run 38784143085 found all four immutable published
+SDK tags at `f489f529d7d103eaec27bb4dcc4dec53b134e0a6`, reported no commits for
+all five package paths, and passed without publishing. No package version,
+constraint, tag or DAViewer dependency was changed. DAKit has no open PRs.
+Pages deployment 38784142142 passed; post-merge CI 38784142382 on `41d9b9c`
+finished fully green (Analyze and test, Android debug APK, Windows app and
+MSIX, macOS debug app), rechecked 2026-10-16: open-PR list still empty and no
+later workflow run failed. Original Incident
+Verified remains PENDING; this documentation/release cleanup adds no device
+or retained-account evidence. Existing DAViewer stashes/untracked work preserved.
+
 ## 2026-10-15: 02:59 device log — restore confirmed alive; 403 diagnostics round
 
 The 02:59 v0.5.21 log is the first real-device evidence that REG-026 works:

@@ -17,29 +17,13 @@ tests and refactors all reused one unverified protocol assumption, so a large
 green suite could not catch the most basic compatibility break (login
 succeeded, home feed never loaded, v0.5.14).
 
-## Active DAViewer P0 task
+## Completed P0 task (archived 2026-10-16)
 
-The active long-term task is Android personalized-feed session recovery and RFY
-request ownership. Read `docs/agent-tasks/session-recovery/SPEC.md` and
-`docs/agent-tasks/session-recovery/STATUS.md` before starting/resuming work and
-after context compaction. Verify actual Git status, HEAD and stash before edits.
-The authorized joint DAKit scope and integration checkpoints are in
-`docs/agent-tasks/session-recovery/SDK-INTEGRATION.md`; read it when present.
-
-Keep this task primary through compiler, dependency, SDK, proxy and emulator
-subtasks. Do not restart completed work or blindly apply the retained old stash.
-Update STATUS at milestones, before risky operations, and before handoff/end.
-Commit/push recoverable milestones only on the development branch; do not lose
-uncommitted work, overwrite published tags or bypass CI/release gates.
-
-Completion requires the SPEC's explicit deliverables and separate Code, Release,
-Android and Original Incident verification. Never mark Original Incident Verified
-without real retained-account Android evidence. These navigation rules remain
-active until completion; archive/remove their temporary pointers afterward using
-repository maintenance conventions.
-
-The user explicitly removed the original-phone acceptance release gate on
-2026-10-13. After CI and artifact checks, proceed with PR integration, merge and
-formal publication. Original Incident Verified remains PENDING until evidence
-exists; disclose that limit without blocking publication. The 12aaeac login and
-3d62b45 startup candidates FAILED. Preserve exact SDK/app dependencies and evidence.
+The Android personalized-feed session recovery / RFY request-ownership task is
+complete and archived under `docs/agent-tasks/session-recovery/`; the final
+state and full history are in its STATUS.md (runtime-stability Phase 1
+complete, v0.5.22 published and verified, development in maintenance mode,
+Android Verified and Original Incident Verified remain PENDING for lack of
+real retained-account device evidence). Do not restart completed work or apply
+the retained old stash. New work follows normal repository conventions; the
+two rules above stay in force permanently.
