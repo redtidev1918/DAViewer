@@ -89,6 +89,26 @@ final class AppStrings {
   String get webLoginChallengeExceeded => _lang == AppLanguage.zh
       ? '当前网络/代理正在被 DeviantArt 拦截（Max challenge attempts exceeded）。请稍等 1-2 分钟只刷新一次，或更换网络/代理节点后重试。'
       : 'DeviantArt is blocking this network/proxy (Max challenge attempts exceeded). Wait 1-2 minutes, refresh once, or switch network/proxy nodes.';
+
+  /// Definite web-session invalidation (verdict `stale`, or `anonymous` with
+  /// prior-login evidence): the sign-in really did expire.
+  String get webSessionInvalidated => _lang == AppLanguage.zh
+      ? '网页登录已失效，推荐等网页功能暂时受限。需要重新登录。'
+      : 'Web sign-in has expired. Recommendations and website features stay limited until you sign in again.';
+  String get webSessionReloginAction =>
+      _lang == AppLanguage.zh ? '重新登录' : 'Sign in again';
+
+  /// Challenge lock: the sign-in itself may still be valid, so the action
+  /// opens the page instead of asking for a fresh login.
+  String get openWebVerificationAction =>
+      _lang == AppLanguage.zh ? '打开网页验证' : 'Open web verification';
+
+  /// Definite API (OAuth) channel invalidation, separate from the web session.
+  String get apiSessionInvalidated => _lang == AppLanguage.zh
+      ? 'App 授权登录已失效，作品等接口功能暂时不可用。需要重新授权。'
+      : 'App sign-in authorization has expired. Artwork features stay unavailable until you authorize again.';
+  String get apiSessionReauthorizeAction =>
+      _lang == AppLanguage.zh ? '重新授权' : 'Authorize again';
   String get notLoggedIn => _lang == AppLanguage.zh ? '未登录' : 'Not signed in';
   String get loginFirst =>
       _lang == AppLanguage.zh ? '请先登录。' : 'Please sign in.';
@@ -134,9 +154,6 @@ final class AppStrings {
   String feedLastUpdated(String time) => _lang == AppLanguage.zh
       ? '上次更新 $time（当前为缓存内容）'
       : 'Last updated $time (cached content)';
-  String get webSessionBanner => _lang == AppLanguage.zh
-      ? '网页登录不可用，推荐等网页功能暂时受限。请重新登录。'
-      : 'Web sign-in is unavailable. Sign in again to restore recommendations and website features.';
   String get noImage => _lang == AppLanguage.zh ? '暂无图片' : 'No image';
   String get imageLoadFailed =>
       _lang == AppLanguage.zh ? '图片加载失败' : 'Failed to load';

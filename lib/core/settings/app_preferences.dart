@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -171,8 +172,63 @@ final class AppPreferences {
   static Future<void> saveLastUpdateCheck(int timestamp) =>
       _update((map) => map['lastUpdateCheck'] = timestamp);
 
+  /// Session-notice dismissals that must survive a restart. An id binds
+  /// channel, account and incident only (see `webSessionNoticeId` /
+  /// `apiSessionNoticeId` in `core/notice/web_session_notice.dart`): no Cookie,
+  /// token or session payload is ever stored. The shape is re-validated on the
+  /// way out of the file, which is untrusted input.
+  static final RegExp _sessionNoticeId = RegExp(
+    r'^(?:web-session:[^:]*:(?:invalid|locked)|api-session:[^:]*:invalid)$',
+  );
+
+  static bool isPersistableSessionNoticeId(String noticeId) =>
+      _sessionNoticeId.hasMatch(noticeId);
+
+  static Future<Set<String>> loadDismissedSessionNotices() async {
+    try {
+      final file = await _file();
+      if (!await file.exists()) return const <String>{};
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is Map) {
+        final value = decoded['dismissedSessionNotices'];
+        if (value is List) {
+          return value
+              .whereType<String>()
+              .where(isPersistableSessionNoticeId)
+              .toSet();
+        }
+      }
+    } on Object catch (error, stack) {
+      AppLogger.instance.warning(
+        'prefs',
+        'failed to load session notice dismissals',
+        error,
+        stack,
+      );
+    }
+    return const <String>{};
+  }
+
+  static Future<void> saveDismissedSessionNotices(Iterable<String> noticeIds) =>
+      _update(
+        (map) => map['dismissedSessionNotices'] = noticeIds
+            .where(isPersistableSessionNoticeId)
+            .toList(growable: false),
+      );
+
+  /// Resolves once every queued preference write has settled, so a caller
+  /// leaving the process (or a test tearing down its directory) never races a
+  /// half-written file.
+  static Future<void> flush() => _writeTail;
+
   static Future<void> _update(void Function(Map<String, Object?>) mutate) {
-    final next = _writeTail.then((_) => _performUpdate(mutate));
+    // Pin the write tail to the root zone: a caller running inside a widget
+    // test's fake-async zone would otherwise strand every queued continuation
+    // (the same trap documented on LoginHistoryStore), and the tail must
+    // outlive the zone that happened to queue the write.
+    final next = Zone.root.run(
+      () => _writeTail.then((_) => _performUpdate(mutate)),
+    );
     // _performUpdate catches and logs storage failures, so the tail remains
     // usable. Serializing read-modify-write prevents language/theme/proxy
     // changes made close together from overwriting each other.

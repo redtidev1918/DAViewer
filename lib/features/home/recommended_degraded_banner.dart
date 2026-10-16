@@ -31,7 +31,7 @@ final class RecommendedDegradedBanner extends ConsumerWidget {
     );
     final dismissed = ref
         .watch(webSessionNoticeDismissalProvider)
-        .contains('personalized-session-degraded');
+        .contains(personalizedSessionDegradedNoticeId);
     if (!degraded || dismissed) return const SizedBox.shrink();
     final s = strings(ref.watch(appLanguageProvider));
     return AppNoticeCard(
@@ -42,7 +42,7 @@ final class RecommendedDegradedBanner extends ConsumerWidget {
       dismissLabel: s.close,
       onDismiss: () => ref
           .read(webSessionNoticeDismissalProvider.notifier)
-          .dismiss('personalized-session-degraded'),
+          .dismiss(personalizedSessionDegradedNoticeId),
     );
   }
 }
