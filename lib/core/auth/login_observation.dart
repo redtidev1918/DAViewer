@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../diagnostics/app_logger.dart';
+
 /// Presentation evidence only. Never grants access or changes authentication.
 enum LoginChannel { web, api }
 
@@ -136,7 +138,13 @@ class LoginHistoryStore {
         storageAt: date('storageAt'),
         storageReason: _safeReason(data['storageReason']),
       );
-    } on Object {
+    } on Object catch (error) {
+      // A read that never succeeds must stay visible: a blank history with no
+      // diagnostic is indistinguishable from a fresh install.
+      AppLogger.instance.warning(
+        'auth',
+        'login history read failed errorType=${error.runtimeType}',
+      );
       return null;
     }
   }
@@ -161,7 +169,15 @@ class LoginHistoryStore {
         );
       }),
     );
-    _tail = _queue.run(() => next.then((_) {}, onError: (Object _) {}));
+    _tail = _queue.run(
+      () => next.then(
+        (_) {},
+        onError: (Object error) => AppLogger.instance.warning(
+          'auth',
+          'login history write failed errorType=${error.runtimeType}',
+        ),
+      ),
+    );
     return _tail;
   }
 

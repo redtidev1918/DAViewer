@@ -35,7 +35,16 @@ final class LoginStatusScreen extends ConsumerWidget {
             title: t('网页登录', 'Website login'),
             observation: web,
             zh: zh,
-            result: verdict.isLocked ? LoginCheckResult.challenge : web.result,
+            // The chain owns the current verdict; the observation only carries
+            // the last attempt. A check the chain answers from a retained
+            // healthy lease stamps no result, and rendering that as unknown
+            // would contradict the verdict the app acts on.
+            result: verdict.isLocked
+                ? LoginCheckResult.challenge
+                : verdict.isHealthy &&
+                      web.result == LoginCheckResult.unavailable
+                ? LoginCheckResult.authenticated
+                : web.result,
             impact: t(
               '影响推荐及依赖网页登录的内容。',
               'Affects recommendations and content requiring website login.',
