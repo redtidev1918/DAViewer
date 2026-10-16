@@ -96,8 +96,16 @@ final class LoginObservation {
 /// Stores only a fixed allowlist of non-credential observations. Historical
 /// success is never restored as a current authenticated verdict.
 class LoginHistoryStore {
-  LoginHistoryStore({this.directory});
+  LoginHistoryStore({this.directory}) : _queue = Zone.current;
   final Future<Directory> Function()? directory;
+
+  /// The serial write queue belongs to the zone that created the store, never
+  /// to whichever caller happened to trigger a write. A widget test's
+  /// fake-async zone is torn down with the test body, which strands the queued
+  /// write's continuations: the write never completes, [flush] never resolves,
+  /// and a tearDown awaiting it hangs forever — test timeouts do not cover
+  /// tearDown, so the whole run hangs instead of failing.
+  final Zone _queue;
   Future<void> _tail = Future<void>.value();
   Future<File> _file(LoginChannel channel) async {
     final dir = await (directory?.call() ?? getApplicationSupportDirectory());
@@ -134,24 +142,26 @@ class LoginHistoryStore {
   }
 
   Future<void> write(LoginChannel channel, LoginObservation state) {
-    final next = _tail.then((_) async {
-      final file = await _file(channel);
-      await file.parent.create(recursive: true);
-      await file.writeAsString(
-        jsonEncode(<String, Object?>{
-          'owner': state.owner,
-          'attempt': state.lastAttempt?.toUtc().toIso8601String(),
-          'success': state.lastSuccess?.toUtc().toIso8601String(),
-          'reason': _safeReason(state.reason),
-          'save': state.save.name,
-          'restore': state.restore.name,
-          'storageAt': state.storageAt?.toUtc().toIso8601String(),
-          'storageReason': _safeReason(state.storageReason),
-        }),
-        flush: true,
-      );
-    });
-    _tail = next.then((_) {}, onError: (Object _) {});
+    final next = _queue.run(
+      () => _tail.then((_) async {
+        final file = await _file(channel);
+        await file.parent.create(recursive: true);
+        await file.writeAsString(
+          jsonEncode(<String, Object?>{
+            'owner': state.owner,
+            'attempt': state.lastAttempt?.toUtc().toIso8601String(),
+            'success': state.lastSuccess?.toUtc().toIso8601String(),
+            'reason': _safeReason(state.reason),
+            'save': state.save.name,
+            'restore': state.restore.name,
+            'storageAt': state.storageAt?.toUtc().toIso8601String(),
+            'storageReason': _safeReason(state.storageReason),
+          }),
+          flush: true,
+        );
+      }),
+    );
+    _tail = _queue.run(() => next.then((_) {}, onError: (Object _) {}));
     return _tail;
   }
 
