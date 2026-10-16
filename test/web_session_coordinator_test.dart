@@ -11,6 +11,7 @@ import 'package:daviewer/core/diagnostics/app_logger.dart';
 import 'package:daviewer/core/runtime/app_runtime.dart';
 import 'package:daviewer/core/runtime/runtime_provider.dart';
 import 'package:dio/dio.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -100,15 +101,18 @@ _coordinator({
   int statusCode = 200,
   String body = '{}',
   bool shouldVerify = true,
-  Duration interval = const Duration(minutes: 1),
 }) {
   final dio = Dio()..httpClientAdapter = _StatusAdapter(statusCode, body: body);
   final recorder = _VerifyRecorder();
+  var clock = DateTime.utc(2026, 10, 16, 12);
+  var status = const WebSessionStatus();
   final coordinator = WebSessionCoordinator(
     dio: dio,
     shouldVerify: () => shouldVerify,
     verify: recorder.call,
-    interval: interval,
+    now: () => clock,
+    currentStatus: () => status,
+    lastSuccessAt: () => null,
   );
   return (coordinator: coordinator, dio: dio, recorder: recorder);
 }
@@ -286,37 +290,138 @@ void main() {
       expect(harness.recorder.calls, isEmpty);
     });
 
-    test('verifies silently while the app is active', () async {
-      final harness = _coordinator(interval: const Duration(milliseconds: 20));
-      addTearDown(harness.coordinator.dispose);
+    test('re-verifies once when the healthy lease expires and re-arms', () {
+      fakeAsync((async) {
+        final recorder = _VerifyRecorder();
+        final start = DateTime.utc(2026, 10, 16, 12);
+        var clock = start;
+        var status = WebSessionStatus(
+          state: WebSessionStatusState.healthy,
+          lastCheckedAt: start,
+        );
+        final coordinator = WebSessionCoordinator(
+          shouldVerify: () => true,
+          verify: recorder.call,
+          now: () => clock,
+          currentStatus: () => status,
+          lastSuccessAt: () => start,
+        );
 
-      await Future<void>.delayed(const Duration(milliseconds: 90));
+        async.elapse(const Duration(minutes: 4, seconds: 59));
+        expect(recorder.calls, isEmpty);
 
-      expect(harness.recorder.countOf('periodic'), greaterThanOrEqualTo(1));
-      expect(harness.recorder.calls.every((call) => call.$1), isFalse);
+        async.elapse(const Duration(seconds: 2));
+        expect(recorder.calls, <(bool, String)>[(false, 'lease-expired')]);
+
+        // The real controller publishes a renewed verdict on success; the
+        // provider listener routes it back, cancelling any post-attempt arm.
+        status = WebSessionStatus(
+          state: WebSessionStatusState.healthy,
+          lastCheckedAt: clock,
+        );
+        coordinator.onStatusChanged(status);
+        async.elapse(const Duration(minutes: 5));
+        expect(recorder.countOf('lease-expired'), 2);
+        coordinator.dispose();
+      });
     });
 
-    test('pause stops the timer and resume verifies immediately', () async {
-      final harness = _coordinator(interval: const Duration(milliseconds: 20));
-      addTearDown(harness.coordinator.dispose);
+    test('transient backoff schedules one retry; terminal states none', () {
+      fakeAsync((async) {
+        final recorder = _VerifyRecorder();
+        final start = DateTime.utc(2026, 10, 16, 12);
+        var clock = start;
+        var status = WebSessionStatus(
+          state: WebSessionStatusState.unavailable,
+          cooldownUntil: start.add(const Duration(seconds: 30)),
+        );
+        final coordinator = WebSessionCoordinator(
+          shouldVerify: () => true,
+          verify: recorder.call,
+          now: () => clock,
+          currentStatus: () => status,
+          lastSuccessAt: () => start,
+        );
 
-      harness.coordinator.pause();
-      await Future<void>.delayed(const Duration(milliseconds: 70));
-      expect(harness.recorder.calls, isEmpty);
+        async.elapse(const Duration(seconds: 29));
+        expect(recorder.calls, isEmpty);
+        async.elapse(const Duration(seconds: 2));
+        expect(recorder.countOf('lease-expired'), 1);
 
-      harness.coordinator.resume();
-      await Future<void>.delayed(Duration.zero);
-      expect(harness.recorder.countOf('app-resume'), 1);
-      expect(
-        harness.recorder.calls
-            .singleWhere((call) => call.$2 == 'app-resume')
-            .$1,
-        isTrue,
-        reason: 'resuming must bypass the cached healthy verdict',
-      );
+        status = WebSessionStatus(
+          state: WebSessionStatusState.unavailable,
+          cooldownUntil: clock.add(const Duration(minutes: 2)),
+        );
+        coordinator.onStatusChanged(status);
+        async.elapse(const Duration(minutes: 2));
+        expect(recorder.countOf('lease-expired'), 2);
 
-      await Future<void>.delayed(const Duration(milliseconds: 70));
-      expect(harness.recorder.countOf('periodic'), greaterThanOrEqualTo(1));
+        // Anonymous/locked/unknown never schedule autonomously.
+        status = const WebSessionStatus(state: WebSessionStatusState.anonymous);
+        coordinator.onStatusChanged(status);
+        async.elapse(const Duration(minutes: 30));
+        expect(recorder.countOf('lease-expired'), 2);
+        coordinator.dispose();
+      });
+    });
+
+    test('resume re-verifies only when the last success is stale', () {
+      fakeAsync((async) {
+        final recorder = _VerifyRecorder();
+        final start = DateTime.utc(2026, 10, 16, 12);
+        var clock = start;
+        DateTime? lastSuccessAt = start.subtract(const Duration(hours: 5));
+        final coordinator = WebSessionCoordinator(
+          shouldVerify: () => true,
+          verify: recorder.call,
+          now: () => clock,
+          currentStatus: () => const WebSessionStatus(),
+          lastSuccessAt: () => lastSuccessAt,
+        );
+
+        coordinator.pause();
+        coordinator.resume();
+        expect(
+          recorder.calls,
+          isEmpty,
+          reason: 'five hours is fresher than the resume threshold',
+        );
+
+        lastSuccessAt = start.subtract(const Duration(hours: 7));
+        coordinator.pause();
+        coordinator.resume();
+        expect(recorder.calls, <(bool, String)>[(false, 'app-resume')]);
+
+        // A session never verified still re-checks on resume.
+        recorder.calls.clear();
+        lastSuccessAt = null;
+        coordinator.pause();
+        coordinator.resume();
+        expect(recorder.countOf('app-resume'), 1);
+        coordinator.dispose();
+      });
+    });
+
+    test('pause cancels the pending lease task', () {
+      fakeAsync((async) {
+        final recorder = _VerifyRecorder();
+        final start = DateTime.utc(2026, 10, 16, 12);
+        final coordinator = WebSessionCoordinator(
+          shouldVerify: () => true,
+          verify: recorder.call,
+          now: () => start,
+          currentStatus: () => WebSessionStatus(
+            state: WebSessionStatusState.healthy,
+            lastCheckedAt: start,
+          ),
+          lastSuccessAt: () => start,
+        );
+
+        coordinator.pause();
+        async.elapse(const Duration(minutes: 30));
+        expect(recorder.calls, isEmpty);
+        coordinator.dispose();
+      });
     });
 
     test('dispose detaches the interceptor and stops verifying', () async {
@@ -333,10 +438,14 @@ void main() {
     test('a failing verification never escapes the trigger', () async {
       final dio = Dio()..httpClientAdapter = _StatusAdapter(403);
       final recorder = _VerifyRecorder(error: StateError('verifier exploded'));
+      final clock = DateTime.utc(2026, 10, 16, 12);
       final coordinator = WebSessionCoordinator(
         dio: dio,
         shouldVerify: () => true,
         verify: recorder.call,
+        now: () => clock,
+        currentStatus: () => const WebSessionStatus(),
+        lastSuccessAt: () => null,
       );
       addTearDown(coordinator.dispose);
 

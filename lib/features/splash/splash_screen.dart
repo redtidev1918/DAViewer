@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/auth_controller.dart';
+import '../../core/auth/login_observation.dart';
 import '../../core/auth/web_session_controller.dart';
+import '../../core/auth/web_session_coordinator.dart';
 import '../../core/auth/web_session_status.dart';
 import '../../core/diagnostics/app_logger.dart';
 import '../../core/l10n/app_strings.dart';
@@ -117,11 +119,32 @@ final class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   Future<void> _checkSession() async {
     try {
+      // Startup owns the first verification trigger, but only when the
+      // persisted success history is stale: a session verified under
+      // WebSessionScheduling.startupInterval is left to the feed and signal
+      // driven checks that fire when a web-dependent feature is used.
+      final observation = ref.read(
+        loginObservationProvider(LoginChannel.web).notifier,
+      );
+      await observation.historyReady;
+      final lastSuccess = ref
+          .read(loginObservationProvider(LoginChannel.web))
+          .lastSuccess;
+      final now = ref.read(webSessionClockProvider)();
+      if (lastSuccess != null &&
+          now.difference(lastSuccess) < WebSessionScheduling.startupInterval) {
+        AppLogger.instance.info(
+          'startup',
+          'verification skipped: last success within startup interval',
+        );
+        return;
+      }
       await ref.read(webSessionStatusProvider.notifier).check();
     } on Object catch (error) {
       AppLogger.instance.warning(
         'startup',
         'verification failed errorType=${error.runtimeType}',
+        error,
       );
     }
   }
