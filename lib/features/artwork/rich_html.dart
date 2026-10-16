@@ -5,10 +5,23 @@ import 'package:flutter_html/flutter_html.dart';
 import '../../core/l10n/app_strings.dart';
 
 String normalizeRichImageUrl(String source) {
-  final trimmed = source.trim();
-  if (trimmed.startsWith('//')) return 'https:$trimmed';
+  var trimmed = source.trim();
+  if (trimmed.startsWith('//')) trimmed = 'https:$trimmed';
   if (trimmed.startsWith('/')) {
     return Uri.https('www.deviantart.com', trimmed).toString();
+  }
+  final uri = Uri.tryParse(trimmed);
+  // DA's da-gif nodes can point to Giphy's MP4 rendition. Image codecs
+  // cannot decode video; use the GIF rendition verified in the live specimen
+  // documented in test/fixtures/artwork_description/README.md.
+  if (uri != null &&
+      (uri.isScheme('https') || uri.isScheme('http')) &&
+      (uri.host == 'giphy.com' || uri.host.endsWith('.giphy.com')) &&
+      uri.path.startsWith('/media/') &&
+      uri.path.endsWith('/giphy.mp4')) {
+    return uri
+        .replace(path: '${uri.path.substring(0, uri.path.length - 4)}.gif')
+        .toString();
   }
   return trimmed;
 }

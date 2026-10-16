@@ -1,5 +1,20 @@
 # Artwork description protocol evidence
 
+## Giphy video rendition regression (2026-10-16)
+
+`web_page_giphy.json` was independently extracted from the public page's
+`window.__INITIAL_STATE__` descriptionText on 2026-10-16 (anonymous HTTP 200):
+https://www.deviantart.com/biggerbutton/art/My-Belly-Button-Explained-----CheekehCherreh-ORIGINS-%5Bremoved%5D-1393595109
+Only the description and artwork ID are retained, arranged in the init envelope
+used by the description parser; no session data is included.
+
+Both actual `da-gif.attrs.url` values end in `/giphy.mp4`. Live GETs returned
+HTTP 200, `video/mp4`, with `ftypisom` in the header. Changing only that filename
+to `giphy.gif` returned HTTP 200, `image/gif`, and `GIF89a` magic for both IDs:
+`xT9DPplLC0JojWdgyI` (550 x 310) and `3osxY48u8kTJbbOQvK` (480 x 244).
+The original full URLs are preserved in the fixture. This supports the narrow
+Giphy rendition conversion, not arbitrary MP4-to-GIF rewriting.
+
 Captured on 2026-10-14 from public DeviantArt pages and anonymous HTTP 200
 `/_puppy/dadeviation/init` responses. No account credentials or private artwork
 were used. Anonymous Cookie/CSRF values and all unrelated response fields were

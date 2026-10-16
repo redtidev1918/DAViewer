@@ -1,0 +1,15 @@
+{
+  "deviation": {
+    "deviationId": 1393595109,
+    "extended": {
+      "descriptionText": {
+        "excerpt": "[GIF]\n[GIF]\n\nCheekeh Cherreh Archive:\n\nHow 'I' Clean My Belly Button Piercing - CHEEKEH CHERREH (Removed) \ud83d\udc95",
+        "html": {
+          "type": "tiptap",
+          "markup": "{\"version\":\"1\",\"document\":{\"type\":\"doc\",\"content\":[{\"type\":\"da-gif\",\"attrs\":{\"url\":\"https://media4.giphy.com/media/v1.Y2lkPTM5MTQ0NmM0Z3FoMmExMHE5eHg5cDM5Z3JncGJiNmR0NzhybWRqanE2bWt2eWNvOSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/xT9DPplLC0JojWdgyI/giphy.mp4\",\"width\":550,\"height\":310,\"alignment\":\"center\"}},{\"type\":\"da-gif\",\"attrs\":{\"url\":\"https://media4.giphy.com/media/v1.Y2lkPTM5MTQ0NmM0a3R5YmtncjVxdXN5cDU4cnZ4dGFxOHp2dzczNjU1N3hjMWtoNHNoYSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/3osxY48u8kTJbbOQvK/giphy.mp4\",\"width\":480,\"height\":244,\"alignment\":\"center\"}},{\"type\":\"paragraph\",\"attrs\":{\"indentType\":null,\"indentation\":null,\"textAlign\":null}},{\"type\":\"paragraph\",\"attrs\":{\"indentType\":null,\"indentation\":null,\"textAlign\":null},\"content\":[{\"type\":\"text\",\"marks\":[{\"type\":\"bold\"},{\"type\":\"italic\"}],\"text\":\"Cheekeh Cherreh Archive:\"}]},{\"type\":\"paragraph\",\"attrs\":{\"indentType\":null,\"indentation\":null,\"textAlign\":null}},{\"type\":\"paragraph\",\"attrs\":{\"indentType\":null,\"indentation\":null,\"textAlign\":null},\"content\":[{\"type\":\"text\",\"marks\":[{\"type\":\"link\",\"attrs\":{\"href\":\"https://www.deviantart.com/biggerbutton/art/How-%27I%27-Clean-My-Belly-Button-Piercing---CHEEKY-CHERREH-%28Removed%29-1391766248\",\"target\":\"_blank\",\"rel\":\"noopener noreferrer nofollow ugc\",\"class\":null}},{\"type\":\"bold\"}],\"text\":\"How 'I' Clean My Belly Button Piercing - CHEEKEH CHERREH (Removed)\"},{\"type\":\"text\",\"marks\":[{\"type\":\"bold\"}],\"text\":\" \ud83d\udc95\"}]}]},\"features\":[]}",
+          "features": "[{\"type\":\"TIPTAP_FEATURE\",\"data\":{\"tiptap\":true,\"version\":1}},{\"type\":\"WORD_COUNT_FEATURE\",\"data\":{\"words\":15,\"chars\":95}},{\"type\":\"MEDIA_COUNT_FEATURE\",\"data\":{\"emoji\":1,\"emotes\":0,\"images\":0,\"mentions\":0,\"video\":0,\"galleries\":0,\"gifs\":2,\"ids\":[]}},{\"type\":\"IS_EMPTY_FEATURE\",\"data\":{\"isEmpty\":false}}]"
+        }
+      }
+    }
+  }
+}
