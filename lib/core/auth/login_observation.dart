@@ -214,6 +214,11 @@ final class LoginObservationController extends StateNotifier<LoginObservation> {
   int _epoch = 0;
   Future<void> _historyReady = Future<void>.value();
 
+  /// Resolves once the persisted history for the currently bound account has
+  /// settled, so startup gating can read a real lastSuccess instead of racing
+  /// the file read.
+  Future<void> get historyReady => _historyReady;
+
   void bind(String username) {
     final owner = username.trim().toLowerCase();
     if (owner == state.owner) return;

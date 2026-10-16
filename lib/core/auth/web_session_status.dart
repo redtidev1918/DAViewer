@@ -150,7 +150,9 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     await check(force: true, source: 'manual-status');
   }
 
-  static const Duration _cacheDuration = Duration(minutes: 5);
+  /// How long a server-confirmed healthy verdict satisfies non-forced
+  /// checks. Single definition shared with the coordinator's scheduling.
+  static const Duration cacheDuration = Duration(minutes: 5);
   static const List<Duration> _backoff = <Duration>[
     Duration(seconds: 30),
     Duration(minutes: 2),
@@ -158,6 +160,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   ];
 
   DateTime? _lastSuccess;
+  DateTime? get lastSuccessAt => _lastSuccess;
   DateTime? _lastRestrictionCheck;
   int _failures = 0;
   int _generation = 0;
@@ -209,7 +212,22 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     );
   }
 
-  void endInteractiveRecovery() => _interactive = false;
+  void endInteractiveRecovery() {
+    if (!_interactive) return;
+    _interactive = false;
+    // Leaving the interactive login without a verdict (cancelled, or a failure
+    // the interactive probe could not judge) publishes no state of its own, and
+    // a non-healthy state without a cooldown schedules nothing: the scheduler
+    // would stay silent until an unrelated event. Re-publish it as a transient
+    // result so the ordinary backoff retry covers the gap.
+    if (state.state == WebSessionStatusState.unverified &&
+        state.cooldownUntil == null) {
+      _setTransient(
+        WebSessionStatusState.unverified,
+        'interactive-recovery-end',
+      );
+    }
+  }
 
   /// Explicit login/lockout supersedes recommendation requests too.
   int get generation => _generation;
@@ -257,7 +275,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     if (!force &&
         last != null &&
         state.isHealthy &&
-        _now().difference(last) < _cacheDuration) {
+        _now().difference(last) < cacheDuration) {
       return;
     }
     if (!force && state.inCooldown) return;
@@ -413,7 +431,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         if (probe.outcome == WebSessionProbeOutcome.unavailable &&
             state.isHealthy &&
             last != null &&
-            _now().difference(last) < _cacheDuration) {
+            _now().difference(last) < cacheDuration) {
           AppLogger.instance.info(
             'auth',
             'recovery inconclusive recoveryId=$recoveryId retained=healthy_lease',
@@ -693,7 +711,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     final last = _lastSuccess;
     if (this.state.isHealthy &&
         last != null &&
-        _now().difference(last) < _cacheDuration) {
+        _now().difference(last) < cacheDuration) {
       AppLogger.instance.info(
         'auth',
         'recovery inconclusive recoveryId=$_recoveryId accountEpoch=$_accountEpoch '

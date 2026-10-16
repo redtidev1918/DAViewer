@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/auth_controller.dart';
+import '../../core/auth/login_observation.dart';
 import '../../core/auth/web_session_controller.dart';
+import '../../core/auth/web_session_coordinator.dart';
 import '../../core/auth/web_session_status.dart';
 import '../../core/diagnostics/app_logger.dart';
 import '../../core/l10n/app_strings.dart';
@@ -117,11 +119,36 @@ final class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   Future<void> _checkSession() async {
     try {
-      await ref.read(webSessionStatusProvider.notifier).check();
+      // Startup owns the first verification trigger, but only when the
+      // persisted success history is stale: a session verified under
+      // WebSessionScheduling.startupInterval is left to the feed and signal
+      // driven checks that fire when a web-dependent feature is used.
+      // Resolve everything through the scope container before the first await:
+      // the history read can outlive this widget (setting the ready flag routes
+      // away from /splash), and touching a disposed ref would drop the startup
+      // verification. The container outlives the widget.
+      final container = ProviderScope.containerOf(context, listen: false);
+      await container
+          .read(loginObservationProvider(LoginChannel.web).notifier)
+          .historyReady;
+      final lastSuccess = container
+          .read(loginObservationProvider(LoginChannel.web))
+          .lastSuccess;
+      final now = container.read(webSessionClockProvider)();
+      if (lastSuccess != null &&
+          now.difference(lastSuccess) < WebSessionScheduling.startupInterval) {
+        AppLogger.instance.info(
+          'startup',
+          'verification skipped: last success within startup interval',
+        );
+        return;
+      }
+      await container.read(webSessionStatusProvider.notifier).check();
     } on Object catch (error) {
       AppLogger.instance.warning(
         'startup',
         'verification failed errorType=${error.runtimeType}',
+        error,
       );
     }
   }

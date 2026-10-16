@@ -23,6 +23,9 @@ final webSessionCoordinatorProvider = Provider<WebSessionCoordinator>((ref) {
   }
   final coordinator = WebSessionCoordinator(
     dio: dio,
+    now: () => ref.read(webSessionClockProvider)(),
+    currentStatus: () => ref.read(webSessionStatusProvider),
+    lastSuccessAt: () => status.lastSuccessAt,
     shouldVerify: () =>
         // Deliberate gate: a device that never logged in must not receive a
         // "refresh your Cookie" prompt for ordinary public traffic. The cost is
@@ -35,18 +38,42 @@ final webSessionCoordinatorProvider = Provider<WebSessionCoordinator>((ref) {
         ? status.recheckAfterWebSignal(source)
         : status.check(source: source),
   );
+  // Every verdict transition (and only those) re-arms the lease schedule;
+  // the coordinator itself re-arms after each verification attempt so an
+  // inconclusive "keep" answer cannot leave the schedule dead.
+  ref.listen(
+    webSessionStatusProvider,
+    (_, next) => coordinator.onStatusChanged(next),
+  );
   ref.onDispose(coordinator.dispose);
   return coordinator;
 });
 
+/// Single policy home for verification scheduling thresholds. They are
+/// scheduling hints only — never identity trust durations.
+final class WebSessionScheduling {
+  /// A cold start verifies only when the persisted last success is older than
+  /// this (or absent); feed and signal driven checks cover fresher sessions.
+  static const Duration startupInterval = Duration(hours: 24);
+
+  /// Returning to the foreground re-verifies only when the last success is
+  /// older than this (or absent); other resumes only re-arm the lease timer.
+  static const Duration resumeInterval = Duration(hours: 6);
+}
+
 /// Coordinates triggers only. The verifier remains the sole verdict writer.
-/// Periodic checks cover dead cookies whose endpoints still answer HTTP 200.
+/// Instead of polling, a single one-shot task re-verifies when the healthy
+/// lease or the transient backoff expires; terminal states (anonymous,
+/// stale, locked, unknown) never schedule autonomously — events drive them.
 final class WebSessionCoordinator {
   WebSessionCoordinator({
     required this.shouldVerify,
     required this.verify,
+    required this.now,
+    required this.currentStatus,
+    required this.lastSuccessAt,
     this.dio,
-    this.interval = const Duration(minutes: 1),
+    this.resumeInterval = WebSessionScheduling.resumeInterval,
   }) {
     _interceptor = InterceptorsWrapper(
       onResponse: (response, handler) {
@@ -64,43 +91,112 @@ final class WebSessionCoordinator {
       },
     );
     dio?.interceptors.add(_interceptor);
-    _startTimer();
+    _arm();
   }
 
   final Dio? dio;
   final bool Function() shouldVerify;
   final Future<void> Function(bool forced, String source) verify;
-  final Duration interval;
+  final DateTime Function() now;
+  final WebSessionStatus Function() currentStatus;
+  final DateTime? Function() lastSuccessAt;
+  final Duration resumeInterval;
   late final Interceptor _interceptor;
-  Timer? _timer;
+  Timer? _scheduled;
+  DateTime? _lastRequestAt;
+  bool _paused = false;
   bool _disposed = false;
 
+  /// A forced verdict observed while paused. Dropping it would lose the only
+  /// evidence that the session was rejected, and the time-based resume check
+  /// cannot replace it, so it is replayed on the next resume.
+  String? _pendingForcedSource;
+
+  void onStatusChanged(WebSessionStatus status) => _armFrom(status);
+
   void pause() {
-    _timer?.cancel();
-    _timer = null;
+    _paused = true;
+    _scheduled?.cancel();
+    _scheduled = null;
   }
 
   void resume() {
     if (_disposed) return;
-    _startTimer();
-    // Returning to the foreground is an explicit "check now" moment: a cached
-    // healthy verdict must not hide a Cookie that died while we were away.
-    _request(true, 'app-resume');
+    _paused = false;
+    final pending = _pendingForcedSource;
+    _pendingForcedSource = null;
+    if (pending != null) {
+      // The verdict observed while paused is the reason to check at all, and it
+      // outranks the time-based resume window.
+      _request(true, pending);
+    } else {
+      final lastSuccess = lastSuccessAt();
+      if (lastSuccess == null ||
+          now().difference(lastSuccess) > resumeInterval) {
+        // Non-forced: the healthy cache has long expired at this distance and
+        // transient backoff must still apply after a recent failure.
+        _request(false, 'app-resume');
+      }
+    }
+    _arm();
   }
 
   void dispose() {
     _disposed = true;
-    pause();
+    _scheduled?.cancel();
+    _scheduled = null;
     dio?.interceptors.remove(_interceptor);
   }
 
-  void _startTimer() {
-    if (_timer != null || _disposed) return;
-    _timer = Timer.periodic(interval, (_) => _request(false, 'periodic'));
+  void _arm() => _armFrom(currentStatus());
+
+  void _armFrom(WebSessionStatus status) {
+    if (_disposed || _paused) return;
+    _scheduled?.cancel();
+    _scheduled = null;
+    final due = _nextDue(status);
+    if (due == null) return;
+    var delay = due.difference(now());
+    if (delay <= Duration.zero) {
+      // An attempt that ends without publishing a new verdict (an
+      // inconclusive "keep") leaves the old due date at or before now;
+      // retrying at full speed would busy-loop, so a due-now arm waits for the
+      // floor exactly like a past-due one.
+      final sinceRequest = _lastRequestAt == null
+          ? null
+          : now().difference(_lastRequestAt!);
+      const floor = Duration(seconds: 10);
+      delay = sinceRequest != null && sinceRequest < floor
+          ? floor - sinceRequest
+          : Duration.zero;
+    }
+    // Timer.zero keeps the request off the listener's synchronous stack.
+    _scheduled = Timer(delay, () {
+      _scheduled = null;
+      _request(false, 'lease-expired');
+    });
+  }
+
+  DateTime? _nextDue(WebSessionStatus status) {
+    final checkedAt = status.lastCheckedAt;
+    if (status.isHealthy && checkedAt != null) {
+      return checkedAt.add(WebSessionStatusController.cacheDuration);
+    }
+    // A transient state retries once when its backoff expires; terminal
+    // states carry no cooldown and never schedule autonomously.
+    final cooldown = status.cooldownUntil;
+    if (cooldown != null) return cooldown;
+    return null;
   }
 
   void _request(bool forced, String source) {
-    if (_disposed || !shouldVerify()) return;
+    if (_disposed) return;
+    if (_paused) {
+      if (forced) _pendingForcedSource = source;
+      return;
+    }
+    if (!shouldVerify()) return;
+    _lastRequestAt = now();
     unawaited(_verify(forced, source));
   }
 
@@ -113,6 +209,10 @@ final class WebSessionCoordinator {
         'web verification trigger failed source=$source',
         error,
       );
+    } finally {
+      // An inconclusive answer keeps the old state object (no listener
+      // fires); re-arming here is what keeps long foreground stays covered.
+      _arm();
     }
   }
 }
