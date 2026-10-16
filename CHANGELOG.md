@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.23](https://github.com/redtidev1918/DAViewer/compare/v0.5.22...v0.5.23) (2026-10-16)
+
+
+### Bug Fixes
+
+* load Giphy animations in artwork descriptions ([a4e0682](https://github.com/redtidev1918/DAViewer/commit/a4e06825e5166877536dea25f9770fa38198574a))
+
 ## [0.5.22](https://github.com/redtidev1918/DAViewer/compare/v0.5.21...v0.5.22) (2026-10-14)
 
 
