@@ -7,6 +7,7 @@ import '../diagnostics/app_logger.dart';
 import '../data/web_session.dart';
 import '../runtime/runtime_provider.dart';
 import 'session_state.dart';
+import 'login_observation.dart';
 import 'web_session_controller.dart';
 import 'web_session_diagnostics.dart';
 import 'web_session_refresher.dart';
@@ -117,6 +118,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         _lastSuccess = null;
         _lastRestrictionCheck = null;
         _verifiedCredentialFingerprint = null;
+        _observation.bind(next.$2);
         if (mounted) state = const WebSessionStatus();
         final epoch = _accountEpoch;
         if (next.$1 == true && next.$2.isNotEmpty) {
@@ -132,6 +134,21 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
 
   final Ref _ref;
   DateTime _now() => _ref.read(webSessionClockProvider)();
+  LoginObservationController get _observation =>
+      _ref.read(loginObservationProvider(LoginChannel.web).notifier);
+  DateTime? _lastManualCheck;
+
+  Future<void> checkLoginStatus() async {
+    if (_interactive || state.isLocked) return;
+    if (_activeCheck != null) return _activeCheck;
+    final now = _now();
+    if (_lastManualCheck != null &&
+        now.difference(_lastManualCheck!) < const Duration(seconds: 30)) {
+      return;
+    }
+    _lastManualCheck = now;
+    await check(force: true, source: 'manual-status');
+  }
 
   static const Duration _cacheDuration = Duration(minutes: 5);
   static const List<Duration> _backoff = <Duration>[
@@ -177,6 +194,12 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   void beginInteractiveRecovery() {
     _interactive = true;
     _generation++;
+    // The generation bump aborts any in-flight check at its next gate
+    // without a verdict; close its observation instead of leaving the UI in
+    // a permanent "checking" state until the next login event.
+    if (_ref.read(loginObservationProvider(LoginChannel.web)).checking) {
+      _observation.finish(LoginCheckResult.unknown);
+    }
     _activeCheck = null;
     _recoveryId = 'recovery-${++_recoverySequence}';
     state = const WebSessionStatus(state: WebSessionStatusState.unverified);
@@ -238,6 +261,8 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       return;
     }
     if (!force && state.inCooldown) return;
+
+    _observation.begin(_ref.read(webSessionControllerProvider).username);
 
     final generation = _generation;
     _recoveryId = 'recovery-${++_recoverySequence}';
@@ -316,6 +341,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     if (nextState != null) {
       switch (nextState) {
         case WebSessionStatusState.healthy:
+          _observation.finish(LoginCheckResult.authenticated);
           _lastSuccess = _now();
           _failures = 0;
           final next = WebSessionStatus(
@@ -333,6 +359,16 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
         case WebSessionStatusState.locked:
         case WebSessionStatusState.unknown:
         case WebSessionStatusState.stale:
+          _observation.finish(
+            nextState == WebSessionStatusState.unknown
+                ? LoginCheckResult.unknown
+                : nextState == WebSessionStatusState.locked
+                ? LoginCheckResult.challenge
+                : LoginCheckResult.unauthenticated,
+            reason: nextState == WebSessionStatusState.locked
+                ? 'challenge'
+                : 'unauthenticated',
+          );
           _failures = 0;
           final next = WebSessionStatus(state: nextState);
           _logTransition(next, evidence.source.name);
@@ -569,6 +605,13 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     } on Object {
       if (_isCurrent(generation)) _setUnavailable(source: 'check-error');
     } finally {
+      if (_isCurrent(generation) &&
+          _ref.read(loginObservationProvider(LoginChannel.web)).checking) {
+        _observation.finish(
+          LoginCheckResult.unavailable,
+          reason: 'unavailable',
+        );
+      }
       AppLogger.instance.info(
         'auth',
         'recovery completed recoveryId=$recoveryId accountEpoch=$accountEpoch sessionGeneration=$generation current=$_generation state=${mounted ? state.state.name : 'disposed'}',
@@ -579,6 +622,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   /// Called by the login WebView when DeviantArt reports its WAF lockout.
   /// All automatic retries must stop while this state is active.
   void markLocked() {
+    _observation.finish(LoginCheckResult.challenge, reason: 'challenge');
     _generation++;
     _failures = 0;
     const next = WebSessionStatus(state: WebSessionStatusState.locked);
@@ -587,6 +631,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   }
 
   void markHealthy({required String serverUsername}) {
+    _observation.begin(serverUsername);
     _generation++;
     _lastSuccess = _now();
     _lastRestrictionCheck = null;
@@ -630,6 +675,10 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
   }
 
   void _setAnonymous({required String source}) {
+    _observation.finish(
+      LoginCheckResult.unauthenticated,
+      reason: 'unauthenticated',
+    );
     _failures = 0;
     const next = WebSessionStatus(state: WebSessionStatusState.anonymous);
     _logTransition(next, source);
@@ -640,6 +689,7 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
       _setTransient(WebSessionStatusState.unavailable, source);
 
   void _setTransient(WebSessionStatusState state, String source) {
+    _observation.finish(LoginCheckResult.unavailable, reason: 'unavailable');
     final last = _lastSuccess;
     if (this.state.isHealthy &&
         last != null &&

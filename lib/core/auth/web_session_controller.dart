@@ -7,6 +7,7 @@ import '../diagnostics/app_logger.dart';
 import '../runtime/runtime_provider.dart';
 import 'auth_controller.dart';
 import 'auth_state.dart';
+import 'login_observation.dart';
 import 'session_state.dart';
 import 'web_session_diagnostics.dart';
 import 'web_session_store.dart';
@@ -133,6 +134,46 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
 
   final Ref _ref;
   final WebSessionStore _store;
+  LoginObservationController get _observation =>
+      _ref.read(loginObservationProvider(LoginChannel.web).notifier);
+
+  Future<void> _saveSnapshot({
+    String? csrf,
+    bool? isLoggedIn,
+    String? username,
+    List<PersistedWebCookie>? cookies,
+    bool Function()? isCurrent,
+  }) async {
+    try {
+      await _store.update(
+        csrf: csrf,
+        isLoggedIn: isLoggedIn,
+        username: username,
+        cookies: cookies,
+        isCurrent: isCurrent,
+      );
+      if (mounted &&
+          _ref.mounted &&
+          (isCurrent?.call() ?? true) &&
+          cookies?.isNotEmpty == true) {
+        _observation.bind(username ?? state.username);
+        _observation.storage(save: LoginStorageResult.saved);
+      }
+    } on Object {
+      if (mounted &&
+          _ref.mounted &&
+          (isCurrent?.call() ?? true) &&
+          cookies?.isNotEmpty == true) {
+        _observation.bind(username ?? state.username);
+        _observation.storage(
+          save: LoginStorageResult.failed,
+          reason: 'write_failed',
+        );
+      }
+      rethrow;
+    }
+  }
+
   final CookieManager? Function()? _cookieManagerFactory;
   Future<void>? _cookieRestore;
   int _identityEpoch = 0;
@@ -190,6 +231,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
       isLoggedIn: saved['isLoggedIn'] as bool?,
       username: (saved['username'] as String?) ?? '',
     );
+    _observation.bind(state.username);
     // The platform WebView store can lose its cookies across an app update;
     // re-inject the persisted copy so the signed-in web session (and with it
     // the personalized feed) survives without asking the user to sign in again.
@@ -236,6 +278,10 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
         ? rawCookies
         : parsePersistedCookies(rawCookies);
     if (cookies.isEmpty) {
+      _observation.storage(
+        restore: LoginStorageResult.notNeeded,
+        reason: 'missing_snapshot',
+      );
       // Distinguishes "no persisted cookie snapshot at all" from a snapshot
       // that exists but cannot be decoded; both previously returned silently.
       AppLogger.instance.info(
@@ -289,12 +335,18 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
     }
     await _withNativeCookies(() async {
       if (!_isCurrentIdentity(epoch)) return;
+      _observation.bind(savedUsername);
+      _observation.storage(restore: LoginStorageResult.restoring);
       try {
         final current = await _ref.read(webSessionProvider).readData();
         if (!mounted || !_ref.mounted || epoch != _identityEpoch) return;
         final liveUsername = current?.username.trim() ?? '';
         if (liveUsername.isNotEmpty &&
             liveUsername.toLowerCase() != savedUsername.toLowerCase()) {
+          _observation.storage(
+            restore: LoginStorageResult.failed,
+            reason: 'missing_identity',
+          );
           return; // Never mix cookies from two accounts.
         }
         final toRestore = missingSavedWebCookies(
@@ -303,6 +355,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
           now: DateTime.now(),
         );
         if (toRestore.isEmpty) {
+          _observation.storage(restore: LoginStorageResult.notNeeded);
           // Previously silent. Live stores that keep a cookie *name* with a
           // rotated or invalid value are not repaired by this path, so record
           // the comparison inputs (names only, never values) to tell "nothing
@@ -323,6 +376,10 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
         );
         final cookieManager = _nativeCookies;
         if (cookieManager == null) {
+          _observation.storage(
+            restore: LoginStorageResult.failed,
+            reason: 'unavailable',
+          );
           AppLogger.instance.warning(
             'web-session',
             'restore skipped reason=native_cookie_manager_unavailable '
@@ -347,12 +404,20 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
           return;
         }
         if (restored == null) {
+          _observation.storage(
+            restore: LoginStorageResult.failed,
+            reason: 'read_failed',
+          );
           AppLogger.instance.warning(
             'web-session',
             'restore readback failed reason=cookie_store_unavailable '
                 'injected=$injected',
           );
         } else if (restored.username.isEmpty) {
+          _observation.storage(
+            restore: LoginStorageResult.failed,
+            reason: 'missing_identity',
+          );
           // The store accepted the writes but the read-back no longer names an
           // identity (e.g. Android truncating the userinfo value). Names only.
           AppLogger.instance.warning(
@@ -362,6 +427,12 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
                 'userinfoPresent=${restored.cookies.any((c) => c.name == 'userinfo')}',
           );
         } else {
+          _observation.storage(
+            restore: injected == toRestore.length
+                ? LoginStorageResult.restored
+                : LoginStorageResult.failed,
+            reason: injected == toRestore.length ? '' : 'partial_restore',
+          );
           AppLogger.instance.info(
             'web-session',
             'restore verified username=${restored.username} '
@@ -376,13 +447,19 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
           // A verified restore is a fresh signed-in establishment: it
           // resolves any logout tombstone from an earlier explicit logout.
           _resolvedLogoutRevision = _logoutRevision;
-          await _store.update(
+          await _saveSnapshot(
             isLoggedIn: true,
             username: restored.username,
             isCurrent: () => _isCurrentIdentity(epoch),
           );
         }
       } on Object catch (error) {
+        if (_isCurrentIdentity(epoch)) {
+          _observation.storage(
+            restore: LoginStorageResult.failed,
+            reason: 'unavailable',
+          );
+        }
         // Best effort; a failed restore only means the user signs in again.
         // The type (never the message) is recorded so the next device capture
         // can distinguish a store write failure from a read failure.
@@ -448,7 +525,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
           isLoggedIn: true,
           username: state.username,
         );
-        await _store.update(
+        await _saveSnapshot(
           csrf: csrf,
           isLoggedIn: true,
           username: state.username,
@@ -484,6 +561,11 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
     }
 
     if (loggedIn && !validSnapshot) {
+      _observation.bind(username);
+      _observation.storage(
+        save: LoginStorageResult.failed,
+        reason: 'missing_snapshot',
+      );
       state = WebSessionState(csrf: csrf, isLoggedIn: true, username: username);
       AppLogger.instance.warning(
         'web-session',
@@ -504,7 +586,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
       // earlier logout tombstone.
       _resolvedLogoutRevision = _logoutRevision;
     }
-    await _store.update(
+    await _saveSnapshot(
       csrf: csrf,
       isLoggedIn: loggedIn,
       username: username,
@@ -528,6 +610,10 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
         const <PersistedWebCookie>[];
     if (!_isCurrentIdentity(epoch)) return false;
     if (!isValidCookieSnapshot(cookies: cookies, username: username)) {
+      _observation.storage(
+        save: LoginStorageResult.failed,
+        reason: 'missing_snapshot',
+      );
       AppLogger.instance.warning(
         'web-session',
         'persist skipped reason=invalid_snapshot '
@@ -542,9 +628,10 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
         : parsePersistedCookies(savedCookies);
     if (webSessionPersistedFingerprint(persisted) ==
         webSessionPersistedFingerprint(cookies)) {
+      _observation.storage(save: LoginStorageResult.saved);
       return true;
     }
-    await _store.update(
+    await _saveSnapshot(
       csrf: state.csrf,
       isLoggedIn: true,
       username: state.username,
@@ -578,7 +665,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
       isLoggedIn: state.isLoggedIn,
       username: state.username,
     );
-    await _store.update(csrf: csrf, isCurrent: () => _isCurrentIdentity(epoch));
+    await _saveSnapshot(csrf: csrf, isCurrent: () => _isCurrentIdentity(epoch));
   }
 
   /// Snapshots the current deviantart.com cookies with their metadata.
@@ -694,7 +781,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
             isLoggedIn: true,
             username: importedUsername,
           );
-          await _store.update(
+          await _saveSnapshot(
             csrf: state.csrf,
             isLoggedIn: true,
             username: importedUsername,
@@ -714,7 +801,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
         isLoggedIn: true,
         username: verifiedUser,
       );
-      await _store.update(
+      await _saveSnapshot(
         csrf: state.csrf,
         isLoggedIn: true,
         username: verifiedUser,
@@ -784,6 +871,7 @@ final class WebSessionController extends StateNotifier<WebSessionState> {
   }
 
   Future<void> clear() async {
+    _observation.reset();
     _identityEpoch++;
     // Raise the logout tombstone: signed-in reports captured before this
     // point are dropped until a fresh valid snapshot resolves it.

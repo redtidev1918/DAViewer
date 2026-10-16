@@ -5,6 +5,7 @@ import 'package:dakit_flutter/dakit_flutter.dart' hide WebSession;
 import 'package:daviewer/core/auth/web_session_controller.dart';
 import 'package:daviewer/core/auth/auth_controller.dart';
 import 'package:daviewer/core/auth/auth_state.dart';
+import 'package:daviewer/core/auth/login_observation.dart';
 import 'package:daviewer/core/auth/web_session_store.dart';
 import 'package:daviewer/core/data/web_session.dart';
 import 'package:daviewer/core/diagnostics/app_logger.dart';
@@ -163,6 +164,7 @@ void main() {
   late _Pending pending;
   late _Tokens tokens;
   late WebSessionStore store;
+  late LoginHistoryStore historyStore;
 
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('daviewer-cookie-race-');
@@ -170,6 +172,7 @@ void main() {
     cookies = _Cookies();
     pending = _Pending();
     tokens = _Tokens();
+    historyStore = LoginHistoryStore(directory: () async => directory);
     const channel = MethodChannel('plugins.flutter.io/path_provider');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (_) async => directory.path);
@@ -196,6 +199,7 @@ void main() {
           ),
         ),
         webSessionProvider.overrideWithValue(WebSession(() => cookies)),
+        loginHistoryStoreProvider.overrideWithValue(historyStore),
         webSessionControllerProvider.overrideWith(
           (ref) => WebSessionController(
             ref,
@@ -219,6 +223,9 @@ void main() {
           const MethodChannel('plugins.flutter.io/path_provider'),
           null,
         );
+    // The login observation store writes asynchronously into this directory;
+    // let queued writes settle before Windows deletes it (errno 32 otherwise).
+    await historyStore.flush();
     await directory.delete(recursive: true);
   });
 
