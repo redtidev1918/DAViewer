@@ -1,5 +1,6 @@
 import 'package:dakit_flutter/dakit_flutter.dart';
 import 'package:daviewer/app/router.dart';
+import 'package:daviewer/core/auth/login_observation.dart';
 import 'package:daviewer/core/auth/web_session_status.dart';
 import 'package:daviewer/core/l10n/app_strings.dart';
 import 'package:daviewer/shared/widgets/app_notice_host.dart';
@@ -102,12 +103,17 @@ void main() {
     final container = ProviderScope.containerOf(
       tester.element(find.byType(AppNoticeHost)),
     );
+    // P3: only an account with prior-login evidence may be told the session
+    // expired; a bare `anonymous` verdict has nothing to invalidate.
+    container.read(loginObservationProvider(LoginChannel.web).notifier)
+      ..begin('artist')
+      ..finish(LoginCheckResult.authenticated);
     container.read(webSessionStatusProvider.notifier).state =
         const WebSessionStatus(state: WebSessionStatusState.anonymous);
     await tester.pump();
     final s = strings(container.read(appLanguageProvider));
-    expect(find.text(s.webSessionBanner), findsOneWidget);
-    await tester.tap(find.text(s.login));
+    expect(find.text(s.webSessionInvalidated), findsOneWidget);
+    await tester.tap(find.text(s.webSessionReloginAction));
     await tester.pumpAndSettle();
     expect(router.state.uri.path, '/web-login');
   });
