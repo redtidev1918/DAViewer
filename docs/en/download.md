@@ -1,16 +1,16 @@
 <!-- docsite-release-repo: redtidev1918/DAViewer -->
-<!-- docsite-release-tag: v0.5.23 -->
+<!-- docsite-release-tag: v0.6.0 -->
 # Download DAViewer
 
 **Language / 语言:** [中文](/download.md) · English
 
-<!-- docsite: generated from redtidev1918/DAViewer release v0.5.23; do not edit by hand -->
+<!-- docsite: generated from redtidev1918/DAViewer release v0.6.0; do not edit by hand -->
 
 GitHub Actions generates this page from release assets. If the page has not been updated yet, check Releases for the latest version. [Releases](https://github.com/redtidev1918/DAViewer/releases)
 
-## Version: `v0.5.23` (2026-10-16)
+## Version: `v0.6.0` (2026-10-16)
 
-[Release notes and checksums](https://github.com/redtidev1918/DAViewer/releases/tag/v0.5.23)
+[Release notes and checksums](https://github.com/redtidev1918/DAViewer/releases/tag/v0.6.0)
 
 ### Installation
 
@@ -32,8 +32,8 @@ From left to right: home feed, artwork detail, related works.
 
 | Platform | File | Size | Download |
 |---|---|---|---|
-| All platforms | `RELEASE-METADATA.json` | 2 KB | [Download](https://github.com/redtidev1918/DAViewer/releases/download/v0.5.23/RELEASE-METADATA.json) |
-| All platforms | `SHA256SUMS` | 0 KB | [Download](https://github.com/redtidev1918/DAViewer/releases/download/v0.5.23/SHA256SUMS) |
-| Android | `DAViewer-v0.5.23.apk` | 64.1 MB | [Download](https://github.com/redtidev1918/DAViewer/releases/download/v0.5.23/DAViewer-v0.5.23.apk) |
-| Windows | `DAViewer-v0.5.23-windows.zip` | 14.0 MB | [Download](https://github.com/redtidev1918/DAViewer/releases/download/v0.5.23/DAViewer-v0.5.23-windows.zip) |
-| macOS | `DAViewer-v0.5.23-macos-unsigned-preview.zip` | 24.2 MB | [Download](https://github.com/redtidev1918/DAViewer/releases/download/v0.5.23/DAViewer-v0.5.23-macos-unsigned-preview.zip) |
+| All platforms | `RELEASE-METADATA.json` | 2 KB | [Download](https://github.com/redtidev1918/DAViewer/releases/download/v0.6.0/RELEASE-METADATA.json) |
+| All platforms | `SHA256SUMS` | 0 KB | [Download](https://github.com/redtidev1918/DAViewer/releases/download/v0.6.0/SHA256SUMS) |
+| Android | `DAViewer-v0.6.0.apk` | 64.2 MB | [Download](https://github.com/redtidev1918/DAViewer/releases/download/v0.6.0/DAViewer-v0.6.0.apk) |
+| Windows | `DAViewer-v0.6.0-windows.zip` | 14.0 MB | [Download](https://github.com/redtidev1918/DAViewer/releases/download/v0.6.0/DAViewer-v0.6.0-windows.zip) |
+| macOS | `DAViewer-v0.6.0-macos-unsigned-preview.zip` | 24.2 MB | [Download](https://github.com/redtidev1918/DAViewer/releases/download/v0.6.0/DAViewer-v0.6.0-macos-unsigned-preview.zip) |
