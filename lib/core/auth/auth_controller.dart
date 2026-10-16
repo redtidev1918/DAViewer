@@ -10,6 +10,7 @@ import '../runtime/app_runtime.dart';
 import '../runtime/runtime_provider.dart';
 import '../settings/app_preferences.dart';
 import 'auth_state.dart';
+import 'login_observation.dart';
 import 'web_session_controller.dart';
 
 final authControllerProvider = StateNotifierProvider<AuthController, AuthState>(
@@ -77,6 +78,10 @@ final class AuthController extends StateNotifier<AuthState> {
   int _authEpoch = 0;
   Future<void>? _loginOperation;
   Future<void>? _accountLoad;
+  Future<void>? _manualCheck;
+  DateTime? _lastManualCheck;
+  LoginObservationController get _observation =>
+      _ref.read(loginObservationProvider(LoginChannel.api).notifier);
 
   AppRuntime get _runtime => _ref.read(runtimeProvider);
   AppLogger get _log => AppLogger.instance;
@@ -201,6 +206,10 @@ final class AuthController extends StateNotifier<AuthState> {
   }
 
   Future<void> _handleSessionInvalidation(DAKitException error) async {
+    _observation.finish(
+      LoginCheckResult.unauthenticated,
+      reason: 'unauthenticated',
+    );
     _log.info(
       'auth',
       'provider invalidated the saved OAuth session; sign-in is required',
@@ -249,6 +258,12 @@ final class AuthController extends StateNotifier<AuthState> {
       return true;
     } on DAKitException catch (error) {
       if (isDefinitiveCredentialFailure(error)) {
+        // The server rejected the token: a real unauthenticated verdict that
+        // also closes any in-flight account-load observation.
+        _observation.finish(
+          LoginCheckResult.unauthenticated,
+          reason: 'unauthenticated',
+        );
         await AppPreferences.saveOAuthSessionKnown(false);
         _authEpoch += 1;
         state = const AuthState(status: AuthStatus.signedOut);
@@ -363,6 +378,7 @@ final class AuthController extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    _observation.reset();
     final runtime = _runtime;
     // Persist the user's intent and leave authenticated UI before best-effort
     // network revocation or secure-storage cleanup. Neither failure may sign
@@ -434,8 +450,40 @@ final class AuthController extends StateNotifier<AuthState> {
 
   Future<void> reloadAccount() => _loadAccount(_runtime, epoch: _authEpoch);
 
+  /// User-visible verification reuses the existing identity request. It never
+  /// treats a stored token or a transiently preserved session as fresh proof.
+  Future<void> checkLoginStatus() async {
+    final active = _manualCheck;
+    if (active != null) return active;
+    final now = _ref.read(loginObservationClockProvider)();
+    if (_lastManualCheck != null &&
+        now.difference(_lastManualCheck!) < const Duration(seconds: 30)) {
+      return;
+    }
+    _lastManualCheck = now;
+    if (state.status != AuthStatus.signedIn) {
+      _observation.begin(state.account?.username ?? '');
+      _observation.finish(
+        state.status == AuthStatus.signedOut
+            ? LoginCheckResult.unauthenticated
+            : LoginCheckResult.unknown,
+      );
+      return;
+    }
+    late final Future<void> tracked;
+    tracked = reloadAccount().whenComplete(() {
+      if (identical(_manualCheck, tracked)) _manualCheck = null;
+    });
+    _manualCheck = tracked;
+    return tracked;
+  }
+
   Future<void> _loadAccount(AppRuntime runtime, {int? epoch}) async {
     final activeEpoch = epoch ?? _authEpoch;
+    _observation.begin(
+      state.account?.username ??
+          _ref.read(loginObservationProvider(LoginChannel.api)).owner,
+    );
     _log.info('auth', 'loading account');
     try {
       final account = await OfficialAccountRepository(runtime.transport!)
@@ -443,22 +491,33 @@ final class AuthController extends StateNotifier<AuthState> {
           .timeout(const Duration(seconds: 15));
       if (!_isCurrentEpoch(activeEpoch)) return;
       _log.info('auth', 'account loaded: ${account.username}');
+      _observation.bind(account.username);
+      _observation.finish(LoginCheckResult.authenticated);
       state = AuthState(status: AuthStatus.signedIn, account: account);
     } on DAKitException catch (error, stack) {
       if (!_isCurrentEpoch(activeEpoch)) return;
       if (isDefinitiveCredentialFailure(error)) {
+        _observation.finish(
+          LoginCheckResult.unauthenticated,
+          reason: 'unauthenticated',
+        );
         await AppPreferences.saveOAuthSessionKnown(false);
         _authEpoch += 1;
         state = const AuthState(status: AuthStatus.signedOut);
         return;
       }
       _log.error('auth', 'account load failed', error, stack);
+      _observation.finish(LoginCheckResult.unavailable, reason: 'unavailable');
       // Tokens are still valid even if the profile fetch failed; stay signed
       // in with an unknown profile instead of forcing a logout.
       state = AuthState(status: AuthStatus.signedIn, error: error);
     } on Object catch (error, stack) {
       if (!_isCurrentEpoch(activeEpoch)) return;
       _log.error('auth', 'account load failed', error, stack);
+      _observation.finish(
+        LoginCheckResult.unavailable,
+        reason: error is TimeoutException ? 'timeout' : 'unavailable',
+      );
       state = AuthState(status: AuthStatus.signedIn, error: error);
     }
   }

@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:dakit_flutter/dakit_flutter.dart';
 import 'package:daviewer/core/auth/auth_controller.dart';
 import 'package:daviewer/core/auth/auth_state.dart';
+import 'package:daviewer/core/auth/login_observation.dart';
 import 'package:daviewer/core/auth/web_session_controller.dart';
 import 'package:daviewer/core/auth/web_session_store.dart';
 import 'package:daviewer/core/auth/web_session_status.dart';
@@ -336,6 +337,13 @@ void registerLogoutLoginTest(String failure) {
         dio: dio,
         webViewOAuthBridge: bridge,
       );
+      // Build the store outside the widget test's fake-async zone: its write
+      // queue registers continuations in the zone it was created in, and this
+      // test drains that queue from tearDown so the history file is closed
+      // before the directory is removed.
+      final history = Zone.root.run(
+        () => LoginHistoryStore(directory: () async => directory),
+      );
       final container = ProviderContainer(
         overrides: [
           runtimeProvider.overrideWithValue(runtime),
@@ -347,6 +355,7 @@ void registerLogoutLoginTest(String failure) {
               cookieManager: () => cookies,
             ),
           ),
+          loginHistoryStoreProvider.overrideWithValue(history),
         ],
       );
       addTearDown(() async {
@@ -355,8 +364,13 @@ void registerLogoutLoginTest(String failure) {
           oauth.authorization.cancelPending,
         );
         await tester.pump(const Duration(milliseconds: 5));
+        container.dispose();
+        // Drain the history write queue before removing its directory: a
+        // still-open history file makes the recursive delete fail on Windows.
+        // This awaits inside the widget zone, where the queue's continuations
+        // are scheduled; runAsync would leave them undrained.
+        await history.flush();
         await tester.runAsync(() async {
-          container.dispose();
           await bridge.dispose();
           await logger.dispose();
           messenger.setMockMethodCallHandler(paths, null);

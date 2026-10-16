@@ -145,6 +145,18 @@ final class SettingsScreen extends ConsumerWidget {
           _SettingsCard(
             children: <Widget>[
               ListTile(
+                leading: const Icon(Icons.verified_user_outlined),
+                title: Text(
+                  language == AppLanguage.zh ? '登录状态' : 'Login status',
+                ),
+                subtitle: Text(
+                  language == AppLanguage.zh ? '网页登录、API 授权与验证历史' : 'Website login, API authorization and verification history',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings/login-status'),
+              ),
+              const Divider(height: 1),
+              ListTile(
                 leading: const Icon(Icons.cookie_outlined),
                 title: Text(s.accountCookies),
                 subtitle: Text(s.accountCookiesSubtitle),

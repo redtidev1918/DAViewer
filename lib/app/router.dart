@@ -23,6 +23,7 @@ import '../features/notifications/notifications_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/settings/proxy_settings_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/settings/login_status_screen.dart';
 import '../features/splash/splash_screen.dart';
 import '../features/tag/tag_screen.dart';
 import '../features/watching/watching_screen.dart';
@@ -79,6 +80,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) =>
             const NoticeOverlay(child: SettingsScreen()),
         routes: <RouteBase>[
+          GoRoute(
+            path: 'login-status',
+            builder: (context, state) =>
+                const NoticeOverlay(child: LoginStatusScreen()),
+          ),
           GoRoute(
             path: 'proxy',
             builder: (context, state) =>
