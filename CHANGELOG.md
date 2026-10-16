@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.0](https://github.com/redtidev1918/DAViewer/compare/v0.5.23...v0.6.0) (2026-10-16)
+
+
+### Features
+
+* **auth:** 分通道登录提醒与重新登录引导 ([26adfc0](https://github.com/redtidev1918/DAViewer/commit/26adfc0609e4b48daf5980263d843551f854046c))
+* **auth:** 登录状态页面与分通道验证历史 ([f9e2b0d](https://github.com/redtidev1918/DAViewer/commit/f9e2b0d4b92ac2f87d6c8fbcafd9be003fab8d26))
+* **auth:** 网页登录状态改为按需低频检查 ([b7b244c](https://github.com/redtidev1918/DAViewer/commit/b7b244c55a031f00b4d17f43737d66f8eaa02c95))
+
 ## [0.5.23](https://github.com/redtidev1918/DAViewer/compare/v0.5.22...v0.5.23) (2026-10-16)
 
 
