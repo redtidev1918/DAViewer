@@ -294,7 +294,7 @@ void main() {
       fakeAsync((async) {
         final recorder = _VerifyRecorder();
         final start = DateTime.utc(2026, 10, 16, 12);
-        var clock = start;
+        DateTime now() => start.add(async.elapsed);
         var status = WebSessionStatus(
           state: WebSessionStatusState.healthy,
           lastCheckedAt: start,
@@ -302,7 +302,7 @@ void main() {
         final coordinator = WebSessionCoordinator(
           shouldVerify: () => true,
           verify: recorder.call,
-          now: () => clock,
+          now: now,
           currentStatus: () => status,
           lastSuccessAt: () => start,
         );
@@ -317,7 +317,7 @@ void main() {
         // provider listener routes it back, cancelling any post-attempt arm.
         status = WebSessionStatus(
           state: WebSessionStatusState.healthy,
-          lastCheckedAt: clock,
+          lastCheckedAt: now(),
         );
         coordinator.onStatusChanged(status);
         async.elapse(const Duration(minutes: 5));
@@ -330,7 +330,7 @@ void main() {
       fakeAsync((async) {
         final recorder = _VerifyRecorder();
         final start = DateTime.utc(2026, 10, 16, 12);
-        var clock = start;
+        DateTime now() => start.add(async.elapsed);
         var status = WebSessionStatus(
           state: WebSessionStatusState.unavailable,
           cooldownUntil: start.add(const Duration(seconds: 30)),
@@ -338,7 +338,7 @@ void main() {
         final coordinator = WebSessionCoordinator(
           shouldVerify: () => true,
           verify: recorder.call,
-          now: () => clock,
+          now: now,
           currentStatus: () => status,
           lastSuccessAt: () => start,
         );
@@ -350,7 +350,7 @@ void main() {
 
         status = WebSessionStatus(
           state: WebSessionStatusState.unavailable,
-          cooldownUntil: clock.add(const Duration(minutes: 2)),
+          cooldownUntil: now().add(const Duration(minutes: 2)),
         );
         coordinator.onStatusChanged(status);
         async.elapse(const Duration(minutes: 2));
@@ -369,13 +369,16 @@ void main() {
       fakeAsync((async) {
         final recorder = _VerifyRecorder();
         final start = DateTime.utc(2026, 10, 16, 12);
-        var clock = start;
+        DateTime now() => start.add(async.elapsed);
         DateTime? lastSuccessAt = start.subtract(const Duration(hours: 5));
         final coordinator = WebSessionCoordinator(
           shouldVerify: () => true,
           verify: recorder.call,
-          now: () => clock,
-          currentStatus: () => const WebSessionStatus(),
+          now: now,
+          currentStatus: () => WebSessionStatus(
+            state: WebSessionStatusState.healthy,
+            lastCheckedAt: start,
+          ),
           lastSuccessAt: () => lastSuccessAt,
         );
 
@@ -398,6 +401,12 @@ void main() {
         coordinator.pause();
         coordinator.resume();
         expect(recorder.countOf('app-resume'), 1);
+
+        // A resume that does not re-verify keeps the healthy lease running.
+        coordinator.pause();
+        coordinator.resume();
+        async.elapse(const Duration(minutes: 5));
+        expect(recorder.countOf('lease-expired'), 1);
         coordinator.dispose();
       });
     });
@@ -409,7 +418,7 @@ void main() {
         final coordinator = WebSessionCoordinator(
           shouldVerify: () => true,
           verify: recorder.call,
-          now: () => start,
+          now: () => start.add(async.elapsed),
           currentStatus: () => WebSessionStatus(
             state: WebSessionStatusState.healthy,
             lastCheckedAt: start,
@@ -422,6 +431,59 @@ void main() {
         expect(recorder.calls, isEmpty);
         coordinator.dispose();
       });
+    });
+
+    test('a past-due lease retries on the retry floor instead of looping', () {
+      fakeAsync((async) {
+        final recorder = _VerifyRecorder();
+        final start = DateTime.utc(2026, 10, 16, 12);
+        DateTime now() => start.add(async.elapsed);
+        final coordinator = WebSessionCoordinator(
+          shouldVerify: () => true,
+          verify: recorder.call,
+          now: now,
+          currentStatus: () => WebSessionStatus(
+            state: WebSessionStatusState.healthy,
+            lastCheckedAt: start.subtract(const Duration(hours: 1)),
+          ),
+          lastSuccessAt: () => start,
+        );
+
+        // A lease that is already past due verifies at once; an attempt that
+        // publishes no new verdict must then wait for the floor rather than
+        // re-verifying at full speed.
+        async.elapse(const Duration(milliseconds: 1));
+        expect(recorder.countOf('lease-expired'), 1);
+
+        async.elapse(const Duration(seconds: 9));
+        expect(recorder.countOf('lease-expired'), 1);
+
+        async.elapse(const Duration(seconds: 1));
+        expect(recorder.countOf('lease-expired'), 2);
+        coordinator.dispose();
+      });
+    });
+
+    test('a forced verdict observed while paused replays on resume', () async {
+      final dio = Dio()..httpClientAdapter = _StatusAdapter(403);
+      final recorder = _VerifyRecorder();
+      final start = DateTime.utc(2026, 10, 16, 12);
+      final coordinator = WebSessionCoordinator(
+        dio: dio,
+        shouldVerify: () => true,
+        verify: recorder.call,
+        now: () => start,
+        currentStatus: () => const WebSessionStatus(),
+        lastSuccessAt: () => start,
+      );
+      addTearDown(coordinator.dispose);
+
+      coordinator.pause();
+      await _request(dio);
+      expect(recorder.calls, isEmpty, reason: 'paused work is not run');
+
+      coordinator.resume();
+      expect(recorder.calls, <(bool, String)>[(true, 'web-http-403')]);
     });
 
     test('dispose detaches the interceptor and stops verifying', () async {

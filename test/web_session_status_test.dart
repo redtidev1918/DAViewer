@@ -214,6 +214,29 @@ Future<ProviderContainer> _anonymousSessionContainer() async {
 
 void main() {
   test(
+    'ending an interactive recovery without a verdict schedules a retry',
+    () {
+      final container = _containerWith(_HomeHtmlAdapter(_signedInHomeHtml));
+      addTearDown(container.dispose);
+      final owner = container.read(webSessionStatusProvider.notifier);
+
+      owner.beginInteractiveRecovery();
+      expect(container.read(webSessionStatusProvider).cooldownUntil, isNull);
+
+      owner.endInteractiveRecovery();
+      expect(
+        container.read(webSessionStatusProvider).state,
+        WebSessionStatusState.unverified,
+      );
+      expect(
+        container.read(webSessionStatusProvider).cooldownUntil,
+        isNotNull,
+        reason: 'a non-healthy state without a cooldown schedules no retry',
+      );
+    },
+  );
+
+  test(
     'overlapping recovery completions retain their own recovery IDs',
     () async {
       final old = Completer<WebSessionProbeResult>();

@@ -107,6 +107,11 @@ final class WebSessionCoordinator {
   bool _paused = false;
   bool _disposed = false;
 
+  /// A forced verdict observed while paused. Dropping it would lose the only
+  /// evidence that the session was rejected, and the time-based resume check
+  /// cannot replace it, so it is replayed on the next resume.
+  String? _pendingForcedSource;
+
   void onStatusChanged(WebSessionStatus status) => _armFrom(status);
 
   void pause() {
@@ -118,11 +123,20 @@ final class WebSessionCoordinator {
   void resume() {
     if (_disposed) return;
     _paused = false;
-    final lastSuccess = lastSuccessAt();
-    if (lastSuccess == null || now().difference(lastSuccess) > resumeInterval) {
-      // Non-forced: the healthy cache has long expired at this distance and
-      // transient backoff must still apply after a recent failure.
-      _request(false, 'app-resume');
+    final pending = _pendingForcedSource;
+    _pendingForcedSource = null;
+    if (pending != null) {
+      // The verdict observed while paused is the reason to check at all, and it
+      // outranks the time-based resume window.
+      _request(true, pending);
+    } else {
+      final lastSuccess = lastSuccessAt();
+      if (lastSuccess == null ||
+          now().difference(lastSuccess) > resumeInterval) {
+        // Non-forced: the healthy cache has long expired at this distance and
+        // transient backoff must still apply after a recent failure.
+        _request(false, 'app-resume');
+      }
     }
     _arm();
   }
@@ -143,10 +157,11 @@ final class WebSessionCoordinator {
     final due = _nextDue(status);
     if (due == null) return;
     var delay = due.difference(now());
-    if (delay < Duration.zero) {
+    if (delay <= Duration.zero) {
       // An attempt that ends without publishing a new verdict (an
-      // inconclusive "keep") leaves the old due date in the past; retrying
-      // at full speed would busy-loop, so clamp past-due arms to the floor.
+      // inconclusive "keep") leaves the old due date at or before now;
+      // retrying at full speed would busy-loop, so a due-now arm waits for the
+      // floor exactly like a past-due one.
       final sinceRequest = _lastRequestAt == null
           ? null
           : now().difference(_lastRequestAt!);
@@ -175,7 +190,12 @@ final class WebSessionCoordinator {
   }
 
   void _request(bool forced, String source) {
-    if (_disposed || _paused || !shouldVerify()) return;
+    if (_disposed) return;
+    if (_paused) {
+      if (forced) _pendingForcedSource = source;
+      return;
+    }
+    if (!shouldVerify()) return;
     _lastRequestAt = now();
     unawaited(_verify(forced, source));
   }

@@ -123,14 +123,18 @@ final class _SplashScreenState extends ConsumerState<SplashScreen> {
       // persisted success history is stale: a session verified under
       // WebSessionScheduling.startupInterval is left to the feed and signal
       // driven checks that fire when a web-dependent feature is used.
-      final observation = ref.read(
-        loginObservationProvider(LoginChannel.web).notifier,
-      );
-      await observation.historyReady;
-      final lastSuccess = ref
+      // Resolve everything through the scope container before the first await:
+      // the history read can outlive this widget (setting the ready flag routes
+      // away from /splash), and touching a disposed ref would drop the startup
+      // verification. The container outlives the widget.
+      final container = ProviderScope.containerOf(context, listen: false);
+      await container
+          .read(loginObservationProvider(LoginChannel.web).notifier)
+          .historyReady;
+      final lastSuccess = container
           .read(loginObservationProvider(LoginChannel.web))
           .lastSuccess;
-      final now = ref.read(webSessionClockProvider)();
+      final now = container.read(webSessionClockProvider)();
       if (lastSuccess != null &&
           now.difference(lastSuccess) < WebSessionScheduling.startupInterval) {
         AppLogger.instance.info(
@@ -139,7 +143,7 @@ final class _SplashScreenState extends ConsumerState<SplashScreen> {
         );
         return;
       }
-      await ref.read(webSessionStatusProvider.notifier).check();
+      await container.read(webSessionStatusProvider.notifier).check();
     } on Object catch (error) {
       AppLogger.instance.warning(
         'startup',

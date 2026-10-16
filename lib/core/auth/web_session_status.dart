@@ -212,7 +212,22 @@ final class WebSessionStatusController extends StateNotifier<WebSessionStatus> {
     );
   }
 
-  void endInteractiveRecovery() => _interactive = false;
+  void endInteractiveRecovery() {
+    if (!_interactive) return;
+    _interactive = false;
+    // Leaving the interactive login without a verdict (cancelled, or a failure
+    // the interactive probe could not judge) publishes no state of its own, and
+    // a non-healthy state without a cooldown schedules nothing: the scheduler
+    // would stay silent until an unrelated event. Re-publish it as a transient
+    // result so the ordinary backoff retry covers the gap.
+    if (state.state == WebSessionStatusState.unverified &&
+        state.cooldownUntil == null) {
+      _setTransient(
+        WebSessionStatusState.unverified,
+        'interactive-recovery-end',
+      );
+    }
+  }
 
   /// Explicit login/lockout supersedes recommendation requests too.
   int get generation => _generation;
