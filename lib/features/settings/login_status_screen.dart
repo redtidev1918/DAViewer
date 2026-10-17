@@ -26,13 +26,13 @@ final class LoginStatusScreen extends ConsumerWidget {
         children: [
           Text(
             t(
-              '网页登录与官方 API 授权分别影响不同功能。上次验证成功不保证当前仍然有效。',
-              'Website login and official API authorization serve different features. A past successful check does not prove the current session is valid.',
+              '推荐浏览和账号互动的登录状态可能不同。功能无法使用时，可以在这里检查，或打开登录页重新登录。以下显示最近一次检查结果。',
+              'Browsing and account interactions may have different sign-in states. If a feature stops working, check its status here or sign in again. Results below reflect the most recent check.',
             ),
           ),
           const SizedBox(height: 16),
           LoginStatusCard(
-            title: t('网页登录', 'Website login'),
+            title: t('推荐与内容浏览', 'Recommendations and browsing'),
             observation: web,
             zh: zh,
             // The chain owns the current verdict; the observation only carries
@@ -46,8 +46,8 @@ final class LoginStatusScreen extends ConsumerWidget {
                 ? LoginCheckResult.authenticated
                 : web.result,
             impact: t(
-              '影响推荐及依赖网页登录的内容。',
-              'Affects recommendations and content requiring website login.',
+              '用于加载个性化推荐和需要登录才能查看的内容。',
+              'Used for personalized recommendations and content that requires sign-in.',
             ),
             check: verdict.isLocked
                 ? null
@@ -55,36 +55,33 @@ final class LoginStatusScreen extends ConsumerWidget {
                       .read(webSessionStatusProvider.notifier)
                       .checkLoginStatus(),
             recover: () =>
-                _recover(context, zh, t('恢复网页登录', 'Restore website login')),
-            recoveryLabel: t('恢复网页登录', 'Restore website login'),
+                _recover(context, zh, t('打开登录页', 'Open sign-in page')),
+            recoveryLabel: t('打开登录页', 'Open sign-in page'),
             storage: true,
           ),
           const SizedBox(height: 16),
           LoginStatusCard(
-            title: t('官方 API 登录', 'Official API login'),
+            title: t('关注、收藏与通知', 'Following, favourites and notifications'),
             observation: api,
             zh: zh,
             result: auth.status == AuthStatus.signedOut
                 ? LoginCheckResult.unauthenticated
                 : api.result,
             impact: t(
-              '影响关注、通知、收藏等官方 API 功能。',
-              'Affects official API features such as follows, notifications and favourites.',
+              '用于关注画师、收藏作品和查看通知。',
+              'Used to follow artists, favourite artworks and view notifications.',
             ),
             check: () =>
                 ref.read(authControllerProvider.notifier).checkLoginStatus(),
-            recover: () => _recover(
-              context,
-              zh,
-              t('恢复 API 授权', 'Restore API authorization'),
-            ),
-            recoveryLabel: t('恢复 API 授权', 'Restore API authorization'),
+            recover: () =>
+                _recover(context, zh, t('打开登录页', 'Open sign-in page')),
+            recoveryLabel: t('打开登录页', 'Open sign-in page'),
           ),
           const SizedBox(height: 16),
           Text(
             t(
-              '检查操作会合并在途请求，30 秒内重复点击不会新增请求。网页挑战受限时，请先打开登录页完成验证或稍后重试。',
-              'Checks join an existing request and are limited to once per 30 seconds. If website verification is restricted, open the login page or try again later.',
+              '检查后请等待 30 秒再试。如果提示需要验证，请打开登录页，按网页提示完成操作。',
+              'Wait 30 seconds between checks. If verification is needed, open the sign-in page and follow the website instructions.',
             ),
           ),
         ],
@@ -99,7 +96,7 @@ Future<void> _recover(BuildContext context, bool zh, String title) async {
     builder: (context) => AlertDialog(
       title: Text(title),
       content: Text(
-        zh ? '现有登录流程可能同时检查或恢复网页登录与 API 授权。不会预先退出账号或清除 Cookie；完成后请分别查看两种登录状态。' : 'The existing login flow may check or restore both website login and API authorization. It does not sign you out or clear cookies first. Review both statuses afterwards.',
+        zh ? '请按网页提示登录或完成验证。完成后返回这里，查看两项登录状态是否恢复。' : 'Follow the website instructions to sign in or complete verification. Then return here to check both sign-in states.',
       ),
       actions: [
         TextButton(
@@ -143,40 +140,55 @@ final class LoginStatusCard extends StatelessWidget {
       ? t('暂无记录', 'No record')
       : value.toLocal().toString().split('.').first;
   String get label => switch (result) {
-    LoginCheckResult.unknown => t('尚未验证', 'Not yet verified'),
-    LoginCheckResult.authenticated => t('已验证登录', 'Login verified'),
+    LoginCheckResult.unknown => t('还未检查', 'Not checked yet'),
+    LoginCheckResult.authenticated => t('上次检查：已登录', 'Last check: signed in'),
     LoginCheckResult.unauthenticated => t(
-      '未登录或需要重新登录',
-      'Signed out or sign-in required',
+      '需要登录，请打开登录页',
+      'Sign-in needed. Open the sign-in page.',
     ),
-    LoginCheckResult.unavailable => t('暂时无法确认', 'Unable to confirm'),
+    LoginCheckResult.unavailable => t(
+      '暂时无法检查，请稍后重试',
+      'Unable to check. Try again later.',
+    ),
     LoginCheckResult.challenge => t(
-      '网页验证受限',
-      'Website verification restricted',
+      '需要网页验证，请打开登录页',
+      'Verification needed. Open the sign-in page.',
     ),
   };
   String storageLabel(LoginStorageResult value) => switch (value) {
     LoginStorageResult.unknown => t('尚未检查', 'Not checked'),
-    LoginStorageResult.saved => t('已保存并读回', 'Saved and read back'),
+    LoginStorageResult.saved => t('已保存登录信息', 'Sign-in details saved'),
     LoginStorageResult.restoring => t('正在恢复', 'Restoring'),
     LoginStorageResult.restored => t(
-      '已写入并读回身份',
-      'Written and identity read back',
+      '已恢复保存的登录信息',
+      'Saved sign-in details restored',
     ),
-    LoginStorageResult.notNeeded => t('未执行恢复', 'No restore performed'),
+    LoginStorageResult.notNeeded => t('无需恢复', 'No restore needed'),
     LoginStorageResult.failed => t('异常', 'Failed'),
   };
   String reason(String value) => switch (value) {
     'timeout' => t('请求超时', 'Request timed out'),
-    'challenge' => t('网页挑战受限', 'Website challenge restricted'),
-    'unauthenticated' => t('未确认有效登录', 'No valid login confirmed'),
-    'read_failed' => t('存储读回失败', 'Storage read-back failed'),
-    'write_failed' => t('保存或保存后的读回失败', 'Save or subsequent read-back failed'),
-    'missing_identity' => t('读回未确认账号', 'Read-back did not confirm an account'),
-    'missing_snapshot' => t('没有可用的保存快照', 'No usable saved snapshot'),
+    'challenge' => t(
+      '请在登录页完成网页验证',
+      'Complete verification on the sign-in page',
+    ),
+    'unauthenticated' => t('请重新登录', 'Please sign in again'),
+    'read_failed' => t('无法读取保存的登录信息', 'Could not read saved sign-in details'),
+    'write_failed' => t(
+      '无法保存或读取登录信息',
+      'Could not save or read sign-in details',
+    ),
+    'missing_identity' => t(
+      '保存的登录信息中没有找到账号',
+      'No account found in saved sign-in details',
+    ),
+    'missing_snapshot' => t(
+      '没有可恢复的登录信息',
+      'No saved sign-in details to restore',
+    ),
     'partial_restore' => t(
-      '部分 Cookie 未能写入',
-      'Some cookies could not be written',
+      '登录信息未能完整恢复',
+      'Sign-in details could not be fully restored',
     ),
     'unavailable' || 'network' => t(
       '网络、服务或本地存储暂时不可用',
@@ -203,41 +215,48 @@ final class LoginStatusCard extends StatelessWidget {
           if (observation.owner.isNotEmpty)
             Text('${t('账号', 'Account')}: ${observation.owner}'),
           Text('${t('最近检查', 'Last check')}: ${date(observation.lastAttempt)}'),
-          Text(
-            '${t('最近成功验证', 'Last successful verification')}: ${date(observation.lastSuccess)}',
-          ),
-          Text(
-            '${t('最近检查原因', 'Last check reason')}: ${reason(observation.reason)}',
-          ),
           Text(impact),
-          if (storage) ...[
-            const Divider(),
-            Text(
-              '${t('最近保存结果', 'Last save result')}: ${storageLabel(observation.save)}',
-            ),
-            Text(
-              '${t('最近恢复结果', 'Last restore result')}: ${storageLabel(observation.restore)}',
-            ),
-            Text(
-              '${t('存储记录时间', 'Storage observation time')}: ${date(observation.storageAt)}',
-            ),
-            if (observation.storageReason.isNotEmpty)
-              Text(reason(observation.storageReason)),
-            if (observation.save == LoginStorageResult.failed ||
-                observation.restore == LoginStorageResult.failed)
-              Text(
-                t(
-                  '登录状态保存或恢复异常；即使当前会话可用，下次启动仍可能需要重新登录。',
-                  'Saving or restoring the login state failed. Even if this session works, a later launch may require sign-in.',
-                ),
-              ),
+          if (storage &&
+              (observation.save == LoginStorageResult.failed ||
+                  observation.restore == LoginStorageResult.failed))
             Text(
               t(
-                '本地保存、写入与读回结果不代表服务器接受了登录身份。',
-                'Local save, write and read-back results do not prove server authentication.',
+                '登录信息未能保存或恢复，下次打开应用时可能需要重新登录。',
+                'Sign-in details could not be saved or restored. You may need to sign in again next time.',
               ),
             ),
-          ],
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: Text(t('查看检查详情', 'Check details')),
+            children: [
+              Text(
+                '${t('上次登录成功', 'Last successful sign-in check')}: ${date(observation.lastSuccess)}',
+              ),
+              if (observation.reason.isNotEmpty)
+                Text(
+                  '${t('检查说明', 'Check information')}: ${reason(observation.reason)}',
+                ),
+              if (storage) ...[
+                Text(
+                  '${t('最近保存结果', 'Last save result')}: ${storageLabel(observation.save)}',
+                ),
+                Text(
+                  '${t('最近恢复结果', 'Last restore result')}: ${storageLabel(observation.restore)}',
+                ),
+                Text(
+                  '${t('登录信息更新时间', 'Sign-in details updated')}: ${date(observation.storageAt)}',
+                ),
+                if (observation.storageReason.isNotEmpty)
+                  Text(reason(observation.storageReason)),
+                Text(
+                  t(
+                    '已保存登录信息不代表仍然处于登录状态，请以上方检查结果为准。',
+                    'Saved sign-in details do not guarantee you are still signed in. Refer to the check result above.',
+                  ),
+                ),
+              ],
+            ],
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,

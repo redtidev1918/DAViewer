@@ -59,9 +59,9 @@ void main() {
     'channels stay independent: web success with storage failure, API untouched',
     (tester) async {
       await pumpScreen(tester);
-      expect(find.text('网页登录'), findsOneWidget);
-      expect(find.text('官方 API 登录'), findsOneWidget);
-      expect(find.text('尚未验证'), findsNWidgets(2));
+      expect(find.text('推荐与内容浏览'), findsOneWidget);
+      expect(find.text('关注、收藏与通知'), findsOneWidget);
+      expect(find.text('还未检查'), findsNWidgets(2));
 
       final web = container.read(
         loginObservationProvider(LoginChannel.web).notifier,
@@ -77,10 +77,10 @@ void main() {
       web.finish(LoginCheckResult.authenticated);
       web.storage(save: LoginStorageResult.failed, reason: 'write_failed');
       await tester.pump();
-      expect(find.text('已验证登录'), findsOneWidget);
-      expect(find.text('登录状态保存或恢复异常；即使当前会话可用，下次启动仍可能需要重新登录。'), findsOneWidget);
+      expect(find.text('上次检查：已登录'), findsOneWidget);
+      expect(find.text('登录信息未能保存或恢复，下次打开应用时可能需要重新登录。'), findsOneWidget);
       // The API card keeps its own untouched verdict.
-      expect(find.text('尚未验证'), findsOneWidget);
+      expect(find.text('还未检查'), findsOneWidget);
     },
   );
 
@@ -90,7 +90,7 @@ void main() {
     await pumpScreen(tester);
     container.read(webSessionStatusProvider.notifier).markLocked();
     await tester.pump();
-    expect(find.text('网页验证受限'), findsOneWidget);
+    expect(find.text('需要网页验证，请打开登录页'), findsOneWidget);
     expect(
       tester
           .widget<OutlinedButton>(find.byType(OutlinedButton).at(0))
@@ -118,8 +118,8 @@ void main() {
       status: AuthStatus.signedOut,
     );
     await tester.pump();
-    expect(find.text('未登录或需要重新登录'), findsOneWidget);
-    expect(find.text('已验证登录'), findsOneWidget);
+    expect(find.text('需要登录，请打开登录页'), findsOneWidget);
+    expect(find.text('上次检查：已登录'), findsOneWidget);
   });
 
   testWidgets('raw failure details never surface in the UI', (tester) async {
@@ -134,6 +134,6 @@ void main() {
     expect(find.textContaining('secret'), findsNothing);
     expect(find.textContaining('userinfo'), findsNothing);
     expect(find.textContaining('Bearer'), findsNothing);
-    expect(find.text('未登录或需要重新登录'), findsOneWidget);
+    expect(find.text('需要登录，请打开登录页'), findsOneWidget);
   });
 }

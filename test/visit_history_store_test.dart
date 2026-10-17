@@ -54,6 +54,35 @@ void main() {
     expect(File('${directory.path}/visit_history.json').existsSync(), isFalse);
   });
 
+  test('concurrent visits retain every entry in invocation order', () async {
+    final writes = [
+      for (var i = 0; i < 30; i++)
+        VisitHistoryStore.record(artwork('$i'), directory: directory),
+    ];
+    final read = VisitHistoryStore.load(directory: directory);
+    await Future.wait(writes);
+    expect((await read).map((visit) => visit.id), [
+      for (var i = 29; i >= 0; i--) '$i',
+    ]);
+  });
+
+  test('clear orders pending visits before subsequent visits', () async {
+    final before = VisitHistoryStore.record(
+      artwork('before'),
+      directory: directory,
+    );
+    final clear = VisitHistoryStore.clear(directory: directory);
+    final after = VisitHistoryStore.record(
+      artwork('after'),
+      directory: directory,
+    );
+    await Future.wait<void>([before, clear, after]);
+    expect(
+      (await VisitHistoryStore.load(directory: directory)).map((v) => v.id),
+      ['after'],
+    );
+  });
+
   test('invalid JSON degrades to empty history', () async {
     File('${directory.path}/visit_history.json')
       ..createSync()
