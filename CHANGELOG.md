@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/redtidev1918/DAViewer/compare/v0.6.1...v0.7.0) (2026-10-17)
+
+
+### Features
+
+* add local content filters for AI, tags, artists and artworks ([#140](https://github.com/redtidev1918/DAViewer/issues/140)) ([07b3d5f](https://github.com/redtidev1918/DAViewer/commit/07b3d5fadc2524c232e6fb875568612cc5998c27))
+
 ## [0.6.1](https://github.com/redtidev1918/DAViewer/compare/v0.6.0...v0.6.1) (2026-10-17)
 
 
