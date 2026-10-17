@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/redtidev1918/DAViewer/compare/v0.6.0...v0.6.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* simplify login status and history navigation ([#138](https://github.com/redtidev1918/DAViewer/issues/138)) ([ad95e85](https://github.com/redtidev1918/DAViewer/commit/ad95e852e8ed538593683b6345c56388f74ff56d))
+
 ## [0.6.0](https://github.com/redtidev1918/DAViewer/compare/v0.5.23...v0.6.0) (2026-10-16)
 
 
