@@ -1,16 +1,16 @@
 <!-- docsite-release-repo: redtidev1918/DAViewer -->
-<!-- docsite-release-tag: v0.6.0 -->
+<!-- docsite-release-tag: v0.6.1 -->
 # 下载 DAViewer
 
 **语言 / Language:** 中文 · [English](/en/download.md)
 
-<!-- docsite: generated from redtidev1918/DAViewer release v0.6.0; do not edit by hand -->
+<!-- docsite: generated from redtidev1918/DAViewer release v0.6.1; do not edit by hand -->
 
 本页由 GitHub Actions 根据发布资产生成。若页面尚未更新，请到 Releases 查看最新版本。 [Releases](https://github.com/redtidev1918/DAViewer/releases)
 
-## 本页版本：`v0.6.0`（2026-10-16）
+## 本页版本：`v0.6.1`（2026-10-17）
 
-[查看 Release 说明与校验和](https://github.com/redtidev1918/DAViewer/releases/tag/v0.6.0)
+[查看 Release 说明与校验和](https://github.com/redtidev1918/DAViewer/releases/tag/v0.6.1)
 
 ### 安装
 
@@ -32,8 +32,8 @@
 
 | 平台 | 文件 | 大小 | 下载 |
 |---|---|---|---|
-| Android | `DAViewer-v0.6.0.apk` | 64.2 MB | [下载](https://github.com/redtidev1918/DAViewer/releases/download/v0.6.0/DAViewer-v0.6.0.apk) |
-| Windows | `DAViewer-v0.6.0-windows.zip` | 14.0 MB | [下载](https://github.com/redtidev1918/DAViewer/releases/download/v0.6.0/DAViewer-v0.6.0-windows.zip) |
-| macOS | `DAViewer-v0.6.0-macos-unsigned-preview.zip` | 24.2 MB | [下载](https://github.com/redtidev1918/DAViewer/releases/download/v0.6.0/DAViewer-v0.6.0-macos-unsigned-preview.zip) |
-| 通用 | `RELEASE-METADATA.json` | 2 KB | [下载](https://github.com/redtidev1918/DAViewer/releases/download/v0.6.0/RELEASE-METADATA.json) |
-| 通用 | `SHA256SUMS` | 0 KB | [下载](https://github.com/redtidev1918/DAViewer/releases/download/v0.6.0/SHA256SUMS) |
+| Android | `DAViewer-v0.6.1.apk` | 64.2 MB | [下载](https://github.com/redtidev1918/DAViewer/releases/download/v0.6.1/DAViewer-v0.6.1.apk) |
+| Windows | `DAViewer-v0.6.1-windows.zip` | 14.0 MB | [下载](https://github.com/redtidev1918/DAViewer/releases/download/v0.6.1/DAViewer-v0.6.1-windows.zip) |
+| macOS | `DAViewer-v0.6.1-macos-unsigned-preview.zip` | 24.2 MB | [下载](https://github.com/redtidev1918/DAViewer/releases/download/v0.6.1/DAViewer-v0.6.1-macos-unsigned-preview.zip) |
+| 通用 | `RELEASE-METADATA.json` | 2 KB | [下载](https://github.com/redtidev1918/DAViewer/releases/download/v0.6.1/RELEASE-METADATA.json) |
+| 通用 | `SHA256SUMS` | 0 KB | [下载](https://github.com/redtidev1918/DAViewer/releases/download/v0.6.1/SHA256SUMS) |
