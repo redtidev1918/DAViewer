@@ -5,6 +5,7 @@ import 'package:dakit_core/dakit_core.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../diagnostics/app_logger.dart';
+import '../storage/storage_queue.dart';
 
 /// A locally persisted artwork visit. Only enough data is kept to draw the
 /// list and reopen the detail route; account data is always refreshed live.
@@ -82,6 +83,7 @@ final class VisitHistoryStore {
 
   static const int _maxEntries = 200;
   static const String _fileName = 'visit_history.json';
+  static final _queue = StorageQueue();
 
   static Future<File> _file([Directory? directory]) async {
     final dir = directory ?? await getApplicationSupportDirectory();
@@ -97,7 +99,10 @@ final class VisitHistoryStore {
         .toList(growable: false);
   }
 
-  static Future<List<ArtworkVisit>> load({Directory? directory}) async {
+  static Future<List<ArtworkVisit>> load({Directory? directory}) =>
+      _queue.run(() => _load(directory: directory));
+
+  static Future<List<ArtworkVisit>> _load({Directory? directory}) async {
     try {
       final file = await _file(directory);
       if (!await file.exists()) return const <ArtworkVisit>[];
@@ -116,11 +121,16 @@ final class VisitHistoryStore {
   static Future<List<ArtworkVisit>> record(
     Artwork artwork, {
     Directory? directory,
+  }) => _queue.run(() => _record(artwork, directory: directory));
+
+  static Future<List<ArtworkVisit>> _record(
+    Artwork artwork, {
+    Directory? directory,
   }) async {
     final visit = ArtworkVisit.fromArtwork(artwork);
-    if (visit.id.isEmpty) return load(directory: directory);
+    if (visit.id.isEmpty) return _load(directory: directory);
     try {
-      final history = (await load(directory: directory))
+      final history = (await _load(directory: directory))
           .where((v) => v.id != visit.id)
           .toList();
       history.insert(0, visit);
@@ -134,11 +144,14 @@ final class VisitHistoryStore {
         error,
         stack,
       );
-      return load(directory: directory);
+      return _load(directory: directory);
     }
   }
 
-  static Future<void> clear({Directory? directory}) async {
+  static Future<void> clear({Directory? directory}) =>
+      _queue.run(() => _clear(directory: directory));
+
+  static Future<void> _clear({Directory? directory}) async {
     try {
       final file = await _file(directory);
       if (await file.exists()) await file.delete();

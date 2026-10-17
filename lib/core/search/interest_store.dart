@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
+import '../storage/storage_queue.dart';
+
 /// Persists lightweight tag-interest counts (a tag -> weight map) so the
 /// personalized "recommended tags" survive app restarts instead of vanishing
 /// with the in-memory artwork cache. Only tag names and weights are stored —
@@ -11,14 +13,16 @@ final class InterestStore {
   const InterestStore._();
 
   static const String _fileName = 'interests.json';
-  static Future<void> _writeTail = Future<void>.value();
+  static final _queue = StorageQueue();
 
   static Future<File> _file() async {
     final dir = await getApplicationSupportDirectory();
     return File('${dir.path}${Platform.pathSeparator}$_fileName');
   }
 
-  static Future<Map<String, int>> load() async {
+  static Future<Map<String, int>> load() => _queue.run(_load);
+
+  static Future<Map<String, int>> _load() async {
     try {
       final file = await _file();
       if (!await file.exists()) return <String, int>{};
@@ -49,9 +53,7 @@ final class InterestStore {
   }
 
   static Future<void> _update(void Function(Map<String, int>) mutate) {
-    final next = _writeTail.then((_) => _performUpdate(mutate));
-    _writeTail = next;
-    return next;
+    return _queue.run(() => _performUpdate(mutate));
   }
 
   static Future<void> _performUpdate(

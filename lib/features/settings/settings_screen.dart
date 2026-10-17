@@ -55,6 +55,18 @@ final class SettingsScreen extends ConsumerWidget {
           _SettingsCard(
             children: <Widget>[
               ListTile(
+                leading: const Icon(Icons.history_outlined),
+                title: Text(s.history),
+                subtitle: Text(s.browsingHistorySubtitle),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/history'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _SettingsCard(
+            children: <Widget>[
+              ListTile(
                 leading: const Icon(Icons.translate),
                 title: Text(s.language),
                 subtitle: Text(
@@ -150,7 +162,9 @@ final class SettingsScreen extends ConsumerWidget {
                   language == AppLanguage.zh ? '登录状态' : 'Login status',
                 ),
                 subtitle: Text(
-                  language == AppLanguage.zh ? '网页登录、API 授权与验证历史' : 'Website login, API authorization and verification history',
+                  language == AppLanguage.zh
+                      ? '检查登录是否正常，解决登录问题'
+                      : 'Check your sign-in status and resolve login issues',
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/settings/login-status'),

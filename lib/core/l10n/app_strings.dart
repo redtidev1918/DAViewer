@@ -64,9 +64,12 @@ final class AppStrings {
   String get favourites => _lang == AppLanguage.zh ? '收藏' : 'Favourites';
   String get downloads => _lang == AppLanguage.zh ? '下载' : 'Downloads';
   String get notifications => _lang == AppLanguage.zh ? '通知' : 'Notifications';
-  String get history => _lang == AppLanguage.zh ? '历史' : 'History';
+  String get history => _lang == AppLanguage.zh ? '浏览历史' : 'Browsing history';
+  String get browsingHistorySubtitle => _lang == AppLanguage.zh
+      ? '查看最近浏览的作品'
+      : 'Revisit recently viewed artworks';
   String get noHistory =>
-      _lang == AppLanguage.zh ? '暂无访问历史' : 'No visit history.';
+      _lang == AppLanguage.zh ? '还没有浏览过作品' : 'No artworks viewed yet.';
   String get noNotifications =>
       _lang == AppLanguage.zh ? '暂无通知' : 'No notifications.';
   String get settings => _lang == AppLanguage.zh ? '设置' : 'Settings';

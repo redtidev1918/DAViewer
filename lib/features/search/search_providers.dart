@@ -217,16 +217,23 @@ final class SearchHistoryController extends StateNotifier<List<String>> {
     _load();
   }
 
-  Future<void> _load() async => state = await SearchHistoryStore.load();
+  Future<void> _load() async {
+    final history = await SearchHistoryStore.load();
+    if (mounted) state = history;
+  }
 
-  Future<void> add(String query) async =>
-      state = await SearchHistoryStore.add(query);
+  Future<void> add(String query) async {
+    final history = await SearchHistoryStore.add(query);
+    if (mounted) state = history;
+  }
 
-  Future<void> remove(String query) async =>
-      state = await SearchHistoryStore.remove(query);
+  Future<void> remove(String query) async {
+    final history = await SearchHistoryStore.remove(query);
+    if (mounted) state = history;
+  }
 
   Future<void> clear() async {
     await SearchHistoryStore.clear();
-    state = const <String>[];
+    if (mounted) state = const <String>[];
   }
 }
