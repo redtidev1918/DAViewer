@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/diagnostics/error_text.dart';
 import '../../core/l10n/app_strings.dart';
+import '../../core/filtering/content_filter_provider.dart';
 import '../../shared/widgets/app_error_state.dart';
 import '../../shared/widgets/skeleton.dart';
 import '../artwork/artwork_navigation.dart';
@@ -23,6 +24,7 @@ final class JournalsView extends ConsumerWidget {
       error: (error, stackTrace) =>
           AppErrorState(message: friendlyErrorMessage(error)),
       data: (items) {
+        items = visibleArtworks(ref, items);
         if (items.isEmpty) {
           return Center(child: Text(s.noJournals));
         }

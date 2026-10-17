@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 
 import '../auth/webview_oauth_bridge.dart';
 import '../diagnostics/app_logger.dart';
+import '../filtering/platform_ai_metadata.dart';
 import '../network/dynamic_proxy_dio.dart';
 import '../network/proxy_controller.dart';
 import '../network/system_proxy.dart';
@@ -72,6 +73,7 @@ final class AppRuntime {
         receiveTimeout: const Duration(seconds: 30),
       ),
     );
+    dio.interceptors.add(PlatformAiInterceptor());
     final runtime = _build(null, dio: dio, proxyController: proxyController);
     try {
       await runtime.webViewProxyManager?.prepare().timeout(

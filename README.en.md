@@ -73,6 +73,7 @@ These are real device captures from an older version. Card layout and tab labels
 | Theme and language | Light / dark / system, with a Chinese or English interface. |
 | Proxy | Enter a proxy address by hand, or let the app use the system proxy. |
 | Visit history | The artworks you opened recently, kept on this device, up to 200 entries, clearable in one tap. |
+| Content filters | Hide platform-marked AI artworks, exact tags, artists or individual works in Settings. Long-press an artwork card for shortcuts; remove filters anytime. Filtering depends on supplied metadata; missing tags or AI flags cannot be identified. |
 | Update check | Tells you when a new version exists and opens the release page in your browser. |
 
 Browsing, search, favourites, watch, and downloads all require signing in with a DeviantArt account; while signed out, only the sign-in screen, Settings, and visit history are usable.

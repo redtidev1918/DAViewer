@@ -1,5 +1,8 @@
 import 'package:dakit_flutter/dakit_flutter.dart';
 import 'package:flutter/material.dart';
+
+import '../../core/filtering/content_filter_provider.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -101,6 +104,7 @@ class _CollectionContentsScreenState
   }
 
   Widget _grid(List<Artwork> artworks) {
+    artworks = visibleArtworks(ref, artworks);
     final width = MediaQuery.of(context).size.width;
     final crossAxisCount = (width / 200).round().clamp(2, 4);
     return MasonryGridView.count(

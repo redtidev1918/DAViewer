@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:dakit_core/dakit_core.dart';
 
+import '../filtering/platform_ai_metadata.dart';
+
 /// One persisted personalized-feed first page, scoped to the account that
 /// produced it.
 final class ArtworkFeedCacheSnapshot {
@@ -53,6 +55,7 @@ final class ArtworkFeedCacheStore {
       final data = jsonDecode(await file.readAsString());
       if (data is! Map<String, dynamic>) return null;
       if (data['version'] != formatVersion) return null;
+      PlatformAiMetadata.instance.observe(data['aiFlags']);
       final savedAt = DateTime.tryParse(data['savedAt'] as String? ?? '');
       if (savedAt == null) return null;
       final rawItems = data['items'];
@@ -88,6 +91,7 @@ final class ArtworkFeedCacheStore {
       'username': trimmed,
       'savedAt': DateTime.now().toIso8601String(),
       'items': <Object?>[for (final item in bounded) _artworkToJson(item)],
+      'aiFlags': PlatformAiMetadata.instance.snapshot(bounded),
     });
     final temp = File('${file.path}.tmp');
     await temp.writeAsString(payload, flush: true);
