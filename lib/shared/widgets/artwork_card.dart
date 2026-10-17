@@ -12,6 +12,7 @@ import '../../app/theme/app_theme.dart';
 import '../../core/auth/media_session_signal.dart';
 import '../../core/diagnostics/error_text.dart';
 import '../../core/l10n/app_strings.dart';
+import '../../core/filtering/content_filter_provider.dart';
 import '../../core/sharing/app_share.dart';
 import '../../features/artwork/artwork_access.dart';
 import '../../features/artwork/artwork_access_controller.dart';
@@ -257,88 +258,136 @@ final class ArtworkCard extends ConsumerWidget {
     showModalBottomSheet<void>(
       context: context,
       builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            ListTile(
-              leading: const Icon(Icons.visibility_outlined),
-              title: Text(s.viewDetail),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                onTap?.call();
-              },
-            ),
-            ListTile(
-              leading: Icon(
-                favourited ? Icons.favorite : Icons.favorite_border,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.hide_image_outlined),
+                title: Text(s.blockArtwork),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  await _block(context, ref, artist: false);
+                },
               ),
-              title: Text(favourited ? s.unfavourite : s.favourite),
-              onTap: () async {
-                Navigator.pop(sheetContext);
-                try {
-                  final now = await setArtworkFavourite(
-                    ref,
-                    artwork.id,
-                    !favourited,
+              if (artwork.author.username.isNotEmpty)
+                ListTile(
+                  leading: const Icon(Icons.person_off_outlined),
+                  title: Text(s.blockArtist),
+                  subtitle: Text('@${artwork.author.username}'),
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+                    await _block(context, ref, artist: true);
+                  },
+                ),
+              ListTile(
+                leading: const Icon(Icons.visibility_outlined),
+                title: Text(s.viewDetail),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  onTap?.call();
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  favourited ? Icons.favorite : Icons.favorite_border,
+                ),
+                title: Text(favourited ? s.unfavourite : s.favourite),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  try {
+                    final now = await setArtworkFavourite(
+                      ref,
+                      artwork.id,
+                      !favourited,
+                    );
+                    if (context.mounted) {
+                      showFeedback(
+                        context,
+                        now ? s.favouritedToast : s.unfavouritedToast,
+                        source: 'favourite-toggle',
+                      );
+                    }
+                  } on Object catch (error) {
+                    if (context.mounted) {
+                      showFeedback(
+                        context,
+                        friendlyErrorMessage(error),
+                        source: 'favourite-toggle',
+                        severity: AppNoticeSeverity.error,
+                      );
+                    }
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.share_outlined),
+                title: Text(s.share),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  await shareDeviantArtLink(
+                    context,
+                    uri: artwork.pageUri,
+                    title: artwork.title,
+                    strings: s,
                   );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.copy_outlined),
+                title: Text(s.copyLink),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  await Clipboard.setData(ClipboardData(text: url));
                   if (context.mounted) {
-                    showFeedback(
-                      context,
-                      now ? s.favouritedToast : s.unfavouritedToast,
-                      source: 'favourite-toggle',
-                    );
+                    showFeedback(context, s.linkCopied, source: 'link-copy');
                   }
-                } on Object catch (error) {
-                  if (context.mounted) {
-                    showFeedback(
-                      context,
-                      friendlyErrorMessage(error),
-                      source: 'favourite-toggle',
-                      severity: AppNoticeSeverity.error,
-                    );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.open_in_new),
+                title: Text(s.openInBrowser),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  final uri = Uri.tryParse(url);
+                  if (uri != null) {
+                    launchUrl(uri, mode: LaunchMode.externalApplication);
                   }
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.share_outlined),
-              title: Text(s.share),
-              onTap: () async {
-                Navigator.pop(sheetContext);
-                await shareDeviantArtLink(
-                  context,
-                  uri: artwork.pageUri,
-                  title: artwork.title,
-                  strings: s,
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.copy_outlined),
-              title: Text(s.copyLink),
-              onTap: () async {
-                Navigator.pop(sheetContext);
-                await Clipboard.setData(ClipboardData(text: url));
-                if (context.mounted) {
-                  showFeedback(context, s.linkCopied, source: 'link-copy');
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.open_in_new),
-              title: Text(s.openInBrowser),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                final uri = Uri.tryParse(url);
-                if (uri != null) {
-                  launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
-            ),
-          ],
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _block(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool artist,
+  }) async {
+    final s = strings(ref.read(appLanguageProvider));
+    final controller = ref.read(contentRulesProvider.notifier);
+    try {
+      if (artist) {
+        await controller.blockArtist(artwork.author.username);
+      } else {
+        await controller.blockArtwork(artwork);
+      }
+      if (context.mounted) {
+        showFeedback(context, s.blockSaved, source: 'content-blocks');
+      }
+    } on Object {
+      if (context.mounted) {
+        showFeedback(
+          context,
+          s.blockSaveFailed,
+          source: 'content-blocks',
+          severity: AppNoticeSeverity.error,
+        );
+      }
+    }
   }
 }
 

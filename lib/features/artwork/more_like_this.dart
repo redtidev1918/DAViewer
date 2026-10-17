@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/auth/web_session_refresher.dart';
 import '../../core/diagnostics/app_logger.dart';
 import '../../core/l10n/app_strings.dart';
+import '../../core/filtering/content_filter_provider.dart';
 import '../../shared/widgets/artwork_card.dart';
 import 'artwork_detail_providers.dart';
 import 'artwork_navigation.dart';
@@ -153,54 +154,58 @@ final class _MoreLikeThisSectionState extends ConsumerState<MoreLikeThisSection>
     AppStrings s,
     List<Artwork> items, {
     bool refreshing = false,
-  }) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: <Widget>[
-      const SizedBox(height: 24),
-      Row(
-        children: <Widget>[
-          Expanded(
-            child: Text(
-              s.moreLikeThis,
-              style: Theme.of(context).textTheme.titleMedium,
+  }) {
+    items = visibleArtworks(ref, items);
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const SizedBox(height: 24),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                s.moreLikeThis,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
             ),
-          ),
-          IconButton(
-            tooltip: refreshing ? s.moreLikeThisChecking : s.checkSuggestions,
-            visualDensity: VisualDensity.compact,
-            onPressed: refreshing ? null : _manualRetry,
-            icon: refreshing
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.refresh, size: 20),
-          ),
-        ],
-      ),
-      const SizedBox(height: 8),
-      MasonryGridView.count(
-        crossAxisCount: 2,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        itemCount: items.length,
-        itemBuilder: (context, index) {
-          final artwork = items[index];
-          return ArtworkCard(
-            artwork: artwork,
-            onTap: () => openArtworkFromList(
-              context,
-              ref,
-              artworks: items,
+            IconButton(
+              tooltip: refreshing ? s.moreLikeThisChecking : s.checkSuggestions,
+              visualDensity: VisualDensity.compact,
+              onPressed: refreshing ? null : _manualRetry,
+              icon: refreshing
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh, size: 20),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        MasonryGridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            final artwork = items[index];
+            return ArtworkCard(
               artwork: artwork,
-            ),
-          );
-        },
-      ),
-    ],
-  );
+              onTap: () => openArtworkFromList(
+                context,
+                ref,
+                artworks: items,
+                artwork: artwork,
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
 
   void _logFailure(Object error) {
     final signature = '$error';

@@ -18,6 +18,7 @@ import '../features/diagnostics/diagnostics_screen.dart';
 import '../features/downloads/downloads_screen.dart';
 import '../features/favourites/favourites_screen.dart';
 import '../features/history/history_screen.dart';
+import '../features/settings/content_blocks_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/notifications/notifications_screen.dart';
 import '../features/search/search_screen.dart';
@@ -94,6 +95,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: 'diagnostics',
             builder: (context, state) =>
                 const NoticeOverlay(child: DiagnosticsScreen()),
+          ),
+          GoRoute(
+            path: 'content-blocks',
+            builder: (context, state) =>
+                const NoticeOverlay(child: ContentBlocksScreen()),
           ),
         ],
       ),

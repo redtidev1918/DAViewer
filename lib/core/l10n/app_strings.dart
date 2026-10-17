@@ -73,6 +73,56 @@ final class AppStrings {
   String get noNotifications =>
       _lang == AppLanguage.zh ? '暂无通知' : 'No notifications.';
   String get settings => _lang == AppLanguage.zh ? '设置' : 'Settings';
+  String get contentBlocks =>
+      _lang == AppLanguage.zh ? '内容屏蔽' : 'Content filters';
+  String get contentBlocksSubtitle => _lang == AppLanguage.zh
+      ? 'AI 作品、标签、画师和单幅作品'
+      : 'AI works, tags, artists and individual artworks';
+  String get contentBlocksScope => _lang == AppLanguage.zh
+      ? '仅在本机隐藏作品，不会取消关注、删除收藏或屏蔽对方账号。可随时在这里解除。'
+      : 'Hides artworks on this device only. Does not unfollow artists, remove favourites or block accounts. You can undo filters here.';
+  String get hideAi =>
+      _lang == AppLanguage.zh ? '隐藏 AI 作品' : 'Hide AI artworks';
+  String get hideAiHint => _lang == AppLanguage.zh
+      ? '仅隐藏平台明确标记为 AI 创作的作品；未提供标记的内容无法识别，不根据标签猜测。'
+      : 'Only hides works explicitly marked as AI by the platform. Works without a supplied flag cannot be identified; tags are not used to guess.';
+  String get blockedTags => _lang == AppLanguage.zh ? '屏蔽的标签' : 'Blocked tags';
+  String get blockedArtists =>
+      _lang == AppLanguage.zh ? '屏蔽的画师' : 'Blocked artists';
+  String get blockedArtworks =>
+      _lang == AppLanguage.zh ? '屏蔽的作品' : 'Blocked artworks';
+  String get blockTagHint => _lang == AppLanguage.zh
+      ? '输入完整标签，不区分大小写'
+      : 'Enter an exact tag (case-insensitive)';
+  String get blockArtistHint => _lang == AppLanguage.zh
+      ? '输入画师用户名（不是显示名称）'
+      : 'Enter an artist username, not a display name';
+  String get blockArtworkHint => _lang == AppLanguage.zh
+      ? '粘贴 DeviantArt 作品链接或作品 ID'
+      : 'Paste a DeviantArt artwork URL or artwork ID';
+  String get addBlock => _lang == AppLanguage.zh ? '添加' : 'Add';
+  String get unblock => _lang == AppLanguage.zh ? '解除屏蔽' : 'Unblock';
+  String get noBlocks => _lang == AppLanguage.zh ? '暂无屏蔽项' : 'No blocked items';
+  String get invalidBlock =>
+      _lang == AppLanguage.zh ? '请检查输入内容' : 'Please check your input';
+  String get blockSaveFailed => _lang == AppLanguage.zh
+      ? '未能保存屏蔽设置，请重试'
+      : 'Could not save filters. Please try again.';
+  String get blockLoadFailed => _lang == AppLanguage.zh
+      ? '未能读取屏蔽设置，请重试'
+      : 'Could not load filters. Please try again.';
+  String get blockArtwork =>
+      _lang == AppLanguage.zh ? '屏蔽这幅作品' : 'Hide this artwork';
+  String get blockArtist =>
+      _lang == AppLanguage.zh ? '屏蔽这位画师的作品' : 'Hide artworks by this artist';
+  String get blockSaved => _lang == AppLanguage.zh
+      ? '已屏蔽，可在设置中解除'
+      : 'Hidden. You can undo this in Settings.';
+  String get filteredEmpty => _lang == AppLanguage.zh
+      ? '当前作品已被屏蔽设置隐藏'
+      : 'Current artworks are hidden by your filters';
+  String get loadMoreFiltered =>
+      _lang == AppLanguage.zh ? '加载更多作品' : 'Load more artworks';
   String get logout => _lang == AppLanguage.zh ? '退出登录' : 'Logout';
   String get signedOut => _lang == AppLanguage.zh ? '已登出' : 'Signed out';
   String get localLogoutHint => _lang == AppLanguage.zh

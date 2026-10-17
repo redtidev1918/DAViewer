@@ -7,6 +7,7 @@ import '../../core/diagnostics/app_logger.dart';
 import '../../core/diagnostics/error_text.dart';
 import '../../core/feed/artwork_feed_controller.dart';
 import '../../core/l10n/app_strings.dart';
+import '../../core/filtering/content_filter_provider.dart';
 import '../../features/artwork/artwork_navigation.dart';
 import 'app_empty_state.dart';
 import 'app_error_state.dart';
@@ -167,6 +168,16 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
 
   @override
   Widget build(BuildContext context) {
+    final items = visibleArtworks(ref, widget.feed.items);
+    final s = strings(ref.watch(appLanguageProvider));
+    final rules = ref.watch(contentRulesProvider);
+    if (rules.hasError) {
+      return AppErrorState(
+        message: s.blockLoadFailed,
+        onRetry: () => ref.invalidate(contentRulesProvider),
+      );
+    }
+    if (!rules.hasValue) return const SkeletonGrid();
     Widget body;
 
     if (widget.feed.error != null && widget.feed.items.isEmpty) {
@@ -189,6 +200,18 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
         actionLabel: widget.emptyActionLabel,
         onAction: widget.emptyOnAction,
       );
+    } else if (items.isEmpty && widget.feed.items.isNotEmpty) {
+      body = widget.feed.isLoading
+          ? const SkeletonGrid()
+          : AppEmptyState(
+              message: s.filteredEmpty,
+              actionLabel: widget.feed.hasMore && widget.onLoadMore != null
+                  ? s.loadMoreFiltered
+                  : null,
+              onAction: widget.feed.isLoading
+                  ? null
+                  : widget.onRetryLoadMore ?? widget.onLoadMore,
+            );
     } else {
       // Masonry (waterfall) layout: cards render at their image's natural
       // aspect ratio, which looks more like a modern image feed.
@@ -210,15 +233,15 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
               crossAxisCount: crossAxisCount,
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              childCount: widget.feed.items.length,
+              childCount: items.length,
               itemBuilder: (context, index) {
-                final artwork = widget.feed.items[index];
+                final artwork = items[index];
                 return ArtworkCard(
                   artwork: artwork,
                   onTap: () => openArtworkFromList(
                     context,
                     ref,
-                    artworks: widget.feed.items,
+                    artworks: items,
                     artwork: artwork,
                   ),
                 );
@@ -288,6 +311,18 @@ final class _ArtworkFeedGridState extends ConsumerState<ArtworkFeedGrid> {
                           ? s.feedEnd
                           : s.feedPaginationUnknown,
                       textAlign: TextAlign.center,
+                    ),
+                  );
+                }
+                if (items.length < widget.feed.items.length &&
+                    widget.feed.hasMore &&
+                    widget.onLoadMore != null) {
+                  return Center(
+                    child: TextButton(
+                      onPressed: widget.feed.isLoading
+                          ? null
+                          : widget.onLoadMore,
+                      child: Text(s.loadMoreFiltered),
                     ),
                   );
                 }

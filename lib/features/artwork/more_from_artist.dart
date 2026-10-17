@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/app_theme.dart';
 import '../../core/l10n/app_strings.dart';
+import '../../core/filtering/content_filter_provider.dart';
 import 'artwork_detail_providers.dart';
 import 'artwork_navigation.dart';
 
@@ -35,8 +36,11 @@ final class _MoreFromArtistSectionState
   Widget build(BuildContext context) {
     super.build(context);
     final artworkId = widget.artworkId;
-    final items = ref.watch(moreFromArtistProvider(artworkId)).value;
-    if (items == null || items.isEmpty) return const SizedBox.shrink();
+    final items = visibleArtworks(
+      ref,
+      ref.watch(moreFromArtistProvider(artworkId)).value ?? const <Artwork>[],
+    );
+    if (items.isEmpty) return const SizedBox.shrink();
     final s = strings(ref.watch(appLanguageProvider));
     final author = ref
         .watch(artworkDetailProvider(artworkId))

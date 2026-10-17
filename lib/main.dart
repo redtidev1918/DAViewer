@@ -9,6 +9,8 @@ import 'core/diagnostics/app_logger.dart';
 import 'core/diagnostics/crash_marker.dart';
 import 'core/downloads/shared_storage_saver.dart';
 import 'core/l10n/app_strings.dart';
+import 'core/filtering/content_filter_provider.dart';
+import 'core/filtering/content_rules.dart';
 import 'core/runtime/app_runtime.dart';
 import 'core/runtime/runtime_provider.dart';
 import 'core/runtime/startup_stage.dart';
@@ -98,11 +100,17 @@ Future<void> main() async {
     _ => ThemeMode.system,
   };
 
+  final contentRules = await runOptionalStartupStage<ContentRules?>(
+    stage: 'content_filters',
+    operation: () => ContentRulesStore().load(),
+    fallback: null,
+  );
   runApp(
     ProviderScope(
       retry: (_, _) => null,
       overrides: <Override>[
         runtimeProvider.overrideWithValue(runtime),
+        initialContentRulesProvider.overrideWithValue(contentRules),
         crashDetectedProvider.overrideWithValue(crashedLastSession),
         appLanguageProvider.overrideWith(
           (ref) => AppLanguageController(initialLanguage),
