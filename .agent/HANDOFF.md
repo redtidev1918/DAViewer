@@ -12,7 +12,7 @@
 - 下一步入口：
 ```
 
-### 2026-10-26 分支 docs/agent-governance
+### 2026-10-26 PR #142（分支 docs/agent-governance）
 
 - 本会话改动：建立 `.agent/` 六件（STATUS/PLAN/TASKS/HANDOFF/DECISIONS/LESSONS）、`docs/TESTING.md`、`.agents/skills/release/SKILL.md`、`.agents/skills/diagnosis/SKILL.md`；改写 `AGENTS.md` 为唯一入口；`docs/_sidebar.md`、`docs/en/_sidebar.md`、`docs/README.md` 增加测试规范入口。
 - 验证情况：新文档内部相对链接逐一核对指向真实文件；未跑 Flutter 测试（无代码改动，CI 在 PR 上全量执行）。
