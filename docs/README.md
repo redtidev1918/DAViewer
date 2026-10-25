@@ -20,6 +20,7 @@ DAViewer 是面向 Android、macOS 和 Windows 的 DeviantArt 第三方客户端
 | 排查私有网页接口变更 | [网页适配器契约](web_adapter.md) | [Web adapter](en/web_adapter.md) |
 | 配置工具链、本地构建和发布 | [构建说明](build.md) | [Build notes](en/build.md) |
 | 核对发布条件和实机证据 | [发布门禁](release-gate.md) | 中文文档 |
+| 明确各层测试与验证要求 | [测试规范](TESTING.md) | 中文文档 |
 | 查找历史缺陷、测试和未验证项 | [回归目录](regressions/README.md) | 英文索引，条目为中文或英文 |
 
 贡献流程见 [CONTRIBUTING.md](https://github.com/redtidev1918/DAViewer/blob/main/CONTRIBUTING.md)，安全报告见 [SECURITY.md](https://github.com/redtidev1918/DAViewer/blob/main/SECURITY.md)，社区准则见 [CODE_OF_CONDUCT.md](https://github.com/redtidev1918/DAViewer/blob/main/CODE_OF_CONDUCT.md)。OAuth、官方 API 映射、领域模型和传输问题请查阅 [DAKit 文档](https://github.com/redtidev1918/DAKit/blob/main/docs/README.md)。
