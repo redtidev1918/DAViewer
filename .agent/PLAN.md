@@ -13,7 +13,7 @@
 3. [x] 建立 `docs/TESTING.md`（复用既有门禁词汇，不开第二套标准）。
 4. [x] 建立 `.agents/skills/release` 与 `.agents/skills/diagnosis`。
 5. [x] 改写 AGENTS.md 为唯一 Agent 入口（保留两条永久规则与归档纪律）。
-6. [ ] 以独立 docs PR 合并（纯 `docs:` 提交，不触发客户端发版）。
+6. [x] 以独立 docs PR 合并（PR #142 → main `ea7a2fe`；PR 与 main CI 全绿，release-please 未产生版本 PR，Pages 已部署）。
 
 **验收门槛**：
 

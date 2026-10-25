@@ -4,7 +4,7 @@
 
 | Id | 任务 | 状态 | 说明 / 入口 |
 | --- | --- | --- | --- |
-| T-001 | Agent 工程治理体系落地 | IN_PROGRESS | PR #142：`.agent/`、`docs/TESTING.md`、`.agents/skills/*`、AGENTS.md 改写；合并后置 DONE。 |
+| T-001 | Agent 工程治理体系落地 | DONE | PR #142 已合并（main `ea7a2fe`，squash）；PR CI 全绿，main 上 Release 运行成功且 build/finalize 跳过（release-please 正确忽略纯 `docs:` 提交），Pages 已部署。 |
 | T-002 | Android Verified 实机证据（v0.5.22+） | BLOCKED | 缺真实保留账号设备；解锁条件：用户提供设备日志。按 `docs/agent-tasks/session-recovery/STATUS.md` 顶部要求补验。 |
 | T-003 | Original Incident Verified 证据 | BLOCKED | 原始故障链的保留账号复验；解锁条件同 T-002。 |
 | T-004 | 回归目录 Partial 项补证据 | DEFERRED | R1 / R3 / R7 / R17 / R22 / R23 及 `docs/regressions/README.md` 的设备证据清单；随相关功能开发顺带补，不单独立项。 |
