@@ -11,6 +11,7 @@
   - [Web 适配器契约](/web_adapter.md)
   - [构建说明](/build.md)
   - [发布门禁](/release-gate.md)
+  - [测试规范](/TESTING.md)
   - [回归目录](/regressions/README.md)
 - English
   - [English index](/en/)
