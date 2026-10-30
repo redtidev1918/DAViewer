@@ -13,5 +13,3 @@
   - [发布门禁](/release-gate.md)
   - [测试规范](/TESTING.md)
   - [回归目录](/regressions/README.md)
-- English
-  - [English index](/en/)

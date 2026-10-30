@@ -32,8 +32,7 @@ persistence and pagination stalls"）起把 `cookies` 字段解码并迁移为
 3. `ensurePersistentSnapshot`：读回"已持久化"快照恒为空 → 指纹比对恒不相等
    → 每次健康检查都重写快照（去重失效）。
 
-v0.5.14–v0.5.20 全部携带该缺陷（`git merge-base --is-ancestor 058edd0b
-<tag>` 逐个核实）。
+v0.5.14–v0.5.20 全部携带该缺陷（`git merge-base --is-ancestor 058edd0b <tag>` 逐个核实）。
 
 ### 为什么 586 项全绿的套件没有发现
 

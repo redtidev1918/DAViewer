@@ -83,3 +83,7 @@ session-*/
 !docs/agent-tasks/session-recovery/
 !docs/agent-tasks/session-recovery/SPEC.md
 !docs/agent-tasks/session-recovery/STATUS.md
+
+node_modules/
+docs/.vitepress/dist/
+docs/.vitepress/cache/

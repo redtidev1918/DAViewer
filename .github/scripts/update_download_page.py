@@ -1,5 +1,5 @@
 # docsite-managed-file: update_download_page.py
-# docsite-managed-version: 3
+# docsite-managed-version: 4
 # docsite: managed file, run `python3 docsite.py update` to refresh.
 """Generate download page(s) from a GitHub release.
 
@@ -62,7 +62,7 @@ LANGS = {
         "title": lambda display: f"# 下载 {display}",
         "lang_line": lambda base: f"**语言 / Language:** 中文 · [English]({base}/en/download.md)",
         "auto_note": "本页由 GitHub Actions 根据发布资产生成。若页面尚未更新，请到 Releases 查看最新版本。",
-        "latest_head": lambda tag, date: f"## 本页版本：`{tag}`（{date}）",
+        "latest_head": lambda tag, date: f"## 最新版本：`{tag}`（{date}）",
         "release_link": lambda url: f"[查看 Release 说明与校验和]({url})",
         "table_head": "| 平台 | 文件 | 大小 | 下载 |",
         "download_word": "下载",
@@ -73,7 +73,7 @@ LANGS = {
         "lang_line": lambda base: f"**Language / 语言:** [中文]({base}/download.md) · English",
         "auto_note": "GitHub Actions generates this page from release assets. "
         "If the page has not been updated yet, check Releases for the latest version.",
-        "latest_head": lambda tag, date: f"## Version: `{tag}` ({date})",
+        "latest_head": lambda tag, date: f"## Latest version: `{tag}` ({date})",
         "release_link": lambda url: f"[Release notes and checksums]({url})",
         "table_head": "| Platform | File | Size | Download |",
         "download_word": "Download",
@@ -288,7 +288,7 @@ def cmd_render(args) -> int:
         body = render_page(lang, cfg["displayName"], cfg["linkBase"], payload,
                            language_preview, cfg)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(body, encoding="utf-8")
+        path.write_text(body, encoding="utf-8", newline="")
         print(f"wrote {path} <- {repo} {tag}")
         wrote += 1
     print(f"download page(s) written for {repo} {tag} ({wrote} page(s))")
