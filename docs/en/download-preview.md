@@ -8,10 +8,10 @@ See [Authentication and session recovery](/en/authentication.md) for sign-in iss
 
 ### App preview
 
-<p>
-  <img src="../screenshots/home_feed.jpg" alt="Home feed" width="210" style="border-radius:8px;margin-right:8px"/>
-  <img src="../screenshots/artwork_detail.jpg" alt="Artwork detail" width="210" style="border-radius:8px;margin-right:8px"/>
-  <img src="../screenshots/related_works.jpg" alt="Related works" width="210" style="border-radius:8px"/>
+<p style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">
+  <img src="../screenshots/home_feed.jpg" alt="Home feed" style="width:180px;border-radius:8px"/>
+  <img src="../screenshots/artwork_detail.jpg" alt="Artwork detail" style="width:180px;border-radius:8px"/>
+  <img src="../screenshots/related_works.jpg" alt="Related works" style="width:180px;border-radius:8px"/>
 </p>
 
 From left to right: home feed, artwork detail, related works.
