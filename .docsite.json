@@ -1,0 +1,11 @@
+{
+  "repo": "redtidev1918/DAViewer",
+  "name": "DAViewer",
+  "emoji": "🖼️",
+  "description": "DAViewer 文档：安装、账号登录、网络配置、构建与开发。",
+  "branch": "main",
+  "engine": "vitepress",
+  "engineVersion": "1.6.4",
+  "version": 2,
+  "themeKey": "daviewer-theme"
+}

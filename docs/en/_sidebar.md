@@ -11,6 +11,4 @@
   - [Build](/en/build.md)
   - [Release gate (中文)](/release-gate.md)
   - [Testing (中文)](/TESTING.md)
-  - [Regression catalog](/regressions/README.md)
-- 中文
-  - [中文文档](/)
+  - [Regression catalog (English index; Chinese records)](/regressions/README.md)

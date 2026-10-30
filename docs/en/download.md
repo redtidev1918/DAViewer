@@ -8,7 +8,7 @@
 
 GitHub Actions generates this page from release assets. If the page has not been updated yet, check Releases for the latest version. [Releases](https://github.com/redtidev1918/DAViewer/releases)
 
-## Version: `v0.7.0` (2026-10-17)
+## Latest version: `v0.7.0` (2026-10-17)
 
 [Release notes and checksums](https://github.com/redtidev1918/DAViewer/releases/tag/v0.7.0)
 
