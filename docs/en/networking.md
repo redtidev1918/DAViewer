@@ -1,6 +1,6 @@
 ---
 title: Networking and proxy
-description: Proxy configuration, connectivity tests, and WebView network limits in DAViewer.
+description: Proxy implementation mechanics in DAViewer — priority chain, platform coverage, and maintainer checks (setup steps live in the Help Center).
 ---
 
 # Networking and proxy
@@ -19,6 +19,8 @@ The app can configure its own route but cannot silently reconfigure an external
 browser. UI and diagnostics must describe this boundary instead of promising
 that one successful test covers both routes.
 
+Where to set the proxy, the address format, and everyday scenarios are covered in the Help Center's [Networking and proxy](help/network.md); this page describes the implementation mechanics and maintainer checks.
+
 ## Selection and persistence
 
 The App runtime priority is:
@@ -30,11 +32,9 @@ The App runtime priority is:
 5. direct connection.
 
 The settings screen accepts an HTTP CONNECT proxy as `host:port` or a full URL
-such as `http://127.0.0.1:<PORT>`. `<PORT>` is a placeholder: users enter the
-HTTP/Mixed listener displayed by their own proxy app. The in-app setting rejects
-SOCKS, HTTPS-to-proxy, and URLs containing proxy credentials. On mobile,
-`127.0.0.1` means the proxy runs on that same phone. A proxy on a computer or
-router requires its LAN IP and an enabled “allow LAN” option.
+such as `http://127.0.0.1:<PORT>` (`<PORT>` is the HTTP/Mixed listener displayed
+by the user's proxy app). The in-app setting rejects SOCKS, HTTPS-to-proxy, and
+URLs containing proxy credentials.
 
 `export all_proxy=http://127.0.0.1:<PORT>` works when launching from that shell.
 Finder, Start Menu, and most desktop launchers do not inherit the variable, so

@@ -4,7 +4,7 @@
 - Windows：解压 ZIP 后运行 `daviewer.exe`，保留同目录的其他文件。
 - macOS：解压 ZIP 后打开 `DAViewer.app`。这是未公证的预览版，首次打开可在 Finder 中右键选择「打开」。
 
-登录问题见 [认证与会话恢复](/authentication.md)，连接问题见 [网络与代理](/networking.md)。
+登录问题见 [登录与账号](/help/login-and-account.md)，连接问题见 [网络与代理](/help/network.md)。
 
 ### 应用预览
 

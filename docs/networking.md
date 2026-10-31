@@ -1,6 +1,6 @@
 ---
 title: 网络与代理
-description: DAViewer 代理配置、连接测试与 WebView 网络限制说明。
+description: DAViewer 代理实现机制：优先级链、平台覆盖与维护者检查项（设置步骤见帮助中心）。
 ---
 
 # 网络与代理
@@ -14,6 +14,8 @@ description: DAViewer 代理配置、连接测试与 WebView 网络限制说明�
 
 应用可以配置自己的路由，但无法静默重配外部浏览器。UI 与诊断必须如实描述这条边界，不能承诺一次成功的连通性测试覆盖了两条路由。
 
+代理的设置位置、地址格式与常见场景的操作步骤见帮助中心[网络与代理](help/network.md)；本页描述实现机制与维护者检查项。
+
 ## 选择与持久化
 
 应用运行时的优先级为：
@@ -24,7 +26,7 @@ description: DAViewer 代理配置、连接测试与 WebView 网络限制说明�
 4. 构建期传入的 `DAKIT_PROXY_URL`；
 5. 直连。
 
-设置界面接受 HTTP CONNECT 代理，形式为 `host:port` 或完整 URL，例如 `http://127.0.0.1:<PORT>`。应用内设置不接受 SOCKS、HTTPS-to-proxy 或带用户名密码的代理 URL。`<PORT>` 是占位符：用户需填入自己代理应用显示的 HTTP/Mixed 监听端口。在移动端，`127.0.0.1` 表示代理运行在同一台手机上。电脑或路由器上的代理需要其局域网 IP，并开启「允许局域网」选项。
+设置界面接受 HTTP CONNECT 代理，形式为 `host:port` 或完整 URL（如 `http://127.0.0.1:<PORT>`，`<PORT>` 为代理应用的 HTTP/Mixed 监听端口）；不接受 SOCKS、HTTPS-to-proxy 或带用户名密码的代理 URL。
 
 从某个 shell 启动时 `export all_proxy=http://127.0.0.1:<PORT>` 有效。Finder、开始菜单与多数桌面启动器不会继承该变量，因此正式用户的应用流量应优先使用持久化的应用内设置，外部浏览器使用系统代理或 VPN。macOS 12/13 的登录 WebView 也依赖系统代理。
 
