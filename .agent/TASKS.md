@@ -11,6 +11,7 @@
 | T-005 | VitePress 文档站迁移试点 | DONE | 迁移经 `3b202a5` 合并，PR #144（`8d8cb60`）修复截图布局，Pages 已上线；纯 `docs:` 提交未触发客户端发布。 |
 | T-006 | 文档站系统优化 | DONE | PR #145 已合并（main `00eed67`，merge commit）；CI 全绿（docs/Analyze and test/branch-contract，release 正确 skipping），Pages 部署成功（run 41201701264），实站验收通过：新侧边栏分组、`/en/` 直达 200、新译页 200、meta description 上线、旧 vendor 404。 |
 | T-007 | 认证文档恢复事务节精简 | DONE | PR #146 已合并；zh/en 两侧精简为现行摘要（保留实机验收警示、保守判证规则、诊断导出、状态映射，细节指向 REG-021 与归档），Pages run 41202427693 部署，实站标题已更新。 |
+| T-008 | 文档站信息架构重构（帮助中心/开发者文档） | IN_PROGRESS | 分支 `docs/help-center`：新增 docs/help 与 docs/en/help 各 6 个用户向帮助页（以 app_strings 真实 UI 文案为写作依据），authentication/networking 用户内容迁出，侧边栏双区（使用帮助/开发者文档），首页重排，现有页面路径全部不动。 |
 
 ## 更新规则
 

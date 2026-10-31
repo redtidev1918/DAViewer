@@ -1,6 +1,6 @@
 ---
 title: Authentication and session recovery
-description: Sign-in methods, OAuth versus the web session, cookie management, and mature-content settings.
+description: Implementation contracts for authentication and session recovery in DAViewer — session roles, cold start, the recovery transaction, and cookie import rules (everyday steps live in the Help Center).
 ---
 
 # Authentication and session recovery
@@ -12,20 +12,11 @@ never receives or stores a DeviantArt, Google, Apple, Facebook, or Mac password.
 Credentials and provider security checks stay on DeviantArt's official page,
 which the app shows inside its own embedded WebView.
 
-## Sign-in and common issues
+## User guide
 
-Choose **Sign in or create an account** and authorize on DeviantArt's official page in the embedded WebView. A normal sign-in establishes both OAuth and web sessions. The app does not store account passwords.
+Everyday sign-in steps, CAPTCHAs, what to do when the session expires, cookie backup/import, mature-content settings, and app updates live in the Help Center: [Login and account](help/login-and-account.md) and [FAQ](help/faq.md); proxy setup steps are in [Networking and proxy](help/network.md). See [Networking internals](networking.md) for WebView coverage.
 
-| Situation | Action |
-| --- | --- |
-| The login page fails to open or gets stuck | Close and reopen it; check the proxy and run the connectivity test in Settings |
-| The official page asks for a challenge or account confirmation | Complete it on that page; the app waits for the authorization callback |
-| For you asks for recovery while Daily works | The web session and OAuth have separate states; follow the recovery prompt |
-| macOS asks for Keychain access | Allow access to the app's account storage; upgrade behavior depends on signing |
-| Mature content is hidden or blurred | Open Settings → DeviantArt account settings → Mature content settings and check website preferences |
-| You need a different account | Sign out first, then sign in; cookie import rejects mixed accounts |
-
-See [Networking and proxy](networking.md) for WebView coverage. The sections below describe implementation and recovery rules.
+The sections below describe implementation and recovery rules for maintainers.
 
 ## Android recovery transaction
 
@@ -255,21 +246,6 @@ problem or a user-visible degradation notice (REG-024 RC1; diagnostic logs
 only). A genuinely dead session is still identified by the authoritative
 verdict chain and shows the recovery entry point.
 
-## Checking for app updates
-
-The app checks stable releases on launch, resume and periodically while in the
-foreground, caching successful results for five minutes. A new version appears
-in the Home update banner, which opens the release page in the browser so the
-user can download and install it — the app only checks, it never downloads or
-installs an update itself. Dismissing
-it suppresses the same version. Settings still offers a manual check and notes
-for the current release. Failed checks report failure instead of “up to date”.
-
-If an older build shows no banner, check manually in Settings or download from
-[Releases](https://github.com/redtidev1918/DAViewer/releases). Version 0.5.10
-fixes missing app version information that caused automatic checks to be
-skipped; installing the new build is required for that fix.
-
 ## Public website adapters
 
 A few detail-page features require undocumented public website data, such as
@@ -283,20 +259,11 @@ Legacy browser cookies are accepted only for public adapter compatibility. If
 they expose a username different from the OAuth account, they are cleared to
 prevent mixed-account data.
 
-## Cookie viewing, export, and import
+## Cookie import contract
 
-Settings → **账号 Cookie / Account cookies** shows the live deviantart.com
-web-session cookies as indented JSON and can copy them to the clipboard, so the
-user can view or back up their web session. The live WebView cookies are
-preferred; the persisted snapshot is used as a fallback when the WebView store
-cannot be read. The dialog carries an explicit warning that these cookies are
-login credentials. Export is a manual, user-initiated copy: nothing is sent
-anywhere by the app, and diagnostics/report output never includes cookies.
+Steps for viewing, copying, and importing cookies in Settings → **Account cookies** are in the Help Center's [Login and account](help/login-and-account.md). This section keeps the implementation contract only: the dialog prefers the live WebView cookies, falling back to the persisted snapshot when the WebView store cannot be read. Cookies are login credentials; export is a manual, user-initiated copy, the app sends nothing anywhere, and diagnostics/report output never includes cookies.
 
-The same dialog imports pasted cookies: exported JSON, a browser-extension
-cookie array (non-DeviantArt domains are ignored), or a `name=value; …` Cookie
-header. Import is the most identity-sensitive write in the app and follows a
-strict one-account rule (`evaluateCookieImportIdentity`):
+Import accepts exported JSON, a browser-extension cookie array (non-DeviantArt domains are ignored), or a `name=value; …` Cookie header. It is the most identity-sensitive write in the app and follows a strict one-account rule (`evaluateCookieImportIdentity`):
 
 1. The imported cookies must carry a signed-in `userinfo` username; an
    anonymous paste is rejected.
@@ -313,20 +280,10 @@ strict one-account rule (`evaluateCookieImportIdentity`):
 On a verified import the snapshot is persisted, the web-session state is
 updated, and a CSRF refresh runs so website adapters use the new session. An
 imported web-only session (no OAuth account) powers the web adapters and the
-personalized feed, while official-API features still require OAuth sign-in.
-After such an import the app therefore offers the normal embedded sign-in
-once: the DeviantArt page recognizes the imported cookies and typically
-completes without asking for a password, and the user can dismiss the prompt
-(web features keep working; official-API features ask for sign-in again on
-use). The official-API session can only be established through OAuth/PKCE; importing
-cookies still requires completing OAuth sign-in.
+personalized feed, while official-API features still require OAuth sign-in —
+the official-API session can only be established through OAuth/PKCE. After such an import the app offers the normal embedded sign-in once: the DeviantArt page recognizes the imported cookies, typically completing without a password, and the user can dismiss the prompt (web features keep working; official-API features ask for sign-in again on use).
 
-## Mature content
-
-`mature_content: true` is only a request flag. DeviantArt account browsing
-preferences remain authoritative and may hide or blur adult content. Settings
-links directly to DeviantArt's browsing preferences; the app does not bypass
-account restrictions.
+`mature_content: true` is only a request flag; DeviantArt account browsing preferences remain authoritative, and Settings links directly to them — the app does not bypass account restrictions (user-facing notes in the Help Center [FAQ](help/faq.md)).
 
 ## User-facing error policy
 

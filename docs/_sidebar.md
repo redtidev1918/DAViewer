@@ -1,16 +1,19 @@
-- 开始
-  - [概览](/)
-  - [下载](/download.md)
-- 使用与配置
-  - [认证与会话恢复](/authentication.md)
-  - [网络与代理](/networking.md)
+- 使用帮助
+  - [快速上手](/help/getting-started.md)
+  - [下载与安装](/download.md)
+  - [登录与账号](/help/login-and-account.md)
+  - [网络与代理](/help/network.md)
+  - [浏览与搜索](/help/browse-and-search.md)
+  - [下载与保存](/help/download-artwork.md)
   - [内容屏蔽](/content-filtering.md)
-- 开发
+  - [常见问题](/help/faq.md)
+- 开发者文档
   - 架构说明
     - [总体架构](/architecture.md)
     - [作品访问状态](/architecture/artwork-access.md)
     - [网页会话与提醒](/architecture/web-session-and-notices.md)
-  - [Web 适配器契约](/web_adapter.md)
+  - [认证与会话恢复](/authentication.md)
+  - [网页适配器契约](/web_adapter.md)
   - [构建说明](/build.md)
   - [发布门禁](/release-gate.md)
   - [测试规范](/TESTING.md)

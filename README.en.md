@@ -194,8 +194,8 @@ This README covers the overview and getting started; sign-in states, proxy detai
 | What you want | Where |
 | --- | --- |
 | Download a build | [Download page](docs/en/download.md) |
-| Solve sign-in, session, and common issues | [Authentication](docs/en/authentication.md) |
-| Configure networking and proxies | [Networking](docs/en/networking.md) |
+| Solve sign-in, session, and common issues | [Login and account](docs/en/help/login-and-account.md) · [FAQ](docs/en/help/faq.md) |
+| Configure networking and proxies | [Networking and proxy](docs/en/help/network.md) |
 | Understand the app/SDK boundary | [Architecture](docs/en/architecture.md) |
 | Build and release locally | [Build notes](docs/en/build.md) |
 | Pre-release evidence and risks | [Release gate](docs/release-gate.md), [regressions](docs/regressions/README.md) (zh) |
