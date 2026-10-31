@@ -2,6 +2,13 @@
 
 > 每次 Coding Agent 会话结束时在顶部追加一节，只记本会话发生的事实与下一步入口。跨会话状态在 [STATUS.md](STATUS.md)，任务在 [TASKS.md](TASKS.md)。
 
+### 2026-10-31 PR #147（分支 docs/help-center）
+
+- 本会话改动：文档站信息架构重构（应用户诊断「文档是工程交接记录而非使用说明书」）——新增双语帮助中心 12 页（`docs/help/` + `docs/en/help/`：快速上手、登录与账号、网络与代理、浏览与搜索、下载与保存、常见问题），写作依据为 `lib/core/l10n/app_strings.dart` 真实 UI 文案；authentication/networking（zh/en）用户操作内容迁出、仅保留实现契约并指向帮助中心；侧边栏双区（使用帮助/开发者文档）与首页「我想……」任务表重排（sidebar.generated.mjs 由固定 SHA 工具再生成）；download 页用真实 v0.7.0 JSON 本地重放同步新链接；根 README 用户任务行改指帮助页。**现有页面路径零变动**。
+- 验证情况（含未跑的检查）：build 零死链（修复 en/authentication 两处 faq 相对路径）；docsite check 9/9、navcheck 零警告；12 页全部在 dist；白话质检对照 app_strings 无虚构 UI 路径。PR #147 CI 全绿（release 正确 skipping）；Pages run 41204239255 成功；实站验收：`/help/`、`/en/help/` 各页 200、旧页 200、首页双区渲染、download 页新链接在线。**未跑** Flutter 检查（无 Dart 改动）。
+- 未提交内容与风险：无。遗留：帮助页截图暂缺（文字描述操作路径，后续可补图）；en 侧内容质量建议使用者阅读时顺带校订。
+- 下一步入口：可选后续——帮助页配 App 截图；帮助中心使用数据观察（搜索热词）；og/sitemap 仍需 docsite 工具仓库升级（见 T-006 遗留）。
+
 ### 2026-10-31 PR #146（分支 docs/trim-recovery-transaction）
 
 - 本会话改动：应用户要求评估并精简 `docs/authentication.md` / `docs/en/authentication.md` 的「Android 恢复事务」节——保留实机验收警示（T-002/T-003 仍 BLOCKED）、保守判证规则摘要、诊断导出行为、状态映射；观察器代际/指纹采纳/事务协调细则改为指向 REG-021 与 `docs/agent-tasks/session-recovery/` 归档（归档经核实含全部细节）。标题去掉「2026-10-12 修正」日期后缀，无锚点引用受影响。
