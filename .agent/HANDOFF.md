@@ -2,6 +2,13 @@
 
 > 每次 Coding Agent 会话结束时在顶部追加一节，只记本会话发生的事实与下一步入口。跨会话状态在 [STATUS.md](STATUS.md)，任务在 [TASKS.md](TASKS.md)。
 
+### 2026-10-31 PR #146（分支 docs/trim-recovery-transaction）
+
+- 本会话改动：应用户要求评估并精简 `docs/authentication.md` / `docs/en/authentication.md` 的「Android 恢复事务」节——保留实机验收警示（T-002/T-003 仍 BLOCKED）、保守判证规则摘要、诊断导出行为、状态映射；观察器代际/指纹采纳/事务协调细则改为指向 REG-021 与 `docs/agent-tasks/session-recovery/` 归档（归档经核实含全部细节）。标题去掉「2026-10-12 修正」日期后缀，无锚点引用受影响。
+- 验证情况：本地 build 零死链、docsite check 9/9、navcheck 零警告；PR #146 CI 全绿（docs/Analyze and test/branch-contract，release skipping）；合并后 Pages run 41202427693 成功，实站已无旧标题。未跑 Flutter 检查（无 Dart 改动）。
+- 未提交内容与风险：无。
+- 下一步入口：更大的文档站信息架构重构（帮助中心 vs 开发者文档分区）另行规划（T-008 候选）。
+
 ### 2026-10-31 PR #145（分支 docs/site-optimization）
 
 - 本会话改动：文档站系统优化——删除 docsify 残留（旧 index.html、vendor、根级 .nojekyll、static.yml.docsite.bak）；侧边栏补全（zh/en 内容屏蔽、架构审计组、en 撤掉全部「(中文)」回退）；新译 en/TESTING、en/release-gate、en/architecture/web-session-and-notices；en/artwork-access 移入 en/architecture/ 对齐路径；login-status-proposal/RECOVERY-REPORT/notice-ux 归档进 docs/agent-tasks/；4 份英文审计移入 en/architecture/；21 个手写页加 title/description frontmatter；build.md 不再复述 L1 命令（权威在 TESTING.md）、示例版本 0.5.10→0.7.0；README.en.md 两处 `/#/en/` 修正；截图 900→540px q82（-30%）。sidebar.generated.mjs 由固定 SHA `d4915deb` 工具 `update` 再生成。
