@@ -4,11 +4,19 @@
 - Usage & Configuration
   - [Authentication & Session Recovery](/en/authentication.md)
   - [Networking & Proxy](/en/networking.md)
+  - [Content Filtering](/en/content-filtering.md)
 - Development
-  - [Architecture](/en/architecture.md)
-  - [Artwork access states](/en/artwork-access.md)
+  - Architecture
+    - [Overview](/en/architecture.md)
+    - [Artwork access states](/en/architecture/artwork-access.md)
+    - [Web session & notices](/en/architecture/web-session-and-notices.md)
   - [Web Adapter Contract](/en/web_adapter.md)
   - [Build](/en/build.md)
-  - [Release gate (中文)](/release-gate.md)
-  - [Testing (中文)](/TESTING.md)
+  - [Release gate](/en/release-gate.md)
+  - [Testing](/en/TESTING.md)
   - [Regression catalog (English index; Chinese records)](/regressions/README.md)
+  - Architecture audits
+    - [Cookie lifecycle](/en/architecture/cookie-lifecycle.md)
+    - [Data lifecycle](/en/architecture/data-lifecycle-audit.md)
+    - [Lifecycle migration](/en/architecture/lifecycle-migration.md)
+    - [Repository contract](/en/architecture/repository-contract.md)
