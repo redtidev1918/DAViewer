@@ -194,8 +194,8 @@ flutter test
 | 你想做什么 | 文档 |
 | --- | --- |
 | 下载安装包 | [下载页](docs/download.md) |
-| 解决登录、会话和常见问题 | [登录与会话](docs/authentication.md) |
-| 配置网络和代理 | [网络与代理](docs/networking.md) |
+| 解决登录、会话和常见问题 | [登录与账号](docs/help/login-and-account.md) · [常见问题](docs/help/faq.md) |
+| 配置网络和代理 | [网络与代理](docs/help/network.md) |
 | 了解应用与 SDK 的边界 | [架构说明](docs/architecture.md) |
 | 本地构建、发版 | [构建说明](docs/build.md) |
 | 核对发布前验证与剩余风险 | [发布门禁](docs/release-gate.md)、[回归目录](docs/regressions/README.md) |
