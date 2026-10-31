@@ -1,3 +1,8 @@
+---
+title: DAViewer documentation
+description: Entry point for DAViewer docs — installation, configuration, and development guides.
+---
+
 # DAViewer documentation
 
 Language / 语言: [中文](../README.md) · English
@@ -11,6 +16,7 @@ DAViewer is a third-party DeviantArt client for Android, macOS, and Windows. See
 | Download a package for your platform | [Download](download.md) |
 | Sign in, recover sessions, manage cookies, set mature-content preferences | [Authentication and session recovery](authentication.md) |
 | Configure proxies, test connectivity, check WebView limits | [Networking and proxy](networking.md) |
+| Hide AI works, tags, or artists | [Content filtering](content-filtering.md) |
 
 ## Development and maintenance
 
@@ -19,14 +25,15 @@ DAViewer is a third-party DeviantArt client for Android, macOS, and Windows. See
 | Understand SDK/app boundaries, data flow, and gestures | [Architecture](architecture.md) | [架构说明](../architecture.md) |
 | Investigate private website endpoint changes | [Web adapter contract](web_adapter.md) | [网页适配器契约](../web_adapter.md) |
 | Set up the toolchain, build locally, and release | [Build notes](build.md) | [构建说明](../build.md) |
-| Check release conditions and device evidence | [Release gate](../release-gate.md) (Chinese) | [发布门禁](../release-gate.md) |
+| Check release conditions and device evidence | [Release gate](release-gate.md) | [发布门禁](../release-gate.md) |
+| Understand testing and verification layers | [Testing](TESTING.md) | [测试规范](../TESTING.md) |
 | Find past defects, tests, and gaps in verification | [Regression catalog](../regressions/README.md) | Individual records use Chinese or English |
 
 See [CONTRIBUTING.md](https://github.com/redtidev1918/DAViewer/blob/main/CONTRIBUTING.md) for contributions, [SECURITY.md](https://github.com/redtidev1918/DAViewer/blob/main/SECURITY.md) for security reports, and [CODE_OF_CONDUCT.md](https://github.com/redtidev1918/DAViewer/blob/main/CODE_OF_CONDUCT.md) for community rules. For OAuth, official API mapping, domain models, and transfers, consult the [DAKit documentation](https://github.com/redtidev1918/DAKit/blob/main/docs/README.md).
 
 ## Maintaining these docs
 
-User guides and the main developer documents have matching pages in `docs/` and `docs/en/`. Update both languages together. Release gates, architecture audits, and regression records retain their original language.
+User guides and the main developer documents have matching pages in `docs/` and `docs/en/`. Update both languages together. Architecture audits and regression records retain their original language.
 
 Use the guides and architecture overview for current behavior. Records under `architecture/` and `regressions/` trace past findings and migration work; check their version and verification scope. Past changes are in [CHANGELOG.md](https://github.com/redtidev1918/DAViewer/blob/main/CHANGELOG.md) and [RELEASE_NOTES.md](https://github.com/redtidev1918/DAViewer/blob/main/RELEASE_NOTES.md).
 

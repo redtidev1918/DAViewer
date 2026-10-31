@@ -1,3 +1,8 @@
+---
+title: DAViewer Lifecycle Migration
+description: Incremental migration from provider-lifetime-equals-request-lifetime to layered lifecycle contracts.
+---
+
 # DAViewer Lifecycle Migration
 
 本迁移把“Provider 生命周期=网络请求”逐步改成分层契约。每次只迁移一类边界，

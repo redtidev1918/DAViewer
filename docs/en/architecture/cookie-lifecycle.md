@@ -1,3 +1,8 @@
+---
+title: Web Cookie Lifecycle Audit
+description: Point-in-time audit of web cookie truth sources, write paths, and restore behavior.
+---
+
 # Web Cookie Lifecycle Audit
 
 ## Truth sources

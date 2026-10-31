@@ -1,4 +1,11 @@
+---
+title: Content filters
+description: Hide platform-marked AI works, tags, or artists locally in DAViewer without touching your DeviantArt account.
+---
+
 # Content filters
+
+**Language / 语言:** [中文](/content-filtering.md) · English
 
 Open Settings → Content filters to hide platform-marked AI works, exact tags, artist usernames or individual artwork URLs/IDs. Long-press an artwork card to hide it or its artist's works. Remove entries in Settings to undo.
 

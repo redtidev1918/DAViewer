@@ -521,7 +521,7 @@ Original Incident verification remain PENDING; retained account evidence absent.
 User authorized reminder optimization while zcode continues the P0 runtime
 repair. UI workspace `C:\Users\12629\.codex\worktrees\notice-ux\DAViewer`, branch
 `codex/notice-ux`, based on `6a5856a`; the primary workspace is not edited.
-Scope, code locations and verification are in `docs/notice-ux.md`. Integrate
+Scope, code locations and verification are in `notice-ux.md` (same directory). Integrate
 the UI delta after P0 review, retaining newer auth/ownership fixes. Do not
 interpret UI tests or previews as original-incident or Android acceptance.
 Integrated updated P0 source `63ba115`. Local UI validation: format 0 changed,

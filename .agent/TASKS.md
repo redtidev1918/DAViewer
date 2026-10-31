@@ -8,7 +8,8 @@
 | T-002 | Android Verified 实机证据（v0.5.22+） | BLOCKED | 缺真实保留账号设备；解锁条件：用户提供设备日志。按 `docs/agent-tasks/session-recovery/STATUS.md` 顶部要求补验。 |
 | T-003 | Original Incident Verified 证据 | BLOCKED | 原始故障链的保留账号复验；解锁条件同 T-002。 |
 | T-004 | 回归目录 Partial 项补证据 | DEFERRED | R1 / R3 / R7 / R17 / R22 / R23 及 `docs/regressions/README.md` 的设备证据清单；随相关功能开发顺带补，不单独立项。 |
-| T-005 | VitePress 文档站迁移试点 | IN_PROGRESS | 使用 docsite 1.6.4 模板;新 docs.yml/Node 22 构建;本地与 PR 验收后等待审查合并,不发布客户端版本。 |
+| T-005 | VitePress 文档站迁移试点 | DONE | 迁移经 `3b202a5` 合并，PR #144（`8d8cb60`）修复截图布局，Pages 已上线；纯 `docs:` 提交未触发客户端发布。 |
+| T-006 | 文档站系统优化 | IN_PROGRESS | 分支 `docs/site-optimization`，PR #145：docsify 残留清理、导航补全（内容屏蔽/架构审计组）、英文补全（TESTING/release-gate/web-session 翻译）、记录归档、逐页 frontmatter SEO、一致性去重、截图压缩。本地 build 零死链 + docsite check 9/9 + navcheck 零警告；待 PR CI 与合并后 Pages 验收，合并后置 DONE。 |
 
 ## 更新规则
 

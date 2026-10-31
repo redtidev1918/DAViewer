@@ -1,3 +1,8 @@
+---
+title: 认证与会话恢复
+description: DAViewer 登录方式、OAuth 与网页会话的关系、Cookie 管理与成人内容设置。
+---
+
 # 认证与会话恢复
 
 语言 / Language：中文 · [English](en/authentication.md)

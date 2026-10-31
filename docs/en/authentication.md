@@ -1,3 +1,8 @@
+---
+title: Authentication and session recovery
+description: Sign-in methods, OAuth versus the web session, cookie management, and mature-content settings.
+---
+
 # Authentication and session recovery
 
 **Language / 语言:** [中文](/authentication.md) · English
@@ -190,7 +195,7 @@ After startup, session loss has exactly one trigger: `WebSessionCoordinator`. It
 
 A confirmed anonymous session shows a sign-in action on both the main screen and artwork details. Network failures and challenge pages do not produce an expired-Cookie prompt. A confirmed login clears previous media-resolution markers and reloads detail, extra pages, original-file lookups, and related artwork.
 
-Suspicious related previews are also checked against official OAuth detail data for the same artwork, with full web detail as a fallback. The author and artwork path must match, and the response must provide clear media or an explicit access gate before updating the cache. Genuine paid restrictions remain. Inconclusive checks preserve the server preview without editing its blurred URL. See [artwork access states](artwork-access.md) and [REG-013](../regressions/013-mature-related-preview.md).
+Suspicious related previews are also checked against official OAuth detail data for the same artwork, with full web detail as a fallback. The author and artwork path must match, and the response must provide clear media or an explicit access gate before updating the cache. Genuine paid restrictions remain. Inconclusive checks preserve the server preview without editing its blurred URL. See [artwork access states](architecture/artwork-access.md) and [REG-013](../regressions/013-mature-related-preview.md).
 
 ## Authentication transaction lifecycle
 

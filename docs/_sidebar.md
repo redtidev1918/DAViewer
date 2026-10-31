@@ -4,12 +4,19 @@
 - 使用与配置
   - [认证与会话恢复](/authentication.md)
   - [网络与代理](/networking.md)
+  - [内容屏蔽](/content-filtering.md)
 - 开发
-  - [架构说明](/architecture.md)
-  - [作品访问状态](/architecture/artwork-access.md)
-  - [网页会话与提醒](/architecture/web-session-and-notices.md)
+  - 架构说明
+    - [总体架构](/architecture.md)
+    - [作品访问状态](/architecture/artwork-access.md)
+    - [网页会话与提醒](/architecture/web-session-and-notices.md)
   - [Web 适配器契约](/web_adapter.md)
   - [构建说明](/build.md)
   - [发布门禁](/release-gate.md)
   - [测试规范](/TESTING.md)
   - [回归目录](/regressions/README.md)
+  - 架构审计记录
+    - [Cookie 生命周期（英文）](/en/architecture/cookie-lifecycle.md)
+    - [数据生命周期（英文）](/en/architecture/data-lifecycle-audit.md)
+    - [生命周期迁移（英文）](/en/architecture/lifecycle-migration.md)
+    - [仓库请求契约（英文）](/en/architecture/repository-contract.md)

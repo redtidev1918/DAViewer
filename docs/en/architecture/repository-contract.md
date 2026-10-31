@@ -1,3 +1,8 @@
+---
+title: Repository Request Contract
+description: Contract placing cache, dedup, and single-flight request control in the repository layer.
+---
+
 # Repository Request Contract
 
 目标：把 cache / dedup / single-flight 放在 Repository 层，不让 Provider 或 UI

@@ -1,3 +1,8 @@
+---
+title: 构建与发布
+description: DAViewer 工具链准备、Android/macOS/Windows 本地构建与版本发布流程。
+---
+
 # 构建与发布
 
 语言 / Language：中文 · [English](en/build.md)
@@ -31,23 +36,17 @@ flutter run -d <设备ID>
 
 ## 验证与构建
 
-Dart 改动提交前运行与 CI 相同的质量检查：
-
-```shell
-dart format --output=none --set-exit-if-changed lib test
-flutter analyze
-flutter test
-```
+Dart 改动提交前的本地质量门（格式检查、`flutter analyze`、带版本 define 的测试）以 [测试规范](TESTING.md) 的 L1 命令为准，此处不再复述。
 
 在对应平台执行 release 构建：
 
 ```shell
-flutter build apk --release --dart-define=DAVIEWER_VERSION=0.5.10      # 需要 android/key.properties
-flutter build macos --release --dart-define=DAVIEWER_VERSION=0.5.10
-flutter build windows --release --dart-define=DAVIEWER_VERSION=0.5.10
+flutter build apk --release --dart-define=DAVIEWER_VERSION=0.7.0      # 需要 android/key.properties
+flutter build macos --release --dart-define=DAVIEWER_VERSION=0.7.0
+flutter build windows --release --dart-define=DAVIEWER_VERSION=0.7.0
 ```
 
-示例中的 `0.5.10` 应替换为 `pubspec.yaml` 的版本号（不含 `+` 后的构建号）。
+示例中的 `0.7.0` 应替换为 `pubspec.yaml` 的版本号（不含 `+` 后的构建号）。
 安装包版本与 Dart 环境变量分别设置；自动更新检查需要这个 Dart define，不能省略。
 CI 的 `scripts/build-release` 从发布版本传入该值。
 

@@ -1,3 +1,8 @@
+---
+title: Networking and proxy
+description: Proxy configuration, connectivity tests, and WebView network limits in DAViewer.
+---
+
 # Networking and proxy
 
 **Language / 语言:** [中文](/networking.md) · English

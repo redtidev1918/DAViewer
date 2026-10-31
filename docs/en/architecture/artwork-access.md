@@ -1,4 +1,11 @@
+---
+title: Artwork access states
+description: How DAViewer preserves artwork access evidence across data sources so cards, detail views, and cached media agree.
+---
+
 # Artwork access and media resolution
+
+**Language / 语言:** [中文](/architecture/artwork-access.md) · English
 
 Related cards and artist galleries can use different sources for the same artwork. Access evidence must survive mapping so cards, detail views, and cached media agree.
 
@@ -22,4 +29,4 @@ Login restrictions or unexplained blur can request web-session verification. A k
 
 A confirmed web login or successful Cookie import increments the access epoch and invalidates related media providers. Cookie import also requests server verification. A response from an earlier epoch cannot update media, evidence, or lookup progress.
 
-The web repository preserves raw reasons, the access model decides evidence precedence, the access controller owns lookup phases and epochs, the artwork store protects canonical media, providers coordinate requests and recovery, and the presentation layer selects notices and icons. Automated tests cover combined restrictions, unknown codes, both page formats, source boundaries, stale results, web fallback, and card updates. See [REG-013](../regressions/013-mature-related-preview.md) for the live-artwork verification limit.
+The web repository preserves raw reasons, the access model decides evidence precedence, the access controller owns lookup phases and epochs, the artwork store protects canonical media, providers coordinate requests and recovery, and the presentation layer selects notices and icons. Automated tests cover combined restrictions, unknown codes, both page formats, source boundaries, stale results, web fallback, and card updates. See [REG-013](../../regressions/013-mature-related-preview.md) for the live-artwork verification limit.

@@ -8,7 +8,7 @@ DAViewer is an open-source, third-party DeviantArt client for Android, Windows, 
 
 DAViewer is not an official DeviantArt app and has no affiliation or partnership with DeviantArt.
 
-**[Download the latest release](https://github.com/redtidev1918/DAViewer/releases)** · [Documentation](https://redtidev1918.github.io/DAViewer/#/en/) · [Getting started](#getting-started) · [FAQ](#faq)
+**[Download the latest release](https://github.com/redtidev1918/DAViewer/releases)** · [Documentation](https://redtidev1918.github.io/DAViewer/en/) · [Getting started](#getting-started) · [FAQ](#faq)
 
 [![GitHub release](https://img.shields.io/github/v/release/redtidev1918/DAViewer?style=flat)](https://github.com/redtidev1918/DAViewer/releases) [![GitHub license](https://img.shields.io/github/license/redtidev1918/DAViewer?style=flat)](LICENSE)
 
@@ -189,7 +189,7 @@ flutter test
 
 ## Documentation
 
-This README covers the overview and getting started; sign-in states, proxy details, the architectural boundary, and build and release flows live on the [documentation site](https://redtidev1918.github.io/DAViewer/#/en/) and under `docs/`. Pick a document by task:
+This README covers the overview and getting started; sign-in states, proxy details, the architectural boundary, and build and release flows live on the [documentation site](https://redtidev1918.github.io/DAViewer/en/) and under `docs/`. Pick a document by task:
 
 | What you want | Where |
 | --- | --- |

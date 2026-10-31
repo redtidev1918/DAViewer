@@ -1,3 +1,8 @@
+---
+title: DAViewer Data Lifecycle Audit
+description: Point-in-time audit of data lifecycle layers across the current codebase, not a redesign proposal.
+---
+
 # DAViewer Data Lifecycle Audit
 
 状态：基于当前工作树代码的审计，不是新架构设计稿。
