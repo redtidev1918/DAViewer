@@ -3,37 +3,44 @@
 export default {
   "/": [
     {
-      "text": "开始",
+      "text": "使用帮助",
       "items": [
         {
-          "text": "概览",
-          "link": "/"
+          "text": "快速上手",
+          "link": "/help/getting-started"
         },
         {
-          "text": "下载",
+          "text": "下载与安装",
           "link": "/download"
-        }
-      ]
-    },
-    {
-      "text": "使用与配置",
-      "items": [
+        },
         {
-          "text": "认证与会话恢复",
-          "link": "/authentication"
+          "text": "登录与账号",
+          "link": "/help/login-and-account"
         },
         {
           "text": "网络与代理",
-          "link": "/networking"
+          "link": "/help/network"
+        },
+        {
+          "text": "浏览与搜索",
+          "link": "/help/browse-and-search"
+        },
+        {
+          "text": "下载与保存",
+          "link": "/help/download-artwork"
         },
         {
           "text": "内容屏蔽",
           "link": "/content-filtering"
+        },
+        {
+          "text": "常见问题",
+          "link": "/help/faq"
         }
       ]
     },
     {
-      "text": "开发",
+      "text": "开发者文档",
       "items": [
         {
           "text": "架构说明",
@@ -53,7 +60,11 @@ export default {
           ]
         },
         {
-          "text": "Web 适配器契约",
+          "text": "认证与会话恢复",
+          "link": "/authentication"
+        },
+        {
+          "text": "网页适配器契约",
           "link": "/web_adapter"
         },
         {
@@ -98,37 +109,44 @@ export default {
   ],
   "/en/": [
     {
-      "text": "Getting Started",
+      "text": "Help Center",
       "items": [
         {
-          "text": "Overview",
-          "link": "/en/"
+          "text": "Getting started",
+          "link": "/en/help/getting-started"
         },
         {
-          "text": "Download",
+          "text": "Download & install",
           "link": "/en/download"
-        }
-      ]
-    },
-    {
-      "text": "Usage & Configuration",
-      "items": [
-        {
-          "text": "Authentication & Session Recovery",
-          "link": "/en/authentication"
         },
         {
-          "text": "Networking & Proxy",
-          "link": "/en/networking"
+          "text": "Login and account",
+          "link": "/en/help/login-and-account"
         },
         {
-          "text": "Content Filtering",
+          "text": "Networking and proxy",
+          "link": "/en/help/network"
+        },
+        {
+          "text": "Browsing and searching",
+          "link": "/en/help/browse-and-search"
+        },
+        {
+          "text": "Downloading artworks",
+          "link": "/en/help/download-artwork"
+        },
+        {
+          "text": "Content filtering",
           "link": "/en/content-filtering"
+        },
+        {
+          "text": "FAQ",
+          "link": "/en/help/faq"
         }
       ]
     },
     {
-      "text": "Development",
+      "text": "Developer docs",
       "items": [
         {
           "text": "Architecture",
@@ -148,7 +166,11 @@ export default {
           ]
         },
         {
-          "text": "Web Adapter Contract",
+          "text": "Authentication & session recovery",
+          "link": "/en/authentication"
+        },
+        {
+          "text": "Web adapter contract",
           "link": "/en/web_adapter"
         },
         {

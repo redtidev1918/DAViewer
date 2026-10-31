@@ -1,16 +1,19 @@
-- Getting Started
-  - [Overview](/en/)
-  - [Download](/en/download.md)
-- Usage & Configuration
-  - [Authentication & Session Recovery](/en/authentication.md)
-  - [Networking & Proxy](/en/networking.md)
-  - [Content Filtering](/en/content-filtering.md)
-- Development
+- Help Center
+  - [Getting started](/en/help/getting-started.md)
+  - [Download & install](/en/download.md)
+  - [Login and account](/en/help/login-and-account.md)
+  - [Networking and proxy](/en/help/network.md)
+  - [Browsing and searching](/en/help/browse-and-search.md)
+  - [Downloading artworks](/en/help/download-artwork.md)
+  - [Content filtering](/en/content-filtering.md)
+  - [FAQ](/en/help/faq.md)
+- Developer docs
   - Architecture
     - [Overview](/en/architecture.md)
     - [Artwork access states](/en/architecture/artwork-access.md)
     - [Web session & notices](/en/architecture/web-session-and-notices.md)
-  - [Web Adapter Contract](/en/web_adapter.md)
+  - [Authentication & session recovery](/en/authentication.md)
+  - [Web adapter contract](/en/web_adapter.md)
   - [Build](/en/build.md)
   - [Release gate](/en/release-gate.md)
   - [Testing](/en/TESTING.md)
