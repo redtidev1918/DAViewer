@@ -5,9 +5,10 @@
 ### 2026-10-31 PR #145（分支 docs/site-optimization）
 
 - 本会话改动：文档站系统优化——删除 docsify 残留（旧 index.html、vendor、根级 .nojekyll、static.yml.docsite.bak）；侧边栏补全（zh/en 内容屏蔽、架构审计组、en 撤掉全部「(中文)」回退）；新译 en/TESTING、en/release-gate、en/architecture/web-session-and-notices；en/artwork-access 移入 en/architecture/ 对齐路径；login-status-proposal/RECOVERY-REPORT/notice-ux 归档进 docs/agent-tasks/；4 份英文审计移入 en/architecture/；21 个手写页加 title/description frontmatter；build.md 不再复述 L1 命令（权威在 TESTING.md）、示例版本 0.5.10→0.7.0；README.en.md 两处 `/#/en/` 修正；截图 900→540px q82（-30%）。sidebar.generated.mjs 由固定 SHA `d4915deb` 工具 `update` 再生成。
-- 验证情况（含未跑的检查）：`npm run docs:build` 零死链；固定 SHA 工具 `docsite.py check` 9/9 一致、`navcheck` 零 error 零 warning；grep 复核移动/删除文件无残留引用（含 agent-tasks STATUS.md 一处反引号路径已修）；压缩截图经视觉检查无可见瑕疵。**未跑** `flutter analyze`/`flutter test`（无 Dart 改动，PR CI 亦不涉及）；**未做**合并后 Pages 实站验收（等 PR #145 合并）。
-- 未提交内容与风险：无未提交改动（工作区仅历史保留的未跟踪残留与 stash，未动）。风险：en 侧三页为新译内容，术语沿用回归目录词汇，合并前可请使用者过目；4 份审计 URL 由 `/architecture/…` 变为 `/en/architecture/…`（零入链，仅书签影响）。
-- 下一步入口：PR #145 CI 绿后合并；合并后按 release skill 第 6 步验收 Pages（侧边栏新组、en 新页、`/en/` 直达）；T-006 置 DONE。og:image/sitemap/en 独立 description 需 docsite 工具仓库升级模板后再升 pin（`.docsite.json` 的 themeKey 死键可顺手清理）。
+- 验证情况（含未跑的检查）：`npm run docs:build` 零死链；固定 SHA 工具 `docsite.py check` 9/9 一致、`navcheck` 零 error 零 warning；grep 复核移动/删除文件无残留引用（含 agent-tasks STATUS.md 一处反引号路径已修）；压缩截图经视觉检查无可见瑕疵。**未跑** `flutter analyze`/`flutter test`（无 Dart 改动，PR CI 亦不涉及）。
+- 合并结果：PR #145 merge commit 合并为 main `00eed67`；CI 全绿（docs、Analyze and test、branch-contract，release build/finalize/release-please 正确 skipping，无客户端发布）；Pages 部署成功（run 41201701264），实站验收通过：en/TESTING 页 meta description 与新侧边栏（Content Filtering、Architecture 嵌套组、Architecture audits 组）在线、`/en/` 直达 200、web-session-and-notices 200、旧 vendor 404。T-006 已置 DONE。
+- 未提交内容与风险：无。风险遗留：en 侧三页为新译内容，术语沿用回归目录词汇，使用者后续阅读时可顺带校订；4 份审计 URL 由 `/architecture/…` 变为 `/en/architecture/…`（零入链，仅外部书签影响）。
+- 下一步入口：og:image/sitemap/en 独立 description 需 docsite 工具仓库升级模板后再升 pin（`.docsite.json` 的 themeKey 死键可顺手清理）；其余开发工作走 GitHub issues。
 
 ### 2026-10-31 VitePress 文档站试点
 

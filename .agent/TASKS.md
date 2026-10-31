@@ -9,7 +9,7 @@
 | T-003 | Original Incident Verified 证据 | BLOCKED | 原始故障链的保留账号复验；解锁条件同 T-002。 |
 | T-004 | 回归目录 Partial 项补证据 | DEFERRED | R1 / R3 / R7 / R17 / R22 / R23 及 `docs/regressions/README.md` 的设备证据清单；随相关功能开发顺带补，不单独立项。 |
 | T-005 | VitePress 文档站迁移试点 | DONE | 迁移经 `3b202a5` 合并，PR #144（`8d8cb60`）修复截图布局，Pages 已上线；纯 `docs:` 提交未触发客户端发布。 |
-| T-006 | 文档站系统优化 | IN_PROGRESS | 分支 `docs/site-optimization`，PR #145：docsify 残留清理、导航补全（内容屏蔽/架构审计组）、英文补全（TESTING/release-gate/web-session 翻译）、记录归档、逐页 frontmatter SEO、一致性去重、截图压缩。本地 build 零死链 + docsite check 9/9 + navcheck 零警告；待 PR CI 与合并后 Pages 验收，合并后置 DONE。 |
+| T-006 | 文档站系统优化 | DONE | PR #145 已合并（main `00eed67`，merge commit）；CI 全绿（docs/Analyze and test/branch-contract，release 正确 skipping），Pages 部署成功（run 41201701264），实站验收通过：新侧边栏分组、`/en/` 直达 200、新译页 200、meta description 上线、旧 vendor 404。 |
 
 ## 更新规则
 

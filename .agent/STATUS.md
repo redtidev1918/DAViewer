@@ -2,7 +2,7 @@
 
 > 当前工程状态的摘要快照，每次重要任务结束或发布后更新。任务进度的权威是 [TASKS.md](TASKS.md)；CI、Release、PR 的平台事实以 GitHub 为准，本文件不复制它们。
 
-- 更新时间：2026-10-31（文档站系统优化 PR #145）
+- 更新时间：2026-10-31（文档站系统优化 PR #145 合并上线）
 - 当前版本：v0.7.0+239（2026-10-17 发布并核验，见 [CHANGELOG](../CHANGELOG.md)）
 - 分支：`main` 与远端同步，无未合并功能改动。工作区存在本地未跟踪残留（`docs/agent-tasks/session-recovery/audits/` 部分备份、`.review-tmp/`、`.tmp-session-import/`、`.workbuddy/`、`clear/` 及两个 stash）——历史会话有意保留，不提交、不删除。
 - 开发阶段：常规开发。2026-10-16 P0 会话恢复任务关闭后曾宣布维护模式，实际自 v0.5.23 起恢复功能开发（v0.6.0 登录状态分通道、v0.7.0 本地内容过滤）。
@@ -15,7 +15,7 @@
 
 ## 当前无阻塞
 
-VitePress 迁移（T-005）已完成并上线。当前进行文档站系统优化（T-006，PR #145）：导航补全、英文补全、docsify 残留清理、逐页 frontmatter SEO；本地验证全绿（build 零死链、docsite check 9/9、navcheck 零警告）。客户端源码和 Flutter 依赖未改，不发布客户端版本；待 PR CI 与合并后 Pages 验收。
+VitePress 迁移（T-005）与文档站系统优化（T-006，PR #145）均已完成并上线：导航补全、英文补全、docsify 残留清理、逐页 frontmatter SEO；实站验收通过（新侧边栏分组、`/en/` 直达、新译页、meta description、旧 vendor 404）。客户端版本保持 v0.7.0+239 未动。
 
 ## 更新纪律
 
