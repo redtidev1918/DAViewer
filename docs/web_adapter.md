@@ -1,3 +1,8 @@
+---
+title: 网页适配器兼容性契约
+description: DAViewer 私有网页接口适配层的兼容性契约与变更规则。
+---
+
 # 网页适配器兼容性契约
 
 语言 / Language：中文 · [English](en/web_adapter.md)

@@ -1,3 +1,8 @@
+---
+title: DAViewer 架构说明
+description: DAKit SDK 与应用的责任边界、数据流与手势交互的总体架构说明。
+---
+
 # DAViewer 架构说明
 
 语言 / Language：中文 · [English](en/architecture.md)

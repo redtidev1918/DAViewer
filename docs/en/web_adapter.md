@@ -1,3 +1,8 @@
+---
+title: Web adapter compatibility contract
+description: The compatibility contract governing DAViewer's private web endpoint adapter.
+---
+
 # Web adapter compatibility contract
 
 **Language / 语言:** [中文](/web_adapter.md) · English

@@ -1,3 +1,8 @@
+---
+title: Building and releasing
+description: Toolchain setup, local builds for Android, macOS, and Windows, and the release process.
+---
+
 # Building and releasing
 
 Language / 语言: [中文](../build.md) · English

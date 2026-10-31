@@ -1,3 +1,8 @@
+---
+title: 测试规范
+description: DAViewer 测试策略：七个验证层次、L1 本地质量门命令、fixture 编写规则与证据状态词汇。
+---
+
 # 测试规范
 
 语言 / Language：中文
@@ -38,7 +43,7 @@ flutter test --dart-define=DAVIEWER_VERSION=0.7.0
 
 - `flutter analyze` 与 `dart format` 校验（CI 只检查不重写文件）。
 - 带 manifest 版本 define 的 `flutter test`。
-- 当前 manifest 版本的中文 release notes 检查：`.github/release-notes/<版本>.md` 必须存在、含「本次更新」小节与中文。
+- 当前 manifest 版本的中文 release notes 检查，规则以 [构建与发布](build.md) 为准。
 - 发布资产命名规范：`scripts/build-release` 与 `.release-policy.yml` 只允许 `DAViewer-v*` 形式的资产名。
 
 ## L4 SDK 联合验证（sdk-integration.yml）
