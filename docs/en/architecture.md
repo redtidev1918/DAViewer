@@ -1,3 +1,8 @@
+---
+title: DAViewer architecture
+description: SDK and app responsibility boundaries, data flow, and gesture handling in DAViewer.
+---
+
 # DAViewer architecture
 
 **Language / 语言:** [中文](/architecture.md) · English
@@ -198,7 +203,7 @@ must stay reachable from the login screen.
 
 ## App-local state
 
-Artwork access evidence, media resolution, and web-session health use separate states. Source precedence and session epochs are specified in [Artwork access and media resolution](artwork-access.md).
+Artwork access evidence, media resolution, and web-session health use separate states. Source precedence and session epochs are specified in [Artwork access and media resolution](architecture/artwork-access.md).
 
 Some state is deliberately kept client-side and never synced to DeviantArt:
 
