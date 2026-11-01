@@ -54,3 +54,7 @@
 
 OAuth/Bearer 路径与 Cookie+CSRF 网页路径健康状态独立（v0.5.19：官方路径全 200、网页路径全 403）；曾把网页 403 误报为 `officialError`（归档 2026-10-14 修复）。诊断先分通道，UI 分通道提示（v0.6.0）与两套验证历史即源于此。
 **来源**：`.agents/skills/diagnosis/SKILL.md` 判读规则、`docs/authentication.md`。
+
+## 托管文档工作流与 Dependabot
+
+Dependabot 单改托管 docs.yml 的 setup-node 主版本会触发 DRIFT（2026-11-01 审计）。先修 docsite 模板并合并，再固定新 SHA 和运行生成器；不关闭一致性检查。

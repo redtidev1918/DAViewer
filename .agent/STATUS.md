@@ -22,3 +22,7 @@ VitePress 迁移（T-005）与文档站系统优化（T-006，PR #145）均已�
 - 只记录可核实的事实并注明来源；不把计划写成已完成，不把测试通过写成实机验证。
 - 发布后按 `.agents/skills/release/SKILL.md` 第 6 步回填本文件。
 - 与 [HANDOFF.md](HANDOFF.md) 分工：本文件管跨会话状态，HANDOFF 管单次会话交接。
+
+## 2026-11-01 文档模板同步
+
+固定 docsite `3fa6b643de6d2843ce713ccacb16e4ca2475656b`，通过统一生成器采用 setup-node v7。docs build 与无 .git 的 check/navcheck 本地通过；远程 CI 待 PR 验收。

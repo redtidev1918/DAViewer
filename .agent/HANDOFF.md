@@ -48,3 +48,7 @@
 - 未提交内容与风险：工作区既有未跟踪残留（session-recovery audits 备份、`.review-tmp/`、`.tmp-session-import/`、`.workbuddy/`、`clear/`）与两个 stash 保持原样未动。注意 `stash@{1}`（backup-local-edits-before-update-2026-10-12）是明确禁止应用的旧备份。
 - 合并结果：PR #142 squash 合并为 main `ea7a2fe`，T-001 已置 DONE。PR 检查全绿（Analyze and test、branch-contract、release/build-plan dry-run）；main 上 Release 运行成功且 build/finalize 跳过——release-please 正确忽略纯 `docs:` 提交，未产生版本 PR，最新 release 保持 v0.7.0；Pages 已部署（侧边栏含测试规范入口）。
 - 下一步入口：后续功能开发走 GitHub issues，发布按 `.agents/skills/release/SKILL.md`；遗留证据门见 T-002/T-003。
+
+## 2026-11-01 codex/sync-docsite-template
+
+上游 docsite #16 已合并；更新固定 SHA 并运行 docsite update。旧 pin 附带的下载页生成器 showAssetTable 选项默认保持原输出。npm ci、docs:build、无 .git 的 check/navcheck 通过；应用测试未在本地重跑，远程 CI 和 Dependabot 最新 SHA 待验收。
