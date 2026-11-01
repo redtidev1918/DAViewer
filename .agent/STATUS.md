@@ -22,3 +22,9 @@ VitePress 迁移（T-005）与文档站系统优化（T-006，PR #145）均已�
 - 只记录可核实的事实并注明来源；不把计划写成已完成，不把测试通过写成实机验证。
 - 发布后按 `.agents/skills/release/SKILL.md` 第 6 步回填本文件。
 - 与 [HANDOFF.md](HANDOFF.md) 分工：本文件管跨会话状态，HANDOFF 管单次会话交接。
+
+## 2026-11-01 SDK candidate 信任边界修复
+
+IN_PROGRESS：同仓库来源不能单独授权签名；Dependabot/fork 只运行 quality。
+实际 workflow 表达式回归覆盖人工、机器人、fork、dispatch；远端 CI 待验收。
+未修改 Dart、依赖、签名配置或生产 Secrets。

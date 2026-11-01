@@ -48,3 +48,9 @@
 - 未提交内容与风险：工作区既有未跟踪残留（session-recovery audits 备份、`.review-tmp/`、`.tmp-session-import/`、`.workbuddy/`、`clear/`）与两个 stash 保持原样未动。注意 `stash@{1}`（backup-local-edits-before-update-2026-10-12）是明确禁止应用的旧备份。
 - 合并结果：PR #142 squash 合并为 main `ea7a2fe`，T-001 已置 DONE。PR 检查全绿（Analyze and test、branch-contract、release/build-plan dry-run）；main 上 Release 运行成功且 build/finalize 跳过——release-please 正确忽略纯 `docs:` 提交，未产生版本 PR，最新 release 保持 v0.7.0；Pages 已部署（侧边栏含测试规范入口）。
 - 下一步入口：后续功能开发走 GitHub issues，发布按 `.agents/skills/release/SKILL.md`；遗留证据门见 T-002/T-003。
+
+### 2026-11-01 SDK candidate trust
+
+- 根因：#148/#149 的 Dependabot head 同属本仓，旧条件进入签名 candidate，Ubuntu 因缺生产密钥失败。
+- 修复：明确 dispatch 或可信关联的同仓人工 PR，额外排除 Dependabot 作者/执行者/重跑者；quality 无条件且无生产 Secrets。
+- 验证：scripts/test-sdk-trust.py 直接求值真实 workflow 表达式；旧实现失败，修复后通过。main classic required contexts=[]、active rules=[]（本次 API 读取）；不修改保护规则。远端 CI 尚待验证；Flutter 本地未跑（无 Dart 改动）。
