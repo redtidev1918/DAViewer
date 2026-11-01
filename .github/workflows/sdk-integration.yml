@@ -11,6 +11,7 @@ on:
       - 'scripts/configure-sdk-integration.py'
       - 'scripts/verify-desktop-startup.py'
       - '.github/workflows/sdk-integration.yml'
+      - 'scripts/test-sdk-trust.py'
   workflow_dispatch:
 
 permissions:
@@ -41,6 +42,8 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
+      - name: Verify candidate trust boundary
+        run: python3 scripts/test-sdk-trust.py
       - name: Verify SDK workspace
         working-directory: .joint-sdk
         run: |
@@ -60,8 +63,17 @@ jobs:
 
   candidate:
     needs: quality
-    # Signing is available only for trusted same-repository candidates.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # Same-repository branches alone do not establish trust: Dependabot also
+    # creates them. Keep bot/fork quality validation separate from signing.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association) &&
+       github.event.pull_request.user.type == 'User' &&
+       github.event.pull_request.user.login != 'dependabot[bot]' &&
+       github.actor != 'dependabot[bot]' &&
+       github.triggering_actor != 'dependabot[bot]')
     strategy:
       fail-fast: false
       matrix:
@@ -124,7 +136,8 @@ jobs:
             --expected-revision "$EXPECTED_REVISION" \
             --summary "dist/release/startup-smoke-$RUNNER_OS.json"
       - uses: actions/upload-artifact@v7
-        if: always()
+        # Failed builds have no candidate artifact; the job log is the evidence.
+        if: success()
         with:
           name: sdk-integration-${{ runner.os }}-${{ github.event.pull_request.head.sha || github.sha }}
           path: dist/release/*
