@@ -18,3 +18,5 @@
 - 新任务先入表再动手；`BLOCKED` 必须写原因与解锁条件。
 - `DONE` 需要证据（PR、release、测试日志链接）；证据不足只能保持 `IN_PROGRESS`。
 - 已归档的大任务不回填本表（完整历史在 `docs/agent-tasks/`）。
+
+| DOC-CI-20261101 | docsite setup-node 模板同步 | IN_PROGRESS | 本地文档三项验证通过；远程 PR CI 待验收 |
