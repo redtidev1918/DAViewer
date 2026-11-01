@@ -10,15 +10,15 @@ dependencies:
   flutter:
     sdk: flutter
   cached_network_image: ^3.4.1
-  chewie: ^1.17.2
-  crypto: ^3.0.3
+  chewie: ^1.17.4
+  crypto: ^3.0.8
   cupertino_icons: ^1.0.8
   dakit_api: ^1.2.0
   dakit_core: ^2.0.0
-  dakit_web: ^0.3.0
+  dakit_web: ^0.3.1
   dakit_flutter: ^1.1.0
   dio: ^5.11.1
-  flutter_cache_manager: ^3.4.5
+  flutter_cache_manager: ^3.4.6
   flutter_html: ^3.0.0
   flutter_inappwebview: 6.1.5
   flutter_riverpod: ^3.4.3
