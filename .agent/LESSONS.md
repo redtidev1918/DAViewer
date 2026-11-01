@@ -58,3 +58,7 @@ OAuth/Bearer 路径与 Cookie+CSRF 网页路径健康状态独立（v0.5.19：�
 ## L-11 同仓 PR 不等于可获得签名密钥的可信来源
 
 Dependabot 也能创建本仓分支。签名必须同时检查事件、仓库归属、作者关联和机器人身份；人工重跑不能把机器人 PR 升格。quality 始终保留，签名跳过必须单独记录为预期跳过，不能写成构建成功。
+
+## 托管文档工作流与 Dependabot
+
+Dependabot 单改托管 docs.yml 的 setup-node 主版本会触发 DRIFT（2026-11-01 审计）。先修 docsite 模板并合并，再固定新 SHA 和运行生成器；不关闭一致性检查。

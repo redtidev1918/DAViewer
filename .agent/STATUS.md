@@ -28,3 +28,7 @@ VitePress 迁移（T-005）与文档站系统优化（T-006，PR #145）均已�
 IN_PROGRESS：同仓库来源不能单独授权签名；Dependabot/fork 只运行 quality。
 实际 workflow 表达式回归覆盖人工、机器人、fork、dispatch；远端 CI 待验收。
 未修改 Dart、依赖、签名配置或生产 Secrets。
+
+## 2026-11-01 文档模板同步
+
+固定 docsite `3fa6b643de6d2843ce713ccacb16e4ca2475656b`，通过统一生成器采用 setup-node v7。docs build 与无 .git 的 check/navcheck 本地通过；远程 CI 待 PR 验收。

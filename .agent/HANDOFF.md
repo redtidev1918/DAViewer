@@ -54,3 +54,7 @@
 - 根因：#148/#149 的 Dependabot head 同属本仓，旧条件进入签名 candidate，Ubuntu 因缺生产密钥失败。
 - 修复：明确 dispatch 或可信关联的同仓人工 PR，额外排除 Dependabot 作者/执行者/重跑者；quality 无条件且无生产 Secrets。
 - 验证：scripts/test-sdk-trust.py 直接求值真实 workflow 表达式；旧实现失败，修复后通过。main classic required contexts=[]、active rules=[]（本次 API 读取）；不修改保护规则。远端 CI 尚待验证；Flutter 本地未跑（无 Dart 改动）。
+
+## 2026-11-01 codex/sync-docsite-template
+
+上游 docsite #16 已合并；更新固定 SHA 并运行 docsite update。旧 pin 附带的下载页生成器 showAssetTable 选项默认保持原输出。npm ci、docs:build、无 .git 的 check/navcheck 通过；应用测试未在本地重跑，远程 CI 和 Dependabot 最新 SHA 待验收。
