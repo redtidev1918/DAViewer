@@ -90,7 +90,7 @@ jobs:
           repository: redtidev1918/DAKit
           ref: ${{ env.SDK_SHA }}
           path: .joint-sdk
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
       - uses: actions/setup-java@v6
