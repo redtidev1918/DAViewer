@@ -731,6 +731,9 @@ final class AppStrings {
   String get searchHint => _lang == AppLanguage.zh
       ? '搜索作品 / 用户，或用 #标签 搜标签'
       : 'Search artworks, users, or #tags';
+  String get userSearchHint => _lang == AppLanguage.zh
+      ? '输入完整用户名（无需关注）'
+      : 'Enter a full username (following not required)';
   String get clear => _lang == AppLanguage.zh ? '清空' : 'Clear';
   String get clearHistory => _lang == AppLanguage.zh ? '清除' : 'Clear';
   String get artworks => _lang == AppLanguage.zh ? '作品' : 'Artworks';

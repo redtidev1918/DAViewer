@@ -11,6 +11,7 @@ final class DaLink {
 /// - `https://www.deviantart.com/<user>/art/<title>-<numericId>` → artwork
 /// - `https://fav.me/<short>` or `https://www.deviantart.com/<short>` → artwork
 /// - `https://www.deviantart.com/<user>` → artist
+/// - `https://www.deviantart.com/<user>/gallery` → artist works
 DaLink? parseDeviantArtUrl(String text) {
   final trimmed = text.trim();
   if (trimmed.isEmpty) return null;
@@ -45,8 +46,10 @@ DaLink? parseDeviantArtUrl(String text) {
     }
   }
 
-  // /<user> (a bare username path).
-  if (segments.length == 1 && !isFavMe) {
+  // The artist page opens on its Works tab, matching a gallery root link.
+  if (!isFavMe &&
+      (segments.length == 1 ||
+          (segments.length == 2 && segments[1].toLowerCase() == 'gallery'))) {
     final name = segments.first;
     if (!const <String>{
       'art',

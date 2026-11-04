@@ -5,6 +5,11 @@ void main() {
   const en = AppStrings.en;
   const zh = AppStrings.zh;
 
+  test('user lookup explains complete usernames in both languages', () {
+    expect(zh.userSearchHint, '输入完整用户名（无需关注）');
+    expect(en.userSearchHint, 'Enter a full username (following not required)');
+  });
+
   test('notificationTypeLabel maps known types (English)', () {
     expect(en.notificationTypeLabel('watched'), 'watched you');
     expect(en.notificationTypeLabel('deviation'), 'posted new work');
