@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/redtidev1918/DAViewer/compare/v0.7.0...v0.7.1) (2026-11-04)
+
+
+### Bug Fixes
+
+* look up authors beyond followed users and open gallery links ([#152](https://github.com/redtidev1918/DAViewer/issues/152)) ([3cba914](https://github.com/redtidev1918/DAViewer/commit/3cba914d5bd2adf868c243e38ca5eb03f914a217))
+
 ## [0.7.0](https://github.com/redtidev1918/DAViewer/compare/v0.6.1...v0.7.0) (2026-10-17)
 
 
