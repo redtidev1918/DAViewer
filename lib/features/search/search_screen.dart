@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme/app_theme.dart';
+import '../../core/data/da_uri.dart';
 import '../../core/feed/artwork_feed_controller.dart';
 import '../../core/l10n/app_strings.dart';
 import '../../shared/widgets/artwork_feed_grid.dart';
@@ -49,8 +50,14 @@ final class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   void _submit(String value) {
+    _debounce?.cancel();
     final query = value.trim();
     if (query.isEmpty) return;
+    final link = parseDeviantArtUrl(query);
+    if (link != null) {
+      context.push(link.route);
+      return;
+    }
     // '#tag' → browse by tag.
     if (query.startsWith('#')) {
       final tag = query.substring(1).trim();
@@ -59,7 +66,6 @@ final class _SearchScreenState extends ConsumerState<SearchScreen> {
         return;
       }
     }
-    _debounce?.cancel();
     setState(() => _query = query);
     ref.read(searchHistoryProvider.notifier).add(query);
   }
@@ -87,7 +93,7 @@ final class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   /// Live search: results appear as the user types, debounced so a rapid burst
   /// of keystrokes triggers only one request. `#tag` navigation and search
-  /// history are still commit-time actions (enter / history tap), not live.
+  /// history and link navigation remain submit-time actions, not live.
   void _onChanged(String value) {
     _debounce?.cancel();
     final query = value.trim();
@@ -95,7 +101,7 @@ final class _SearchScreenState extends ConsumerState<SearchScreen> {
       setState(() => _query = '');
       return;
     }
-    if (query.startsWith('#')) return;
+    if (query.startsWith('#') || parseDeviantArtUrl(query) != null) return;
     _debounce = Timer(const Duration(milliseconds: 450), () {
       if (!mounted) return;
       if (_query != query) setState(() => _query = query);
@@ -108,6 +114,7 @@ final class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   void _clear() {
+    _debounce?.cancel();
     _controller.clear();
     setState(() => _query = '');
   }
@@ -146,8 +153,12 @@ final class _SearchScreenState extends ConsumerState<SearchScreen> {
               controller: _controller,
               autofocus: false,
               decoration: InputDecoration(
-                hintText: s.searchHint,
-                prefixIcon: const Icon(Icons.search),
+                hintText: _mode == 1 ? s.userSearchHint : s.searchHint,
+                prefixIcon: IconButton(
+                  tooltip: s.search,
+                  icon: const Icon(Icons.search),
+                  onPressed: () => _submit(_controller.text),
+                ),
                 suffixIcon: _query.isEmpty
                     ? null
                     : IconButton(

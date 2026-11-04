@@ -157,11 +157,14 @@ final tagPreviewProvider = FutureProvider.autoDispose.family<Artwork?, String>((
   }
 });
 
-/// Searches users by name (official `user/friends/search` endpoint).
+/// Looks up a complete username across DeviantArt, regardless of following.
 final userSearchProvider = FutureProvider.autoDispose
     .family<List<UserProfile>, String>((ref, query) async {
+      final username = query.trim();
+      if (username.isEmpty) return const <UserProfile>[];
       final runtime = ref.watch(runtimeProvider);
-      return OfficialUserRepository(runtime.transport!).searchFriends(query);
+      return OfficialUserLookupRepository(runtime.transport!)
+          .lookup([username]);
     });
 
 /// Personalized search tags derived from the user's interests, weighted:

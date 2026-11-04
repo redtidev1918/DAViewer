@@ -12,6 +12,8 @@
 | T-006 | 文档站系统优化 | DONE | PR #145 已合并（main `00eed67`，merge commit）；CI 全绿（docs/Analyze and test/branch-contract，release 正确 skipping），Pages 部署成功（run 41201701264），实站验收通过：新侧边栏分组、`/en/` 直达 200、新译页 200、meta description 上线、旧 vendor 404。 |
 | T-007 | 认证文档恢复事务节精简 | DONE | PR #146 已合并；zh/en 两侧精简为现行摘要（保留实机验收警示、保守判证规则、诊断导出、状态映射，细节指向 REG-021 与归档），Pages run 41202427693 部署，实站标题已更新。 |
 | T-008 | 文档站信息架构重构（帮助中心/开发者文档） | DONE | PR #147 已合并：docs/help 与 docs/en/help 各 6 个帮助页（以 app_strings 真实 UI 文案为写作依据），authentication/networking 用户内容迁出（单一权威），侧边栏双区、首页「我想……」任务表，现有路径零变动；download 页真实 v0.7.0 JSON 重放同步。CI 全绿（release 正确 skipping），Pages run 41204239255 部署，实站验收：12 个 /help/ 页 200、旧页 200、首页双区与下载页新链接在线。 |
+| T-011 | 画廊链接识别与搜索按钮回归 | IN_PROGRESS | Code Verified；本地 L1 与修复前失败证据见 [REG-027](../docs/regressions/027-gallery-link-search.md)，待 PR CI 与发布。 |
+| T-012 | 作者查询不再局限关注列表 | IN_PROGRESS | Code Verified；证据与精确查询范围见 [REG-028](../docs/regressions/028-global-user-lookup.md)，待 PR CI 与发布。 |
 
 ## 更新规则
 

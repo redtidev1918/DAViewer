@@ -11,7 +11,8 @@ description: Search artworks, users, and #tags; the long-press menu, favourites,
 
 Tap the **Search** tab in the bottom navigation.
 
-- Search for **artworks** or **users**: type a keyword and switch type with the "Artworks / Users" toggle under the search box.
+- Search for **artworks** by keyword; switch type with the "Artworks / Users" toggle under the search box.
+- Find a **user**: select "Users" and enter the complete username (e.g. `cyberxiandou-vore`). Following is not required. Lookup matches complete usernames, not partial names or display names.
 - Search a **tag**: type `#tagname` (e.g. `#digitalpainting`) and press enter to open the tag page. Tag pages sort by Default / New / Popular and list related tags to jump to.
 - Artwork results sort by Default / Newest (menu in the top bar).
 - With no query you'll see recent searches (removable one by one or all at once), recommended tags, and popular tags.

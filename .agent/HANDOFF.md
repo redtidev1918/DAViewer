@@ -2,6 +2,34 @@
 
 > 每次 Coding Agent 会话结束时在顶部追加一节，只记本会话发生的事实与下一步入口。跨会话状态在 [STATUS.md](STATUS.md)，任务在 [TASKS.md](TASKS.md)。
 
+### 2026-11-04 提交发布准备（codex/fix-author-search）
+
+- 本会话改动：同步 origin/main `1216df7` 的 CI/依赖更新后恢复本会话补丁，保留既有 `.zcode/`；修正新 Widget 测试的 Page 同名导入；编写 0.7.1 双语发布说明。远端已有 T-009，故本会话任务顺延为 T-011/T-012。
+- 验证：临时工具链 `/tmp/daviewer-flutter-3.47.1`；本地完整验证与旧代码失败证据见 [REG-028](../docs/regressions/028-global-user-lookup.md)。未执行真实账号查询、实机验收或发布核验，CI/发布待本次 PR；没有把 Code Verified 写成设备验收。
+- 未提交内容与风险：本会话代码、测试、回归、帮助与发布说明即将提交；`.zcode/` 不提交。本次新建备份 stash `codex-search-release-20261104` 已恢复到工作区，保留备份；未应用或删除旧 stash。SDK 位于 /tmp，环境清理后需要重新安装。
+- 下一步入口：等待修复 PR 质量门和候选构建通过，再合并并跟进 release-please 版本 PR、三平台资产与线上下载页。
+
+### 2026-11-04 作者全站用户名查询修复（本地 main，未提交）
+
+- 本会话改动：移除用户搜索对 friends/search 的误用，复用当前 SDK 的全站完整用户名 lookup；空输入不请求；新增双语查询提示与帮助说明，以及 provider 请求路由回归。契约证据与范围见 [REG-028](../docs/regressions/028-global-user-lookup.md)，工程状态见 [T-012](TASKS.md)。不声称支持部分名称或显示名模糊搜索。
+- 验证情况（含未跑的检查）：核对官方 Who Is 文档，并下载核对实际依赖 `dakit_api 1.2.0` 发布源码；格式检查通过（241 文件无变化，flutter_lints 依赖解析警告），diff check 通过。测试先于生产改动编写，但 targeted/full Flutter test 与 analyze 均因 command not found 未能启动，未取得修复前后 Flutter 执行证据。未执行联网账号查询、CI、构建、实机验收；没有提交、推送或发布。
+- 未提交内容与风险：本次新增/修改 `search_providers.dart`、`search_screen.dart`、`app_strings.dart`、`app_strings_test.dart`、`user_search_test.dart`、双语 browse-and-search 帮助与 REG-028、`.agent/`；上次 URL 修复和其测试、REG-027 仍未提交。已有 `.zcode/` 保持原样。当前代码与新测试未通过 Flutter 类型检查或执行验证。
+- 下一步入口：恢复 Flutter SDK 后先执行 `flutter test test/user_search_test.dart test/app_strings_test.dart test/da_uri_test.dart test/search_submission_test.dart --dart-define=DAVIEWER_VERSION=0.7.0`，再按 TESTING.md 跑完整 L1；用真实登录账号查询目标作者补运行证据。
+
+### 2026-11-04 作者搜索范围诊断（只读代码检查）
+
+- 本会话发现：`userSearchProvider` 调用 `OfficialUserRepository.searchFriends(query)` 且不传 username。2026-11-04 核对 [官方 Friends Search 文档](https://deviantart.readme.io/reference/user_friends_search)：该端点搜索关注列表，省略 username 时使用当前认证用户。因此现有「用户」搜索并非全站作者搜索，是已确认的功能范围错误；不能据此判断目标作者不存在。
+- 验证情况（含未跑的检查）：检查了 provider、结果 UI 与本机缓存 SDK 的实现，官方文档独立证实端点范围；未取得用户搜索请求日志或目标账号 API 响应，未运行 Flutter 检查（本机仍缺 SDK）。目标作者这次失败的事件原因仍 Unverified。
+- 未提交内容与风险：本次仅追加交接记录，上个条目的所有未提交代码、测试和已有 `.zcode/` 保持原样。本次没有修复作者搜索，也没有提交、推送或发布。
+- 下一步入口：修复作者搜索时复用现有官方用户查询能力支持完整用户名查找，并明确区分关注列表匹配与全站搜索；先核验官方查询契约，再补回归测试。上次 URL 修复只解决链接导航，不解决作者搜索范围。
+
+### 2026-11-04 画廊链接与搜索按钮（本地 main，未提交）
+
+- 本会话改动：共享解析器接受画廊根链接；搜索页点击放大镜/回车复用解析器，链接不进入关键词防抖请求；补 URL 与 Widget 回归。证据、范围和限制见 [REG-027](../docs/regressions/027-gallery-link-search.md)，任务见 [T-011](TASKS.md)。
+- 验证情况（含未跑的检查）：原始链接修复前返回 null、修复后路由正确；原生 Dart 12 项 URL 检查通过；`dart format --output=none --set-exit-if-changed lib test` 通过（240 文件无变化，缺依赖解析有警告）。未跑 Flutter analyze、Widget/全量测试、CI、构建及实机验收：无可用 Flutter SDK，`flutter` command not found；旧工作区 package_config 指向的 SDK 路径也不存在。没有提交、推送或发布。
+- 未提交内容与风险：`lib/core/data/da_uri.dart`、`lib/features/search/search_screen.dart`、`test/da_uri_test.dart`、`test/search_submission_test.dart`、REG-027 与本次 `.agent/` 文档；Widget 测试尚未运行。会话前已存在的未跟踪 `.zcode/` 保持原样，不提交、不删除。
+- 下一步入口：恢复 Flutter SDK 后，先跑 `flutter test test/da_uri_test.dart test/search_submission_test.dart --dart-define=DAVIEWER_VERSION=0.7.0`，再按 TESTING.md 执行 L1。目标账号页面抓取失败，实际联网加载未验证。
+
 ### 2026-10-31 PR #147（分支 docs/help-center）
 
 - 本会话改动：文档站信息架构重构（应用户诊断「文档是工程交接记录而非使用说明书」）——新增双语帮助中心 12 页（`docs/help/` + `docs/en/help/`：快速上手、登录与账号、网络与代理、浏览与搜索、下载与保存、常见问题），写作依据为 `lib/core/l10n/app_strings.dart` 真实 UI 文案；authentication/networking（zh/en）用户操作内容迁出、仅保留实现契约并指向帮助中心；侧边栏双区（使用帮助/开发者文档）与首页「我想……」任务表重排（sidebar.generated.mjs 由固定 SHA 工具再生成）；download 页用真实 v0.7.0 JSON 本地重放同步新链接；根 README 用户任务行改指帮助页。**现有页面路径零变动**。
