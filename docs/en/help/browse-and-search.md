@@ -15,7 +15,9 @@ Tap the **Search** tab in the bottom navigation.
 - Find a **user**: select "Users" and enter the complete username (e.g. `cyberxiandou-vore`). Following is not required. Lookup matches complete usernames, not partial names or display names.
 - Search a **tag**: type `#tagname` (e.g. `#digitalpainting`) and press enter to open the tag page. Tag pages sort by Default / New / Popular and list related tags to jump to.
 - Artwork results sort by Default / Newest (menu in the top bar).
-- With no query you'll see recent searches (removable one by one or all at once), recommended tags, and popular tags.
+- With no query you'll see recent searches, recommended tags, and popular tags. Up to 100 searches are saved locally; the latest five appear first, with "View all" to expand the list.
+- Tap a record to repeat it. `#tag` records have a tag icon and reopen the tag page. Submitting a tag or tapping a recommended/popular tag saves it; repeats move to the top.
+- Use the × beside a record to remove just that entry. "Clear history" removes all local searches after confirmation.
 
 ## Long-press menu
 

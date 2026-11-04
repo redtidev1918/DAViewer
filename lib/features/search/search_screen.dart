@@ -62,6 +62,7 @@ final class _SearchScreenState extends ConsumerState<SearchScreen> {
     if (query.startsWith('#')) {
       final tag = query.substring(1).trim();
       if (tag.isNotEmpty) {
+        ref.read(searchHistoryProvider.notifier).add('#$tag');
         context.push('/tag/${Uri.encodeComponent(tag)}');
         return;
       }
@@ -224,7 +225,7 @@ final class _SearchIdleView extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: <Widget>[
-        // Recent searches first, compact like tags.
+        // Recent searches stay separate from discovery tags.
         _SearchHistorySection(onSelect: onSelect),
         if (recommended.isNotEmpty) ...[
           const Divider(),
@@ -300,7 +301,10 @@ final class _TagPreviewCard extends ConsumerWidget {
       width: 132,
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
-        onTap: () => context.push('/tag/${Uri.encodeComponent(tag)}'),
+        onTap: () {
+          ref.read(searchHistoryProvider.notifier).add('#$tag');
+          context.push('/tag/${Uri.encodeComponent(tag)}');
+        },
         child: Card(
           margin: EdgeInsets.zero,
           clipBehavior: Clip.antiAlias,
@@ -363,13 +367,22 @@ final class _TagPreviewCard extends ConsumerWidget {
 }
 
 /// The recent-search history list (with per-item delete and clear-all).
-final class _SearchHistorySection extends ConsumerWidget {
+final class _SearchHistorySection extends ConsumerStatefulWidget {
   const _SearchHistorySection({required this.onSelect});
 
   final ValueChanged<String> onSelect;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SearchHistorySection> createState() =>
+      _SearchHistorySectionState();
+}
+
+final class _SearchHistorySectionState
+    extends ConsumerState<_SearchHistorySection> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
     final s = strings(ref.watch(appLanguageProvider));
     final theme = Theme.of(context);
     final history = ref.watch(searchHistoryProvider);
@@ -400,39 +413,68 @@ final class _SearchHistorySection extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Row(
             children: <Widget>[
-              Text(s.recent, style: theme.textTheme.titleSmall),
-              const Spacer(),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(s.recent, style: theme.textTheme.titleSmall),
+                    Text(
+                      s.searchHistoryCount(history.length),
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
               TextButton(
-                onPressed: () =>
-                    ref.read(searchHistoryProvider.notifier).clear(),
-                child: Text(s.clearHistory),
+                onPressed: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text(s.clearSearchHistory),
+                      content: Text(s.clearSearchHistoryConfirm),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: Text(s.cancel),
+                        ),
+                        FilledButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: Text(s.clearSearchHistory),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true && mounted) {
+                    setState(() => _expanded = false);
+                    await ref.read(searchHistoryProvider.notifier).clear();
+                  }
+                },
+                child: Text(s.clearSearchHistory),
               ),
             ],
           ),
         ),
-        // Compact chips, like tags, instead of tall list tiles.
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: <Widget>[
-              for (final item in history)
-                InputChip(
-                  avatar: Icon(
-                    Icons.history,
-                    size: 16,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  label: Text(item),
-                  onPressed: () => onSelect(item),
-                  deleteButtonTooltipMessage: s.deleteAction,
-                  onDeleted: () =>
-                      ref.read(searchHistoryProvider.notifier).remove(item),
-                ),
-            ],
+        for (final item in _expanded ? history : history.take(5))
+          ListTile(
+            leading: Icon(item.startsWith('#') ? Icons.tag : Icons.history),
+            title: Tooltip(
+              message: item,
+              child: Text(item, maxLines: 2, overflow: TextOverflow.ellipsis),
+            ),
+            onTap: () => widget.onSelect(item),
+            trailing: IconButton(
+              tooltip: s.deleteAction,
+              icon: const Icon(Icons.close),
+              onPressed: () =>
+                  ref.read(searchHistoryProvider.notifier).remove(item),
+            ),
           ),
-        ),
+        if (history.length > 5)
+          TextButton.icon(
+            onPressed: () => setState(() => _expanded = !_expanded),
+            icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+            label: Text(_expanded ? s.showLessHistory : s.viewAllHistory),
+          ),
         const SizedBox(height: 8),
       ],
     );

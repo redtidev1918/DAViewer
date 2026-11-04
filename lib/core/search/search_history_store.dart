@@ -11,7 +11,7 @@ import '../storage/storage_queue.dart';
 final class SearchHistoryStore {
   const SearchHistoryStore._();
 
-  static const int _maxEntries = 20;
+  static const int _maxEntries = 100;
   static const String _fileName = 'search_history.json';
   static final _queue = StorageQueue();
 

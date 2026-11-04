@@ -752,6 +752,16 @@ final class AppStrings {
       ? '输入关键词搜索作品，或输入 #标签 浏览标签。'
       : 'Search artworks, or type #tag to browse a tag.';
   String get recent => _lang == AppLanguage.zh ? '搜索记录' : 'Recent';
+  String searchHistoryCount(int count) => _lang == AppLanguage.zh
+      ? '$count 条记录 · 最近搜索在前'
+      : '$count ${count == 1 ? 'search' : 'searches'} · Most recent first';
+  String get viewAllHistory => _lang == AppLanguage.zh ? '查看全部' : 'View all';
+  String get showLessHistory => _lang == AppLanguage.zh ? '收起记录' : 'Show less';
+  String get clearSearchHistory =>
+      _lang == AppLanguage.zh ? '清空记录' : 'Clear history';
+  String get clearSearchHistoryConfirm => _lang == AppLanguage.zh
+      ? '清空本机的全部搜索记录？此操作无法撤销。'
+      : 'Clear all search history on this device? This cannot be undone.';
   String get noUsersFound =>
       _lang == AppLanguage.zh ? '无搜索结果' : 'No users found';
 

@@ -2,9 +2,9 @@
 
 > 当前工程状态的摘要快照，每次重要任务结束或发布后更新。任务进度的权威是 [TASKS.md](TASKS.md)；CI、Release、PR 的平台事实以 GitHub 为准，本文件不复制它们。
 
-- 更新时间：2026-11-04（链接与作者查询修复准备 v0.7.1）
-- 当前版本：v0.7.0+239（2026-10-17 发布并核验，见 [CHANGELOG](../CHANGELOG.md)）
-- 分支：`codex/fix-author-search` 基于最新 `origin/main`；验证与交付状态见 [T-011 / T-012](TASKS.md)。
+- 更新时间：2026-11-04（v0.7.2 发布准备）
+- 当前版本：v0.7.1+240（Release Verified，见 [REG-028](../docs/regressions/028-global-user-lookup.md)）
+- 分支：`codex/improve-search-history` 基于 v0.7.1 源码；已同步最新 main，搜索历史改进准备提交，见 [HANDOFF.md](HANDOFF.md) 最新条目。
 - 开发阶段：常规开发。2026-10-16 P0 会话恢复任务关闭后曾宣布维护模式，实际自 v0.5.23 起恢复功能开发（v0.6.0 登录状态分通道、v0.7.0 本地内容过滤）。
 - 依赖：DAKit 已发布版本 `dakit_api 1.2.0` / `dakit_core 2.0.0` / `dakit_web 0.3.1` / `dakit_flutter 1.1.0`；SDK 联合验证固定 SHA `f489f52`（`.github/workflows/sdk-integration.yml`）。
 
@@ -15,9 +15,9 @@
 
 ## 当前工作
 
-链接与作者查询已 Code Verified，正在提交发布；证据与尚未验证范围见 [REG-028](../docs/regressions/028-global-user-lookup.md)。
+搜索修复发布状态见 [T-011 / T-012 / T-013](TASKS.md)。搜索历史扩容与列表改进已在本地 Code Verified，见 [T-014](TASKS.md)；用户已恢复发版部署授权，交付进度见 [T-015](TASKS.md)。
 
-VitePress 迁移（T-005）与文档站系统优化（T-006，PR #145）均已完成并上线：导航补全、英文补全、docsify 残留清理、逐页 frontmatter SEO；实站验收通过（新侧边栏分组、`/en/` 直达、新译页、meta description、旧 vendor 404）。客户端版本保持 v0.7.0+239 未动。
+VitePress 迁移（T-005）与文档站系统优化（T-006，PR #145）均已完成并上线：导航补全、英文补全、docsify 残留清理、逐页 frontmatter SEO；实站验收通过（新侧边栏分组、`/en/` 直达、新译页、meta description、旧 vendor 404）。文档任务不承担当前客户端发布状态。
 
 ## 更新纪律
 
