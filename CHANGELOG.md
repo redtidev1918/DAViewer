@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/redtidev1918/DAViewer/compare/v0.7.1...v0.7.2) (2026-11-04)
+
+
+### Bug Fixes
+
+* make search history clearer and retain tag searches ([#154](https://github.com/redtidev1918/DAViewer/issues/154)) ([8c27b03](https://github.com/redtidev1918/DAViewer/commit/8c27b03457284332f7153fa25407c0c008911f14))
+
 ## [0.7.1](https://github.com/redtidev1918/DAViewer/compare/v0.7.0...v0.7.1) (2026-11-04)
 
 
