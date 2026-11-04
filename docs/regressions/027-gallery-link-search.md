@@ -31,4 +31,5 @@ Status: Partial
 - Flutter verification was initially Blocked by Environment. During release
   preparation on 2026-11-04 an isolated Flutter 3.47.1 toolchain was installed;
   old-code failures and fixed-code checks are recorded in [REG-028](028-global-user-lookup.md).
-  Target-account loading, CI, release and device acceptance remain Unverified.
+  CI Verified evidence is linked there; target-account loading and device
+  acceptance remain Unverified.

@@ -28,13 +28,20 @@ void main() {
     await directory.delete(recursive: true);
   });
 
-  test('concurrent additions retain the newest 20 queries', () async {
+  test('concurrent additions retain the newest 100 queries', () async {
     final writes = [
-      for (var i = 0; i < 30; i++) SearchHistoryStore.add('query $i'),
+      for (var i = 0; i < 110; i++) SearchHistoryStore.add('query $i'),
     ];
     final read = SearchHistoryStore.load();
     await Future.wait(writes);
-    expect(await read, [for (var i = 29; i >= 10; i--) 'query $i']);
+    expect(await read, [for (var i = 109; i >= 10; i--) 'query $i']);
+    await SearchHistoryStore.add('query 20');
+    final reloaded = await SearchHistoryStore.load();
+    expect(reloaded, [
+      'query 20',
+      for (var i = 109; i >= 10; i--)
+        if (i != 20) 'query $i',
+    ]);
   });
 
   test('add, remove, clear and read respect invocation order', () async {

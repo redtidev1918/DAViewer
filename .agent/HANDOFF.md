@@ -2,6 +2,22 @@
 
 > 每次 Coding Agent 会话结束时在顶部追加一节，只记本会话发生的事实与下一步入口。跨会话状态在 [STATUS.md](STATUS.md)，任务在 [TASKS.md](TASKS.md)。
 
+### 2026-11-04 搜索历史 0.7.2 发布准备
+
+- 用户已恢复发版部署授权；同步 origin/main `ddc28fc` 的 0.7.1 下载页提交，保留本地历史改动与既有 `.zcode/`。本次按 `fix:` 准备 0.7.2，中文发布说明随修复先进入 main。
+- 验证：Flutter 3.47.1、当前 manifest 0.7.1 define；format/analyze 与全部 658 测试通过；docs build、固定 docsite check 9/9 与 navcheck 通过。旧代码失败与原生界面渲染证据见 [REG-029](../docs/regressions/029-search-history-list.md)。未做真实账号/Android 实机验收；远端 CI、正式安装包与下载页验收待本次发布。
+- 未提交内容与风险：本次搜索历史代码/测试/双语帮助、REG-029、0.7.2 发布说明和 `.agent/` 即将提交；另包含待提交的 0.7.1 发布证据回填。`.zcode/` 不提交、不删除。SDK 位于 `/tmp/daviewer-flutter-3.47.1`。
+- 下一步入口：T-015 跟进修复 PR 全部质量门与三平台候选，再合并版本 PR，核验正式 Release 及线上下载页。
+
+### 2026-11-04 搜索历史列表与标签记录（本地未提交）
+
+- 用户要求：20 条容量过少，参考成熟现代应用让搜索历史更直观，并纳入标签搜索；同时保持后续发布手动操作暂停。
+- 本会话改动：100 条容量、最近 5 条预览/展开全部、总数与最近优先说明、独立列表行与删除按钮、清空确认；输入提交与推荐/热门标签点击记录 `#tag`，历史点击重开标签页。复用现有 JSON/队列/导航，无新依赖。设计参考、完整契约与验证证据见 [REG-029](../docs/regressions/029-search-history-list.md)。
+- 验证：旧 v0.7.1 存储/界面对新检查出现 9 项行为失败；修复后 Flutter 3.47.1 analyze、format、658 项全量测试通过；随后补齐英文单数文案并通过 app_strings 定向测试。原生 Widget 浅/深色 390×844 中文样例渲染已检查；文档构建通过。未跑远端 CI、未构建新安装包、未做 Android/真实账号实机验收。本次没有提交、推送或新发版。
+- 发布说明：此前已经启动的 0.7.1 发布工作流自动结束；本会话仅只读核验发布资产/元数据/digest 和线上中英下载链接，见 [REG-028 发布验收](../docs/regressions/028-global-user-lookup.md)。0.7.1 不含本次历史改动。
+- 未提交内容与风险：当前分支 `codex/improve-search-history` 基于发布源码 `89f1260`，含历史改动的 lib（store/screen/strings）、测试（store/screen/strings）、双语浏览搜索帮助、REG-029 和 `.agent/`；另含先前待提交的 REG-027/028 发布证据更新。既有 `.zcode/` 保留不动。尚未同步发布后自动下载页提交，准备提交时先 fetch 核对最新 main。仅本机预览/测试通过，不声称 CI 或设备验收。
+- 下一步入口：用户恢复提交/发布授权后，先整理并提交当前补丁，再走 PR/notes-first 发布流程。工具链仍在 `/tmp/daviewer-flutter-3.47.1`；预览图位于本次 Codex visualization 目录的 `search-history-light.png` / `search-history-dark.png`。禁止混入旧 stash 或 `.zcode/`。
+
 ### 2026-11-04 提交发布准备（codex/fix-author-search）
 
 - 本会话改动：同步 origin/main `1216df7` 的 CI/依赖更新后恢复本会话补丁，保留既有 `.zcode/`；修正新 Widget 测试的 Page 同名导入；编写 0.7.1 双语发布说明。远端已有 T-009，故本会话任务顺延为 T-011/T-012。

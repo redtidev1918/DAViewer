@@ -5,6 +5,20 @@ void main() {
   const en = AppStrings.en;
   const zh = AppStrings.zh;
 
+  test('search history controls and confirmation are localized', () {
+    expect(zh.searchHistoryCount(100), '100 条记录 · 最近搜索在前');
+    expect(en.searchHistoryCount(100), '100 searches · Most recent first');
+    expect(en.searchHistoryCount(1), '1 search · Most recent first');
+    expect(zh.viewAllHistory, '查看全部');
+    expect(en.viewAllHistory, 'View all');
+    expect(zh.showLessHistory, '收起记录');
+    expect(en.showLessHistory, 'Show less');
+    expect(zh.clearSearchHistory, '清空记录');
+    expect(en.clearSearchHistory, 'Clear history');
+    expect(zh.clearSearchHistoryConfirm, contains('无法撤销'));
+    expect(en.clearSearchHistoryConfirm, contains('cannot be undone'));
+  });
+
   test('user lookup explains complete usernames in both languages', () {
     expect(zh.userSearchHint, '输入完整用户名（无需关注）');
     expect(en.userSearchHint, 'Enter a full username (following not required)');
